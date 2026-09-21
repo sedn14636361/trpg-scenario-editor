@@ -1,0 +1,8 @@
+# この場所には、このアプリと関係のないファイルも置いてある。
+# 取りこぼしを防ぐため「まず全部よける」→「必要なものだけ戻す」形にしている。
+/*
+!/.gitignore
+!/LICENSE
+!/README.md
+!/trpgscenarioeditor.html
+!/docs/
