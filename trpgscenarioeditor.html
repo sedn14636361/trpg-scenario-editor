@@ -466,7 +466,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.1.5</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.1.6</span>
     <button id="btnSide" title="パネルの表示切替">&#9776;</button>
     <button id="btnPages" title="表紙から奥付まで、全ページを一覧で見る（Ctrl+Shift+P）">ページ一覧</button>
     <button id="btnProp" title="選んだ段落の設定欄（紙面の隣）を出し入れします">設定欄</button>
@@ -6727,10 +6727,20 @@ npcOn('click', e=>{
   }
 });
 /* 色や書体ごと貼り付くと、紙面で文字が白く飛んだりする。
-   どの入力欄でも、貼り付けは素の文字だけにする。 */
+   どの入力欄でも、貼り付けは素の文字だけにする。
+
+   別窓の窓は受け口が二重になっている。窓ぜんたい（#popDlg）に構えたこれと、
+   その内側にある「テキスト」欄（#popSrc）と「プレビュー」欄（#popBlocks）の受け口である。
+   外側のこれは捕まえる向き（capture）なので内側より先に走り、preventDefault だけして
+   伝わるのは止めないため、内側がもう一度入れて文字が二重になっていた。
+   内側に受け口があるところは、そちらに任せて何もしない。
+   （#popSrc の受け口は、空行で区切った文章を段落ごとに分けて取り込む働きも持っているので、
+     こちらが先に入れてしまうとその働きも失われる） */
 function plainPaste(e){
   const t = e.target;
   if(!t || !(t.isContentEditable || t.tagName==='INPUT' || t.tagName==='TEXTAREA')) return;
+  if(e.currentTarget && e.currentTarget.id==='popDlg' && t.closest
+     && (t.closest('#popBlocks') || t.closest('#popSrc .srctext[contenteditable=true]'))) return;
   const cd = e.clipboardData || window.clipboardData; if(!cd) return;
   const txt = cd.getData('text/plain');
   if(txt==null) return;
