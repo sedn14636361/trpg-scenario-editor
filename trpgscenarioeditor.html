@@ -359,6 +359,18 @@ kbd{background:#0e1219;border:1px solid var(--line);border-radius:3px;padding:0 
 /* 別窓のウィンドウの中の「テキスト」欄。左の文章欄と同じ作りにする */
 #popSrc .src{margin:0 0 2px}
 #popSrc .srcgut{display:none}
+/* 別窓じぶんのパネル。本窓の左のパネルと同じ見た目にそろえる。
+   本窓のものを持ってくるのではなく別に作ってあるので、
+   別窓を開いているあいだも本窓のパネルはそのまま使える */
+#popSide{flex:0 0 250px;min-width:150px;max-width:420px;overflow:auto;
+  padding:10px 12px 24px;background:var(--panel);border-right:1px solid var(--line)}
+#popSide.hide{display:none}
+#popSide.hide + .splitter{display:none}
+#popSrc.hide{display:none}
+#popSrc.hide + .splitter{display:none}
+#popProp.hide{display:none !important}
+#popProp.hide + .splitter,.splitter#splitPopProp.hide{display:none}
+#popSideInfo{margin:0 0 8px}
 /* 左の文章欄に出す、別窓の中身 */
 .srcpop{margin:2px 0 6px 22px;border-left:2px solid var(--brass);padding-left:8px}
 .srcpophd{font-size:10px;color:var(--brass);letter-spacing:.08em;padding:3px 0 2px}
@@ -466,7 +478,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.1.6</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.1.7</span>
     <button id="btnSide" title="パネルの表示切替">&#9776;</button>
     <button id="btnPages" title="表紙から奥付まで、全ページを一覧で見る（Ctrl+Shift+P）">ページ一覧</button>
     <button id="btnProp" title="選んだ段落の設定欄（紙面の隣）を出し入れします">設定欄</button>
@@ -745,6 +757,9 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
       placeholder="くわしく" title="この名前が紙面のボタンになります。升目からは ＠この名前 で指せます">
     <span class="hint" id="popHint" style="margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">空行で段落。下のボタンで見出し・箇条書き・表などを入れられます</span>
     <span class="sp" style="flex:1;min-width:0"></span>
+    <button id="popBtnSide" style="flex:0 0 auto" title="この窓の左のパネルを出し入れします">&#9776;</button>
+    <button id="popBtnSrc" style="flex:0 0 auto;white-space:nowrap" title="この窓のテキスト欄を出し入れします">テキスト</button>
+    <button id="popBtnProp" style="flex:0 0 auto;white-space:nowrap" title="この窓の右の設定欄を出し入れします">設定欄</button>
     <button id="popClose" style="flex:0 0 auto;white-space:nowrap">閉じる</button>
   </div>
   <div id="popRich" style="flex:0 0 auto;display:flex;flex-wrap:wrap;gap:5px;padding:8px 12px;
@@ -757,12 +772,39 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
       font-size:13px;line-height:1.9"></div>
   </div>
   <div id="popMain" style="flex:1;display:none;min-height:0">
+    <aside id="popSide">
+      <div id="popSideInfo" class="hint"></div>
+      <div id="popTypeBtns"></div>
+      <label class="f">選んだ段落を</label>
+      <div class="grid2">
+        <button data-popact="mvUp">&#8593; 上へ</button>
+        <button data-popact="mvDn">&#8595; 下へ</button>
+      </div>
+      <div class="grid2" style="margin-top:6px">
+        <button data-popact="mergeBlk">結合</button>
+        <button data-popact="dupBlk">複製</button>
+      </div>
+      <div class="grid2" style="margin-top:6px">
+        <button data-popact="addBlk">下に追加</button>
+        <button data-popact="delBlk" class="danger">削除</button>
+      </div>
+      <div class="grid2" style="margin-top:6px">
+        <button data-popact="btnCopyAll" title="選んだ段落の文章だけをコピーします">文章をコピー</button>
+        <button data-popact="btnDesel" title="どの段落も選ばない状態にします（Escでも同じ）">選択を外す</button>
+      </div>
+      <div class="grid2" style="margin-top:6px">
+        <button data-popact="blkCopy" title="選んだ段落まるごと控えます">ブロックをコピー</button>
+        <button data-popact="blkPaste" title="控えた段落を下に入れます">貼り付け</button>
+      </div>
+    </aside>
+    <div class="splitter" id="splitPopSide" title="つかむと幅が変わります"></div>
     <div id="popSrc" style="flex:0 1 250px;min-width:110px;overflow:auto;padding:10px 10px 40px;
       border-right:1px solid var(--line);background:var(--panel);line-height:1.75"></div>
     <div class="splitter" id="splitPopSrc" title="つかむと幅が変わります"></div>
     <div id="popBlockWrap" style="flex:1;min-width:220px;overflow:auto;background:#555;padding:14px">
       <div id="popBlocks" class="popsheet"></div>
     </div>
+    <div class="splitter" id="splitPopProp" title="つかむと幅が変わります"></div>
     <div id="popProp" style="flex:0 1 250px;min-width:110px;display:none;flex-direction:column;
       border-left:1px solid var(--line);background:var(--panel)">
       <div id="popPropHead" style="flex:0 0 auto;padding:8px 10px;border-bottom:1px solid var(--line);
@@ -6025,8 +6067,23 @@ function placeProps(b){
   const hostR= document.getElementById(inPop ? 'popPropHostR' : 'propHostR');
   if(box.parentElement !== slot) slot.appendChild(box);
   if(cm.parentElement !== hostR) hostR.appendChild(cm);
-  document.getElementById('popProp').style.display = inPop ? 'flex' : 'none';
+  const pp = document.getElementById('popProp');
+  /* 段落を選べば自動で出る。popPropForce は「選んでいなくても出しておく」ための入り切り */
+  pp.style.display = (inPop || popPropForce) ? 'flex' : 'none';
+  if(!inPop && popPropForce)
+    document.getElementById('popPropHead').textContent = '設定（この窓の段落を選ぶと出ます）';
+  syncPopBar();
   return inPop;
+}
+/* 別窓の帯の、出し入れボタンの入り／切りの見た目 */
+let popPropForce = false;
+function syncPopBar(){
+  const a = document.getElementById('popBtnSide'), b2 = document.getElementById('popBtnProp');
+  const sd = document.getElementById('popSide'), pp = document.getElementById('popProp');
+  const sc = document.getElementById('popBtnSrc'), sr = document.getElementById('popSrc');
+  if(a && sd) a.classList.toggle('on', !sd.classList.contains('hide'));
+  if(sc && sr) sc.classList.toggle('on', !sr.classList.contains('hide'));
+  if(b2 && pp) b2.classList.toggle('on', pp.style.display!=='none');
 }
 function popWinList(){
   const f = popId ? findBlock(popId) : null;
@@ -6797,6 +6854,7 @@ function openPopup(id){
   const w = document.getElementById('popDlg');
   w.style.display='flex';
   placeFloatWin(w);
+  syncBlockPanel(); fitPopPanes(); syncPopBar();
   popSeeThruBySel();
 }
 /* ---- 画面の中に浮く窓 ----
@@ -6813,12 +6871,18 @@ function placeFloatWin(w){
     const z = pp ? pp.getBoundingClientRect() : null;
     /* 「テキスト」の右から置く。左端から置くとテキストの欄が窓の下に隠れてしまい、
        段落の取っ手をつかめず、窓へ運べなくなる */
-    const x0 = a ? a.right+8 : 40;
-    const x1 = (z && z.width>0) ? z.left-8 : innerWidth-40;
+    let x0 = a ? a.right+8 : 40;
+    /* 別窓はじぶんの設定欄を持っているので、本窓の右の設定欄までなら覆ってかまわない */
+    const x1 = (w.id==='popDlg') ? innerWidth-16
+             : (z && z.width>0) ? z.left-8 : innerWidth-40;
+    /* 別窓は中に4つの欄を並べるが、幅が足りなくても左へは伸ばさない。
+       本窓のテキストを覆うと、紙面の段落をつかんでこの窓へ運べなくなるため。
+       代わりに、入りきらないときは窓の側で「テキスト」欄をたたんで開く（fitPopPanes）*/
     g = fwGeo[w.id] = (x1-x0 > 420)
       ? { w: Math.round(x1-x0), h: Math.min(700, innerHeight-(a?a.top:60)-32),
           x: Math.round(x0),    y: Math.round((a?a.top:60)+8) }
-      : { w: Math.min(1000, innerWidth-80), h: Math.min(680, innerHeight-100), x:null, y:null };
+      : { w: Math.min(w.id==='popDlg' ? 1180 : 1000, innerWidth-40),
+          h: Math.min(680, innerHeight-100), x:null, y:null };
   }
   g.w = Math.max(460, Math.min(g.w, innerWidth-20));
   g.h = Math.max(220, Math.min(g.h, innerHeight-20));
@@ -6877,14 +6941,15 @@ addEventListener('resize', ()=>{
   const w=document.getElementById('popDlg');
   if(w && w.style.display==='flex') placeFloatWin(w);
 });
-/* 別窓の中の「テキスト」欄も、本窓の仕切りと同じ要領で幅を変えられるようにする */
-(function initPopSplitter(){
-  const sp = document.getElementById('splitPopSrc');
-  const src = document.getElementById('popSrc');
-  if(!sp || !src) return;
+/* 別窓の中の仕切り。本窓と同じ要領で、つかむと隣の欄の幅が変わる。
+   dir は「仕切りのどちら側の欄を伸び縮みさせるか」。
+   左の欄なら右へ引くと広がり、右の欄なら右へ引くと狭まる。 */
+function bindPopSplitter(spId, elId, dir, min, def){
+  const sp = document.getElementById(spId), el = document.getElementById(elId);
+  if(!sp || !el) return;
   let drag=null;
   sp.addEventListener('pointerdown', e=>{
-    drag = {x:e.clientX, w:src.offsetWidth};
+    drag = {x:e.clientX, w:el.offsetWidth};
     document.body.classList.add('resizing');
     sp.classList.add('drag');
     sp.setPointerCapture && sp.setPointerCapture(e.pointerId);
@@ -6893,10 +6958,15 @@ addEventListener('resize', ()=>{
   addEventListener('pointermove', e=>{
     if(!drag) return;
     const main = document.getElementById('popMain');
-    const prop = document.getElementById('popProp');
-    const propW = (prop && prop.style.display!=='none') ? prop.offsetWidth : 0;
-    const max = Math.max(110, (main?main.clientWidth:600) - 220 - 6 - propW);
-    src.style.flex = '0 1 '+Math.max(110, Math.min(drag.w + (e.clientX-drag.x), max))+'px';
+    /* 紙面の欄（popBlockWrap）が潰れないところまでを限りにする */
+    const others = ['popSide','popSrc','popProp'].reduce((a,id)=>{
+      if(id===elId) return a;
+      const x = document.getElementById(id);
+      return a + (x && x.offsetParent && x.style.display!=='none' ? x.offsetWidth+6 : 0);
+    }, 0);
+    const max = Math.max(min, (main?main.clientWidth:600) - 220 - 6 - others);
+    const d = (dir==='left') ? (e.clientX-drag.x) : (drag.x-e.clientX);
+    el.style.flex = '0 1 '+Math.max(min, Math.min(drag.w + d, max))+'px';
   });
   addEventListener('pointerup', ()=>{
     if(!drag) return;
@@ -6904,8 +6974,47 @@ addEventListener('resize', ()=>{
     document.body.classList.remove('resizing');
     sp.classList.remove('drag');
   });
-  sp.addEventListener('dblclick', ()=>{ src.style.flex='0 1 250px'; });
-})();
+  sp.addEventListener('dblclick', ()=>{ el.style.flex='0 1 '+def+'px'; });
+}
+bindPopSplitter('splitPopSide','popSide','left', 150, 250);
+bindPopSplitter('splitPopSrc', 'popSrc', 'left', 110, 250);
+bindPopSplitter('splitPopProp','popProp','right',110, 250);
+/* 帯の出し入れボタン */
+document.getElementById('popBtnSide').onclick = ()=>{
+  document.getElementById('popSide').classList.toggle('hide');
+  popPanesTouched = true;
+  syncPopBar();
+};
+document.getElementById('popBtnSrc').onclick = ()=>{
+  document.getElementById('popSrc').classList.toggle('hide');
+  popPanesTouched = true;
+  syncPopBar();
+};
+/* 窓が狭いと4つの欄は並びきらない。はじめて開くときだけ、
+   いちばん譲りやすい「テキスト」欄をたたんでおく。
+   （同じ中身は右の紙面にも出ているので、ここが無くても書ける）
+   いちど自分で出し入れしたあとは、その決めを尊重して触らない */
+let popPanesTouched = false;
+function fitPopPanes(){
+  if(popPanesTouched) return;
+  const main = document.getElementById('popMain');
+  if(!main || !main.clientWidth) return;
+  /* パネル250＋テキスト250＋紙面220＋設定250＋仕切り18 */
+  document.getElementById('popSrc').classList.toggle('hide', main.clientWidth < 988);
+}
+document.getElementById('popBtnProp').onclick = ()=>{
+  const pp = document.getElementById('popProp');
+  if(pp.style.display==='none'){
+    popPropForce = true;
+    pp.style.display = 'flex';
+    if(!document.getElementById('popPropSlot').children.length)
+      document.getElementById('popPropHead').textContent = '設定（この窓の段落を選ぶと出ます）';
+  }else{
+    popPropForce = false;
+    pp.style.display = 'none';
+  }
+  syncPopBar();
+};
 /* ================= 流れ図の編集窓 =================
    図そのものは紙面とまったく同じ組み方（flowHTML）を拡大して見せ、
    その上に「つかむところ」だけを重ねる。だから編集中の見え方と紙面が食い違わない。 */
@@ -7528,7 +7637,7 @@ function setPopMode(p){
   document.getElementById('popTextWrap').style.display  = blk ? 'none' : 'flex';
   document.getElementById('popMain').style.display      = blk ? 'flex' : 'none';
   document.getElementById('popHint').textContent = blk
-    ? '紙面と同じように書けます。書式は左のパネルのボタンで'
+    ? 'この窓の左のパネルで書式を、右の設定欄で細かいところを決められます'
     : '空行で段落。下のボタンで見出し・箇条書き・表などを入れられます';
   if(blk){ renderPopWin(); } else drawPopupPreview();
 }
@@ -7856,14 +7965,45 @@ function setSrcView(v){
   renderSrc();
 }
 let imgReplaceId=null;
+/* 別窓の中では意味を持たない書式。
+   改ページ・改段はページが無いところでは効かず、表紙・奥付・目次はページ番号を伴うものなので、
+   別窓のパネルには並べない */
+const POP_SKIP = ['break','colbr','cover','colophon','toc'];
+/* 書式ボタンの中身。本窓の左のパネルと別窓のパネルで同じものを使う */
+function typeBtnsHTML(skip){
+  const no = skip || [];
+  return TYPE_GROUPS.map(g=>{
+    const list = TYPES.filter(t=>t.g===g && no.indexOf(t.k)<0);
+    if(!list.length) return '';
+    return '<div class="tgrp"><b>'+g+'</b><div>'
+      + list.map(t=>'<button class="tk" data-k="'+t.k+'" title="Ctrl+Shift+'+t.s
+          +'（Ctrl+Alt+'+t.s+' でも同じ。段落を選んでいれば書式を変える／選んでいなければ末尾に足す）">'
+          +t.n+'<small>Ctrl+Shift+'+t.s+'</small></button>').join('')
+      + '</div></div>';
+  }).join('');
+}
 const tb=document.getElementById('typeBtns');
-tb.innerHTML = TYPE_GROUPS.map(g=>
-  '<div class="tgrp"><b>'+g+'</b><div>'
-  + TYPES.filter(t=>t.g===g).map(t=>'<button class="tk" data-k="'+t.k+'" title="Ctrl+Shift+'+t.s
-      +'（Ctrl+Alt+'+t.s+' でも同じ。段落を選んでいれば書式を変える／選んでいなければ末尾に足す）">'
-      +t.n+'<small>Ctrl+Shift+'+t.s+'</small></button>').join('')
-  + '</div></div>').join('');
+tb.innerHTML = typeBtnsHTML();
 tb.addEventListener('click',e=>{const b=e.target.closest('button[data-k]');if(b)setType(b.dataset.k);});
+/* 別窓じぶんのパネル。書式は本窓と同じ setType を呼び、
+   段落の操作は本窓の同じボタンを押しに行くだけにしてある。
+   二か所に同じ処理を書くと、片方だけ直し忘れるため */
+(function initPopSide(){
+  const ps = document.getElementById('popTypeBtns');
+  ps.innerHTML = typeBtnsHTML(POP_SKIP);
+  ps.addEventListener('click',e=>{const b=e.target.closest('button[data-k]');if(b)setType(b.dataset.k);});
+  document.getElementById('popSide').addEventListener('click',e=>{
+    const b=e.target.closest('button[data-popact]'); if(!b || b.disabled) return;
+    const o=document.getElementById(b.dataset.popact); if(o && !o.disabled) o.click();
+  });
+})();
+/* 別窓のパネルのボタンは、本窓の同じボタンの「押せる／押せない」を写す */
+function syncPopSideBtns(){
+  document.querySelectorAll('#popSide [data-popact]').forEach(b=>{
+    const o=document.getElementById(b.dataset.popact);
+    if(o) b.disabled = !!o.disabled;
+  });
+}
 /* 段落を選んでいれば その書式に変える。選んでいなければ 新しく足す。
    画像だけは中身がないと意味がないので、ファイルの選択を開く。 */
 /* 升目の中に段落を作る。作ったものを選んで、そこへ寄せる */
@@ -8659,7 +8799,11 @@ function syncBlockPanel(){
   if(!sel.size) info.innerHTML='段落を選ぶと、書式や置き方を変えられます。';
   else if(sel.size===1) info.textContent='選択中：'+TYPE_NAME(first.b.type)+'／'+(first.b.cols===1?'全幅':'段の中');
   else info.textContent=sel.size+'個の段落を選択中';
-  document.querySelectorAll('#typeBtns button').forEach(b=>b.classList.toggle('on', !!first && b.dataset.k===first.b.type));
+  document.querySelectorAll('#typeBtns button,#popTypeBtns button')
+    .forEach(b=>b.classList.toggle('on', !!first && b.dataset.k===first.b.type));
+  const psi = document.getElementById('popSideInfo');
+  if(psi) psi.innerHTML = !sel.size ? '段落を選ぶと、書式や置き方を変えられます。'
+    : (sel.size===1 ? '選択中：'+TYPE_NAME(first.b.type) : sel.size+'個の段落を選択中');
   document.getElementById('colSpan').classList.toggle('on', !!first && first.b.cols===1);
   document.getElementById('colFlow').classList.toggle('on', !!first && first.b.cols===2);
   const pidx = selPageIdx();
@@ -8679,6 +8823,7 @@ function syncBlockPanel(){
     : '見出し3の下などを1段内側に寄せられます。';
   document.getElementById('mTop').value = first && first.b.mt!=null ? first.b.mt : '';
   document.getElementById('mBot').value = first && first.b.mb!=null ? first.b.mb : '';
+  syncPopSideBtns();
 }
 ['mTop','mBot'].forEach(id=>document.getElementById(id).addEventListener('change',e=>{
   const v = e.target.value===''?null:+e.target.value;
@@ -9786,7 +9931,18 @@ const HELP = [
 <h4>別窓</h4>
 <p>紙面には<b>ボタンだけ</b>を置き、長い文章はその中にしまう書式です（<code>Ctrl</code>+<code>Alt</code>+<code>W</code>）。ページ数を増やさずに、込み入った資料を持たせられます。</p>
 <ul>
-<li>ボタンを押すと窓が開きます。左に書いて、右にその場で組んだ姿が出ます。</li>
+<li>ボタンを押すと窓が開きます。<b>窓の中だけで書き上げられます</b>。左から順に、
+<b>パネル</b>（書式と段落の操作）・<b>テキスト</b>・<b>紙面</b>・<b>設定欄</b>の4つが並びます。
+本窓と同じ並びなので、後ろの本窓に戻る必要はありません。</li>
+<li>仕切りをつかむと、それぞれの幅を変えられます。二度押しで元の幅に戻ります。</li>
+<li>窓の右上の <b>&#9776;</b>・<b>テキスト</b>・<b>設定欄</b> で、それぞれの欄を出し入れできます。
+画面が狭くて4つとも並びきらないときは、はじめだけ<b>テキスト欄をたたんで</b>開きます
+（同じ中身は右の紙面にも出ているので、たたんだままでも書けます）。
+いちど自分で出し入れすれば、その後はその決めのままです。</li>
+<li>この窓は<b>本窓のテキスト欄を覆わない位置</b>に出ます。紙面の段落をつかんで、この窓へ運べるようにするためです。
+窓は帯をつかんで動かせ、四辺・四隅のどこをつかんでも大きさを変えられます。</li>
+<li>パネルの書式は、別窓の中で意味を持つものだけを並べています。
+改ページ・改段・表紙・奥付・目次は、ページがあってはじめて働くものなので出しません。</li>
 <li>空行で段落が分かれます。<code>|項目|内容|</code> のように <code>|</code> で区切った行が続くと、そこは<b>表</b>になります（1行目が見出しです）。</li>
 <li>ボタンの文字は、ボタンの右の小さな欄で変えられます。</li>
 <li><b>印刷とPDFでは、中身が巻末に「追記」としてまとめて出ます。</b>本文のページ数は増えません。書き出した閲覧HTMLでは、ボタンを押すと窓が開きます。</li>
