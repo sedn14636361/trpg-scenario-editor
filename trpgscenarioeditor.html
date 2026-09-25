@@ -313,7 +313,6 @@ kbd{background:#0e1219;border:1px solid var(--line);border-radius:3px;padding:0 
 .prjRow:hover{background:var(--panel2)}
 .prjRow.on{border-color:var(--brass);background:rgba(211,165,52,.12)}
 .prjRow .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.prjRow .cur{color:#1a1408;background:var(--brass);border-radius:3px;padding:0 5px;font-size:10px;font-weight:700}
 .prjRow .d,.prjRow .z{color:var(--muted);font-size:11px;white-space:nowrap}
 .prjRow .z{min-width:62px;text-align:right}
 #popView p,#popView .pop-p{margin:0 0 10px;white-space:pre-wrap}
@@ -622,7 +621,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
           <input type="file" id="npcArtFile" accept="image/*" hidden>
           <input type="file" id="imgFile" accept="image/*" hidden>
           <div class="hint">自動保存とは別に、上の「保存」で大切な原稿はファイルにも残してください。ほかの作品へは上の「作品」から移れます。</div>
-          <div class="row" style="margin-top:10px"><button id="btnReset" class="danger" title="いま開いている作品の中身を消します（ほかの作品はそのまま）">全部消して最初から</button></div>
+          <div class="row" style="margin-top:10px"><button id="btnReset" class="danger" title="この作品の中身を消します（ほかの作品はそのまま）">全部消して最初から</button></div>
         </section>
 
       </div>
@@ -10799,7 +10798,7 @@ async function prjDlgPaint(){
   ['prjNew','prjDup','prjDel','prjOpenBtn'].forEach(id=>document.getElementById(id).disabled=!prjKV);
   if(!prjKV){
     note.textContent='このブラウザでは作品の置き場を使えないため、作品を1つだけ保存します。';
-    box.innerHTML='<div class="prjRow on"><span class="t">'+esc(S.title||'無題のシナリオ')+'</span><span class="cur">いま開いている</span></div>';
+    box.innerHTML='<div class="prjRow on"><span class="t">'+esc(S.title||'無題のシナリオ')+'</span></div>';
     return;
   }
   await saveNow();                    // いまの作品の題名・更新日時を一覧に反映させる
@@ -10809,7 +10808,6 @@ async function prjDlgPaint(){
   box.innerHTML = list.map(m=>'<div class="prjRow'+(m.id===prjPick?' on':'')+'" role="option" tabindex="-1" data-id="'+esc(m.id)+'"'
       + ' aria-selected="'+(m.id===prjPick)+'">'
       + '<span class="t">'+esc(m.title||'無題のシナリオ')+'</span>'
-      + (m.id===prjId?'<span class="cur">いま開いている</span>':'')
       + '<span class="d">'+prjWhen(m.upd)+'</span><span class="z">'+prjSize(m.size)+'</span></div>').join('');
   const on=box.querySelector('.prjRow.on'); if(on) on.scrollIntoView({block:'nearest'});
   document.getElementById('prjDel').disabled = !prjPick;
