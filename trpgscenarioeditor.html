@@ -308,6 +308,17 @@ kbd{background:#0e1219;border:1px solid var(--line);border-radius:3px;padding:0 
 #helpBody{flex:1;overflow:auto;padding:16px 20px 40px;line-height:1.8;font-size:13px;min-width:0}
 #helpDlg>div{height:min(680px,92vh)}
 #fontDlg{width:min(520px,94vw);padding:0}
+#prjList{overflow:auto;padding:6px;min-height:120px}
+.prjRow{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid transparent;border-radius:5px;cursor:pointer}
+.prjRow:hover{background:var(--panel2)}
+.prjRow.on{border-color:var(--brass);background:rgba(211,165,52,.12)}
+.prjRow .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prjRow .d,.prjRow .z,.prjRow .f{color:var(--muted);font-size:11px;white-space:nowrap}
+.prjRow .busy{color:#ff9b83;font-size:11px;white-space:nowrap}
+.prjRow[data-busy]{opacity:.75}
+#saveBar{display:flex;align-items:center;gap:10px;padding:7px 12px;background:#5a1f16;color:#ffd9cf;border-bottom:1px solid #a8331f;flex:0 0 auto;font-size:12px}
+#saveBar span{flex:1}
+.prjRow .z{min-width:62px;text-align:right}
 #popView p,#popView .pop-p{margin:0 0 10px;white-space:pre-wrap}
 #popView .bx-t{margin:0 0 8px}
 #popView ul.ls{margin:0 0 10px}
@@ -478,7 +489,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.1.7</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.3.0</span>
     <button id="btnSide" title="パネルの表示切替">&#9776;</button>
     <button id="btnPages" title="表紙から奥付まで、全ページを一覧で見る（Ctrl+Shift+P）">ページ一覧</button>
     <button id="btnProp" title="選んだ段落の設定欄（紙面の隣）を出し入れします">設定欄</button>
@@ -492,6 +503,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
       <button id="zoomIn" title="大きく（Ctrl+プラス／Ctrl+Shift+↑）">&#43;</button>
     </span>
     <span class="sp"></span>
+    <button id="btnPrj" title="作品を選ぶ・新しく作る・複製する・消す">作品</button>
     <span class="seggrp">
       <button id="btnSave" title="いまの内容をファイルに保存します（Ctrl+S）">保存</button>
       <button id="btnOpen" title="保存したファイルを読み込みます">開く</button>
@@ -501,6 +513,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
     <button id="btnHelp" title="使い方">ヘルプ</button>
     <span id="status">&#8212;</span>
   </div>
+  <div id="saveBar" class="app-chrome" role="alert" style="display:none"><span id="saveBarMsg"></span><button id="saveBarBtn"></button></div>
   <div id="main">
     <aside id="side">
       <div id="tabs">
@@ -612,8 +625,8 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
           <input type="file" id="jsonFile" accept=".json" hidden>
           <input type="file" id="npcArtFile" accept="image/*" hidden>
           <input type="file" id="imgFile" accept="image/*" hidden>
-          <div class="hint">自動保存とは別に、上の「保存」で大切な原稿はファイルにも残してください。</div>
-          <div class="row" style="margin-top:10px"><button id="btnReset" class="danger">全部消して最初から</button></div>
+          <div class="hint">自動保存とは別に、上の「保存」で大切な原稿はファイルにも残してください。ほかの作品へは上の「作品」から移れます。</div>
+          <div class="row" style="margin-top:10px"><button id="btnReset" class="danger" title="この作品の中身を消します（ほかの作品はそのまま）">全部消して最初から</button></div>
         </section>
 
       </div>
@@ -872,6 +885,38 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <datalist id="dl-mov"></datalist>
 <datalist id="dl-dmg"></datalist>
 
+<div id="prjDlg" style="display:none;position:fixed;inset:0;z-index:85;background:rgba(0,0,0,.7);align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:8px;width:min(640px,96vw);max-height:92vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line)">
+      <span style="color:var(--brass);font-weight:700;letter-spacing:.1em">作品</span>
+      <span style="flex:1"></span>
+      <button id="prjClose">閉じる</button>
+    </div>
+    <div id="prjNote" class="hint" style="padding:0 14px"></div>
+    <div id="prjList" role="listbox" aria-label="作品の一覧"></div>
+    <div style="display:flex;gap:6px;padding:10px 14px;border-top:1px solid var(--line);flex-wrap:wrap">
+      <span data-v="list" style="display:contents">
+        <button id="prjNew">新しく作る</button>
+        <button id="prjDup">複製</button>
+        <button id="prjGens">過去の版</button>
+        <button id="prjDel" class="danger">削除</button>
+        <span style="flex:1"></span>
+        <button id="prjTrashBtn">ゴミ箱</button>
+        <button id="prjOpenBtn" class="on">開く</button>
+      </span>
+      <span data-v="gens" style="display:contents">
+        <button class="prjBack">もどる</button>
+        <span style="flex:1"></span>
+        <button id="prjGenRestore" class="on">この版を新しい作品として戻す</button>
+      </span>
+      <span data-v="trash" style="display:contents">
+        <button class="prjBack">もどる</button>
+        <span style="flex:1"></span>
+        <button id="prjTrashRestore" class="on">戻す</button>
+      </span>
+    </div>
+  </div>
+</div>
 <div id="helpDlg" style="display:none;position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.7);align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--panel);border:1px solid var(--line);border-radius:8px;width:min(880px,96vw);max-height:92vh;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line)">
@@ -1282,7 +1327,7 @@ input.npc-artw{width:3.4em;font-family:inherit;font-size:1em;background:#fff !im
   .t-npc input.npc-i::placeholder{color:transparent}
   .npc-rowbtn{display:none !important}
   /* 開いたままの窓・注のカード・選び口は紙に出さない */
-  #cmtRail,#npcDlg,#popDlg,#flowDlg,#tblDlg,#ccfDlg,#ccfInDlg,#ytDlg,#prevDlg,#outDlg,#helpDlg,#fontDlg{display:none !important}
+  #cmtRail,#npcDlg,#popDlg,#flowDlg,#tblDlg,#ccfDlg,#ccfInDlg,#ytDlg,#prevDlg,#outDlg,#helpDlg,#fontDlg,#prjDlg,#saveBar{display:none !important}
   .t-npc select.dxpick,.t-npc select.dxkindsel,.t-npc .dxseg{display:none !important}
   .t-npc .skwrap select.npc-cat{display:none !important}
   .t-npc .npc-res select.npc-s:first-child{display:none !important}
@@ -3393,60 +3438,482 @@ function syncUndoBtns(){
 }
 addEventListener('keydown', e=>{
   if(!(e.ctrlKey||e.metaKey) || e.altKey) return;
+  if(prjDlgOn()) return;              // 作品の一覧を出しているあいだは、裏の原稿を動かさない
   const k=String(e.key||'').toLowerCase();
   if(k==='z' && !e.shiftKey){ e.preventDefault(); e.stopPropagation(); undo(); }
   else if((k==='z' && e.shiftKey) || k==='y'){ e.preventDefault(); e.stopPropagation(); redo(); }
 }, true);
 
-function save(){
-  unsaved=true;
-  clearTimeout(saveTimer);
-  saveTimer=setTimeout(async()=>{
-    histCommit();
-    const json = JSON.stringify(S);
-    if(json.length > 4*1024*1024){
-      /* フォントや画像で大きくなりすぎると自動保存に収まらない */
-      setStatus('内容が大きいため自動保存を省きました。「保存」でファイルに残してください','#ff9b83');
+/* ================= 作品の置き場 =================
+   原稿（作品）はいくつでも持てる。作品ごとに本体を1つ、一覧用の控え（題名・更新日時・大きさ）を
+   まとめて1つ置く。置き場は次の順に探す。
+     1. window.storage（組版台を載せた側が用意する置き場。あればこれまでどおり優先する）
+     2. IndexedDB
+     3. どちらも無ければ、これまでと同じく localStorage に1作品だけ
+   localStorage を作品の置き場にしないのは、オリジンあたり約500万文字しか入らず（実測）、
+   file:// ではどこに置いた HTML でも同じ置き場を共有するため、作品を並べるとすぐあふれるから。
+
+   原稿を失わないための決めごと（どれも実測で確かめたうえで決めた）
+     ・本体と一覧は同じトランザクションで書く。別のタブの書き込みが割り込んで、作品が一覧から落ちないように
+     ・作品はそれを開いたタブだけが書ける（Web Locks）。2つのタブで同じ作品を書いて上書きし合わないように
+     ・打ち続けていても3秒ごとには書く。閉じる瞬間に書き終えていない分は localStorage に控える
+       （再読み込みや別のページへ移るときは、その瞬間に始めた IndexedDB の書き込みが終わらない）
+     ・過去の版を作品ごとに残し、消した作品はゴミ箱に30日置く
+     ・Chrome / Edge では、ディスク上のファイルにも書く（ブラウザのデータが消えても戻せるように） */
+const PRJ_IDX='trpg-prj-index', PRJ_DOC='trpg-prj:', PRJ_GEN='trpg-gen:', PRJ_FH='trpg-fh:', PRJ_CUR='trpg-prj-cur';
+const JNL_KEY='trpg-prj-journal:', JNL_META='trpg-prj-journal-meta:';
+const SAVE_WAIT=700, SAVE_MAXWAIT=3000;     // 打ち終えて0.7秒後。打ち続けていても3秒ごとには書く
+const GEN_MAX=10, GEN_EVERY=10*60*1000;     // 過去の版は10個まで。書いているあいだは10分ごとに残す
+const TRASH_DAYS=30, FILE_EVERY=2000;
+const JNL_MAX=4.5e6;       // 閉じる瞬間の控えは localStorage に書く。入るのはおよそ500万文字まで（実測）
+let prjKV=null;            // 作品の置き場（get/batch）。null なら1作品だけの昔の保存
+let prjId=null;            // 開いている作品のID（まだ無いときは null。そのあいだは何も書かない）
+let prjQ=Promise.resolve();// 書き込みは1つずつ順に行う（切り替えの途中で混ざらないように）
+let savePending=false;     // 打ちかけで、まだ置き場に書きはじめていない変更があるか
+let pendSince=0;           // その変更が始まった時刻（3秒ごとに書くため）
+let inflight=null;         // 置き場に書いている途中（または書けなかった）の中身
+let saveErr=false;         // 最後の書き込みが失敗したか
+function parseIdx(v){ try{ const a=v?JSON.parse(v):[]; return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function idbKV(){
+  return new Promise((res,rej)=>{
+    let q; try{ q=indexedDB.open('trpg-typeset',1); }catch(e){ rej(e); return; }
+    q.onupgradeneeded=()=>q.result.createObjectStore('kv');
+    q.onerror=()=>rej(q.error); q.onblocked=()=>rej(new Error('blocked'));
+    q.onsuccess=()=>{
+      const db=q.result;
+      const run=(mode,fn)=>new Promise((ok,ng)=>{
+        let t; const out={};
+        try{ t=db.transaction('kv',mode); fn(t.objectStore('kv'), out); }
+        catch(e){ try{ t && t.abort(); }catch(_){} ng(e); return; }
+        t.oncomplete=()=>ok(out.v); t.onerror=t.onabort=()=>ng(t.error||new Error('aborted'));
+      });
+      res({ name:'idb',
+        get:k=>run('readonly',(s,o)=>{ const r=s.get(k); r.onsuccess=()=>{ o.v=r.result; }; }),
+        keys:()=>run('readonly',(s,o)=>{ const r=s.getAllKeys(); r.onsuccess=()=>{ o.v=r.result; }; }),
+        /* 書き込み・消去と一覧の書き換えを、1つのトランザクションで行う。
+           重なる書き込みのトランザクションは、タブをまたいでも1つずつ順に通る（実測で確かめた）ので、
+           一覧を読んでから書くまでのあいだに、別のタブの書き込みが割り込むことはない */
+        batch:(ops,idxFn)=>run('readwrite',(s,o)=>{
+          ops.forEach(([k,v])=>{ if(v===undefined) s.delete(k); else s.put(v,k); });
+          if(!idxFn) return;
+          const r=s.get(PRJ_IDX);
+          r.onsuccess=()=>{ const a=parseIdx(r.result); o.v=idxFn(a); s.put(JSON.stringify(a),PRJ_IDX); };
+        }) });
+    };
+  });
+}
+function wsKV(){
+  const W=window.storage;
+  const get=async k=>{ const r=await W.get(k); return r && r.value ? r.value : undefined; };
+  const del=k=>(W.delete ? W.delete(k) : W.set(k,''));
+  /* window.storage にはトランザクションが無いので、一覧の書き換えは Web Locks で1つずつ通す */
+  const lock=fn=>(navigator.locks && navigator.locks.request) ? navigator.locks.request('trpg-prj-index',fn) : fn();
+  return { name:'ws', get,
+    batch:(ops,idxFn)=>lock(async()=>{
+      for(const [k,v] of ops){ if(v===undefined) await del(k); else await W.set(k,v); }
+      if(!idxFn) return;
+      const a=parseIdx(await get(PRJ_IDX)), v=idxFn(a);
+      await W.set(PRJ_IDX, JSON.stringify(a));
+      return v;
+    }) };
+}
+async function prjInit(){
+  if(window.storage && window.storage.get && window.storage.set){
+    try{ const kv=wsKV(); await kv.get(PRJ_IDX); prjKV=kv; return; }catch(e){}
+  }
+  try{
+    if(window.indexedDB){ const kv=await idbKV(); await kv.get(PRJ_IDX); prjKV=kv; return; }
+  }catch(e){}
+  prjKV=null;
+}
+/* ファイルの置き場所（File System Access のハンドル）は文字列にできないので、いつも IndexedDB に置く */
+let fhKV=null;
+async function fhStore(){
+  if(prjKV && prjKV.name==='idb') return prjKV;
+  if(!fhKV && window.indexedDB){ try{ fhKV=await idbKV(); }catch(e){ fhKV=null; } }
+  return fhKV;
+}
+async function prjAll(){ if(!prjKV) return []; try{ return parseIdx(await prjKV.get(PRJ_IDX)); }catch(e){ return []; } }
+async function prjList(){ return (await prjAll()).filter(m=>!m.del); }      // ゴミ箱のものは除く
+async function prjTrash(){ return (await prjAll()).filter(m=>m.del); }
+function metaOf(a,id,make){ let m=a.find(x=>x.id===id); if(!m && make){ m={id:id}; a.push(m); } return m; }
+/* 作品の本体を書き、一覧の控えも同じトランザクションで直す */
+async function prjWrite(id, json, title, extra){
+  return prjKV.batch([[PRJ_DOC+id, json]], a=>{
+    const m=metaOf(a,id,true);
+    Object.assign(m, extra||{}, {title:String(title||'無題のシナリオ'), upd:Date.now(), size:json.length});
+    return Object.assign({}, m);
+  });
+}
+async function prjMeta(id, patch){
+  return prjKV.batch([], a=>{ const m=metaOf(a,id,false); if(m) Object.assign(m,patch); return m && Object.assign({},m); });
+}
+async function prjRead(id){ return prjKV.get(PRJ_DOC+id); }
+/* 消すときはゴミ箱へ。本体も過去の版もそのまま残る */
+async function prjToTrash(id){ return prjMeta(id, {del:Date.now()}); }
+async function prjRestore(id){ return prjKV.batch([], a=>{ const m=metaOf(a,id,false); if(m) delete m.del; }); }
+/* ゴミ箱で30日たった作品を、本当に消す */
+async function prjPurge(id){
+  const m=(await prjAll()).find(x=>x.id===id);
+  const ops=[[PRJ_DOC+id, undefined]].concat(((m&&m.gens)||[]).map(g=>[PRJ_GEN+id+':'+g.t, undefined]));
+  await prjKV.batch(ops, a=>{ const i=a.findIndex(x=>x.id===id); if(i>=0) a.splice(i,1); });
+  try{ const f=await fhStore(); if(f) await f.batch([[PRJ_FH+id, undefined]]); }catch(e){}
+}
+async function prjPurgeOld(){
+  const lim=Date.now()-TRASH_DAYS*864e5;
+  for(const m of await prjTrash()) if(m.del<lim){ try{ await prjPurge(m.id); }catch(e){} }
+}
+/* 一覧から外れてしまった本体を探して、一覧に戻す（v3.2.0 の一覧の書き込みの取り合いで外れたものも救う） */
+async function prjRepair(){
+  if(!prjKV || !prjKV.keys) return 0;
+  let n=0;
+  const have=new Set((await prjAll()).map(m=>m.id));
+  for(const k of await prjKV.keys()){
+    if(typeof k!=='string' || !k.startsWith(PRJ_DOC)) continue;
+    const id=k.slice(PRJ_DOC.length); if(have.has(id)) continue;
+    const raw=await prjKV.get(k); let d=null; try{ d=JSON.parse(raw); }catch(e){}
+    await prjKV.batch([], a=>{ if(!metaOf(a,id,false)) a.push({id:id, title:String((d&&d.title)||'無題のシナリオ'), upd:Date.now(), size:String(raw||'').length}); });
+    n++;
+  }
+  return n;
+}
+/* ---- 過去の版 ----
+   置き場にある本体をそのまま写して残す。前に残した版と同じ中身なら残さない */
+async function genSnap(id, json){
+  if(!prjKV || !id) return;
+  if(json==null) json=await prjRead(id);
+  if(!json) return;
+  const m=(await prjAll()).find(x=>x.id===id); if(!m) return;
+  const h=strHash(json);
+  if(m.genHash===h) return;
+  const t=Math.max(Date.now(), ((m.gens||[]).slice(-1)[0]||{t:0}).t+1);
+  const gens=(m.gens||[]).concat([{t:t, z:json.length}]);
+  const drop=gens.slice(0, Math.max(0, gens.length-GEN_MAX));
+  await prjKV.batch([[PRJ_GEN+id+':'+t, json]].concat(drop.map(g=>[PRJ_GEN+id+':'+g.t, undefined])), a=>{
+    const mm=metaOf(a,id,false);
+    if(mm){ mm.gens=gens.slice(-GEN_MAX); mm.genHash=h; mm.genAt=t; }
+  });
+}
+async function genRead(id,t){ return prjKV.get(PRJ_GEN+id+':'+t); }
+function prjRemember(id){ try{ localStorage.setItem(PRJ_CUR, id); }catch(e){} }
+function prjLast(){ try{ return localStorage.getItem(PRJ_CUR); }catch(e){ return null; } }
+
+/* ---- 作品を押さえる（Web Locks） ----
+   作品を開いたタブが、その作品の鍵を持つ。ほかのタブはその作品を開けない。
+   タブが閉じられれば（落ちても）鍵はブラウザが外すので、開けなくなったままにはならない */
+const LOCKS = !!(navigator.locks && navigator.locks.request);
+let lockRel=null;          // いまの作品の鍵を手放す関数
+/* wait を渡すと、その時間（ミリ秒）までは鍵が空くのを待つ。
+   再読み込みの直後は、前のページの鍵がまだ外れていないことがある（実測）ので、起動のときは待つ */
+function lockTake(id, wait){
+  if(!LOCKS) return Promise.resolve(()=>{});
+  return new Promise(res=>{
+    let opt={ifAvailable:true}, timer=null;
+    if(wait){ const ac=new AbortController(); timer=setTimeout(()=>ac.abort(), wait); opt={signal:ac.signal}; }
+    navigator.locks.request('trpg-edit:'+id, opt, l=>{
+      clearTimeout(timer);
+      if(!l){ res(null); return; }
+      return new Promise(r=>res(r));
+    }).catch(e=>{ clearTimeout(timer); res(e && e.name==='AbortError' ? null : ()=>{}); });
+  });
+}
+/* 別のタブが押さえている作品のID */
+async function lockBusy(){
+  if(!LOCKS || !navigator.locks.query) return new Set();
+  try{
+    const q=await navigator.locks.query();
+    return new Set((q.held||[]).map(l=>l.name).filter(n=>n.startsWith('trpg-edit:'))
+      .map(n=>n.slice(10)).filter(id=>id!==prjId));
+  }catch(e){ return new Set(); }
+}
+/* Web Locks の無いブラウザでは止められないので、同じ作品を2つのタブで開いたら知らせるだけにする */
+let prjBC=null;
+try{
+  prjBC=new BroadcastChannel('trpg-typeset');
+  prjBC.onmessage=e=>{
+    const m=e.data||{}; if(LOCKS || !prjId || m.id!==prjId) return;
+    if(m.t==='open') prjBC.postMessage({t:'busy', id:prjId});
+    if(m.t==='busy' || m.t==='saved')
+      setStatus('この作品は別のタブでも開かれています。両方で書くと、あとから保存したほうで上書きされます','#ff9b83');
+  };
+}catch(e){ prjBC=null; }
+function prjPost(t){ try{ if(prjBC && prjId) prjBC.postMessage({t:t, id:prjId}); }catch(e){} }
+
+/* ---- 保存の失敗・ファイルへの保存の停止を知らせる帯 ---- */
+function barPaint(){
+  const bar=document.getElementById('saveBar'); if(!bar) return;
+  let msg='', btn='';
+  if(saveErr){ msg='保存できていません。この画面を閉じる前に「保存」でファイルに残してください。'; btn='もう一度試す'; }
+  else if(fileState==='paused'){ msg='ファイルへの自動保存を止めています。'; btn='再開する'; }
+  document.getElementById('saveBarMsg').textContent=msg;
+  document.getElementById('saveBarBtn').textContent=btn;
+  bar.style.display = msg ? 'flex' : 'none';
+}
+function saveFail(on){ if(saveErr!==on){ saveErr=on; barPaint(); } }
+
+/* いまの S を置き場に書く。書き込み先は呼んだ時点の作品に固定する */
+function prjFlush(){
+  savePending=false; pendSince=0;
+  const id=prjId, json=JSON.stringify(S), title=S.title, st=Date.now();
+  inflight=json;
+  prjQ = prjQ.then(async()=>{
+    if(!prjKV){ await legacyWrite(json); if(inflight===json) inflight=null; return; }
+    if(!id){ if(inflight===json) inflight=null; return; }  // まだ作品が決まっていない。何も書かない
+    let m;
+    try{ m=await prjWrite(id, json, title, {st:st}); }
+    catch(e){
+      /* 書けなかった中身は inflight に残す。閉じるときの控えと、閉じる前の確認に使う */
+      if(id===prjId){ saveFail(true); setStatus('自動保存に失敗しました','#ff9b83'); }
       return;
     }
-    let ok=false;
-    try{
-      if(window.storage && window.storage.set){ await window.storage.set(KEY, json); ok=true; }
-    }catch(e){}
-    if(!ok){
-      try{ localStorage.setItem(KEY, json); ok=true; }
-      catch(e2){
-        /* 画像を入れると容量を超えることがある。その場合はファイル保存を促す */
-        setStatus('自動保存の容量を超えました。「保存」でファイルに残してください','#ff9b83');
-        return;
-      }
-    }
-    setStatus(unsaved ? '自動保存しました（未保存の変更あり）' : '自動保存しました', unsaved?'#e8c66a':'var(--ok)');
-  },700);
+    if(inflight===json) inflight=null;
+    if(id===prjId) saveFail(false);
+    if(!savePending && inflight==null) jnlClear(id);
+    prjPost('saved');
+    if(m && Date.now()-(m.genAt||0) >= GEN_EVERY){ try{ await genSnap(id, json); }catch(e){} }
+    fileSchedule(id);
+    if(id===prjId)
+      setStatus(unsaved ? '自動保存しました（未保存の変更あり）' : '自動保存しました', unsaved?'#e8c66a':'var(--ok)');
+  });
+  return prjQ;
 }
-/* 編集の途中でも、いつでもファイルに書き出せるようにする */
-function saveToFile(){
+function save(){
+  unsaved=true;
+  savePending=true;
+  const now=Date.now();
+  if(!pendSince) pendSince=now;
+  clearTimeout(saveTimer);
+  /* 打ち終えて0.7秒で書く。打ち続けていて待ちが延び続けても、変更が始まってから3秒で書く */
+  saveTimer=setTimeout(()=>{ histCommit(); prjFlush(); }, Math.max(0, Math.min(SAVE_WAIT, pendSince+SAVE_MAXWAIT-now)));
+}
+/* 打ちかけの分を、待たずに書き切る（作品を切り替える前に使う） */
+function saveNow(){
+  clearTimeout(saveTimer);
+  if(savePending){ histCommit(); return prjFlush(); }
+  return prjQ;
+}
+/* 作品の置き場が無いときの、これまでどおりの1作品だけの保存 */
+async function legacyWrite(json){
+  if(json.length > 4*1024*1024){
+    /* フォントや画像で大きくなりすぎると自動保存に収まらない */
+    setStatus('内容が大きいため自動保存を省きました。「保存」でファイルに残してください','#ff9b83');
+    return;
+  }
+  let ok=false;
+  try{
+    if(window.storage && window.storage.set){ await window.storage.set(KEY, json); ok=true; }
+  }catch(e){}
+  if(!ok){
+    try{ localStorage.setItem(KEY, json); ok=true; }
+    catch(e2){
+      /* 画像を入れると容量を超えることがある。その場合はファイル保存を促す */
+      setStatus('自動保存の容量を超えました。「保存」でファイルに残してください','#ff9b83');
+      return;
+    }
+  }
+  setStatus(unsaved ? '自動保存しました（未保存の変更あり）' : '自動保存しました', unsaved?'#e8c66a':'var(--ok)');
+}
+
+/* ---- 閉じる瞬間の控え（ジャーナル） ----
+   再読み込みや別のページへ移るときは、その瞬間に始めた IndexedDB の書き込みが終わらない（実測）。
+   localStorage はその場で書き終わるので、書き終えていない分をそこに控え、次に開いたときに戻す */
+function jnlPending(){ return savePending ? JSON.stringify(S) : inflight; }
+function jnlWrite(){
+  const json=jnlPending();
+  if(json==null) return true;
+  if(!prjKV){                                   // 1作品だけの昔の保存。そのまま本来の場所に書く
+    if(json.length > 4*1024*1024) return false;
+    try{ localStorage.setItem(KEY, json); return true; }catch(e){ return false; }
+  }
+  if(!prjId) return true;
+  if(json.length > JNL_MAX) return false;
+  try{
+    localStorage.setItem(JNL_KEY+prjId, json);
+    localStorage.setItem(JNL_META+prjId, JSON.stringify({id:prjId, t:Date.now()}));
+    return true;
+  }catch(e){
+    try{ localStorage.removeItem(JNL_KEY+prjId); localStorage.removeItem(JNL_META+prjId); }catch(_){}
+    return false;
+  }
+}
+function jnlClear(id){ try{ localStorage.removeItem(JNL_KEY+id); localStorage.removeItem(JNL_META+id); }catch(e){} }
+/* 控えが置き場の中身より新しければ、置き場に戻す。戻す前の姿は過去の版に残す。
+   その作品の鍵を持っているときだけ呼ぶ（作品を開くときと、起動したとき） */
+async function jnlApply(id){
+  let meta=null, json=null;
+  try{ meta=JSON.parse(localStorage.getItem(JNL_META+id)||'null'); json=localStorage.getItem(JNL_KEY+id); }catch(e){}
+  if(!meta || json==null){ if(meta || json!=null) jnlClear(id); return null; }
+  const m=(await prjAll()).find(x=>x.id===id);
+  const cur=await prjRead(id);
+  let d=null; try{ d=JSON.parse(json); }catch(e){}
+  let done=null;
+  /* 置き場の中身は、控えを取った時刻より前に写したものか（st はその中身を写した時刻） */
+  if(d && cur!==json && !(m && (m.st||m.upd||0) >= meta.t)){
+    if(cur && m) await genSnap(id, cur);
+    await prjWrite(id, json, d.title, {st:meta.t});
+    done=d.title||'無題のシナリオ';
+  }
+  jnlClear(id);            // 置き場に戻し終えてから消す
+  return done;
+}
+async function jnlRecover(){
+  let ids=[];
+  try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.startsWith(JNL_META)) ids.push(k.slice(JNL_META.length)); } }catch(e){ return []; }
+  const done=[];
+  for(const id of ids){
+    const rel=await lockTake(id, 3000);
+    if(!rel) continue;       // 別のタブで開いたまま。その作品は、そちらのタブが書き続ける
+    try{ const t=await jnlApply(id); if(t) done.push(t); }catch(e){}
+    finally{ rel(); }
+  }
+  return done;
+}
+addEventListener('pagehide', ()=>{ jnlWrite(); });
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='hidden'){ jnlWrite(); saveNow(); }
+});
+
+/* ---- ディスク上のファイルにも書く（Chrome / Edge の File System Access） ---- */
+const FSA = typeof window.showSaveFilePicker==='function';
+let fileH=null, fileId=null, fileState=null, fileTimer=null, fileQ=Promise.resolve();
+/* 作品を開いたとき、その作品に結びつけたファイルを読み出す。書く許可が切れていれば帯で知らせる */
+async function fileLoad(id){
+  if(fileTimer){ clearTimeout(fileTimer); fileTimer=null; }
+  fileH=null; fileId=id; fileState=null;
+  if(FSA && id){
+    try{ const f=await fhStore(); fileH = f ? ((await f.get(PRJ_FH+id))||null) : null; }catch(e){ fileH=null; }
+    if(fileH){
+      let p='granted';
+      try{ p=await fileH.queryPermission({mode:'readwrite'}); }catch(e){}
+      if(p!=='granted') fileState='paused';
+    }
+  }
+  barPaint();
+}
+function fileSchedule(id){
+  if(!fileH || id!==fileId || id!==prjId || fileState==='paused' || fileTimer) return;
+  fileTimer=setTimeout(()=>{ fileTimer=null; fileWrite(); }, FILE_EVERY);
+}
+/* いまの姿をファイルに書き、読み戻して同じか確かめる */
+function fileWrite(){
+  const id=fileId, h=fileH;
+  if(!h || id!==prjId) return fileQ;
+  const text=JSON.stringify(S,null,1);
+  fileQ = fileQ.then(async()=>{
+    try{
+      const w=await h.createWritable(); await w.write(text); await w.close();
+      const back=await (await h.getFile()).text();
+      if(back!==text) throw new Error('mismatch');
+      if(id===prjId){ fileState=null; if(!savePending) unsaved=false; barPaint(); }
+      try{ await prjMeta(id, {fileAt:Date.now(), fileName:h.name}); }catch(e){}
+    }catch(e){
+      if(id===prjId){ fileState='paused'; barPaint(); }
+    }
+  });
+  return fileQ;
+}
+async function fileResume(){
+  if(!fileH) return;
+  let p='denied';
+  try{ p=await fileH.requestPermission({mode:'readwrite'}); }catch(e){}
+  if(p!=='granted'){ fileState='paused'; barPaint(); return; }
+  fileState=null; barPaint();
+  await fileWrite();
+  if(fileState!=='paused') setStatus('ファイルに保存しました','var(--ok)');
+}
+/* 編集の途中でも、いつでもファイルに書き出せるようにする。
+   Chrome / Edge では、はじめに置き場所を選んでもらい、以後は自動保存のたびにそのファイルにも書く */
+async function saveToFile(){
   const name = (S.title||'scenario').replace(/[\\/:*?"<>|]/g,'_');
+  if(FSA && prjKV && prjId){
+    await saveNow();
+    if(!fileH){
+      let h=null;
+      try{
+        h=await window.showSaveFilePicker({suggestedName:name+'.json',
+          types:[{description:'組版台の原稿（JSON）', accept:{'application/json':['.json']}}]});
+      }catch(e){ if(e && e.name==='AbortError') return; h=null; }
+      if(h){
+        fileH=h; fileId=prjId; fileState=null;
+        try{ const f=await fhStore(); if(f) await f.batch([[PRJ_FH+prjId, h]]); }catch(e){}
+      }
+    } else if(fileState==='paused'){
+      await fileResume(); return;
+    }
+    if(fileH){
+      await fileWrite();
+      if(fileState!=='paused') setStatus('ファイルに保存しました','var(--ok)');
+      return;
+    }
+  }
   dl(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}), name+'.json');
   unsaved=false;
+  if(prjKV && prjId) prjMeta(prjId, {fileAt:Date.now()}).catch(()=>{});
   setStatus('ファイルに保存しました','var(--ok)');
 }
 addEventListener('beforeunload', e=>{
-  if(!unsaved) return;
-  e.preventDefault(); e.returnValue='';
+  /* 書き終えていない分が控えに入りきらない、書き込みに失敗している、
+     またはファイルに残していない変更があるときは、閉じる前に確かめる */
+  const pend=jnlPending();
+  if(unsaved || saveErr || (pend!=null && pend.length > (prjKV ? JNL_MAX : 4*1024*1024))){
+    e.preventDefault(); e.returnValue='';
+  }
 });
 addEventListener('keydown', e=>{
-  if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.key==='S')){ e.preventDefault(); saveToFile(); }
+  if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.key==='S')){ e.preventDefault(); if(!prjDlgOn()) saveToFile(); }
 });
-async function load(){
+/* これまでの1作品だけの自動保存（KEY）を、置き場ごとに生のまま拾う */
+async function legacyRaws(){
+  const out=[];
   try{
     if(window.storage && window.storage.get){
       const r = await window.storage.get(KEY);
-      if(r && r.value) return JSON.parse(r.value);
+      if(r && r.value) out.push({src:'ws', raw:r.value});
     }
   }catch(e){}
-  try{ const v = localStorage.getItem(KEY); if(v) return JSON.parse(v); }catch(e){}
+  try{ const v = localStorage.getItem(KEY); if(v && !out.some(o=>o.raw===v)) out.push({src:'ls', raw:v}); }catch(e){}
+  return out;
+}
+async function load(){
+  for(const o of await legacyRaws()){ try{ return JSON.parse(o.raw); }catch(e){} }
   return null;
+}
+async function legacyDelete(src){
+  if(src==='ls'){ localStorage.removeItem(KEY); return; }
+  if(window.storage.delete) await window.storage.delete(KEY); else await window.storage.set(KEY,'');
+}
+/* 引き継いだかどうかを、中身の指紋で見分ける。
+   消すのを断ったときに、次の起動で同じ原稿をもう1つ作ってしまわないように */
+function strHash(s){
+  let h=0x811c9dc5;
+  for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193); }
+  return (h>>>0).toString(36)+'-'+s.length;
+}
+/* これまでの自動保存を、作品として引き継ぐ。
+   書いたものを読み戻して一字一句同じだと確かめてから、古いほうを消すかたずねる */
+async function prjMigrate(){
+  if(!prjKV) return;
+  for(const o of await legacyRaws()){
+    let d; try{ d=JSON.parse(o.raw); }catch(e){ continue; }
+    if(!d || (!d.pages && !d.blocks)) continue;
+    const hash=strHash(o.raw);
+    let m=(await prjList()).find(x=>x.legacy===hash), same=false;
+    try{
+      if(!m){
+        m=await prjWrite(uid(), o.raw, d.title||'無題のシナリオ', {legacy:hash});
+        same = (await prjRead(m.id))===o.raw;
+      } else same = true;       // 前に引き継いで確かめ済み（消すのを断っていた）
+    }catch(e){ same=false; }
+    if(!same){
+      setStatus('以前の自動保存を引き継げなかったため、古い保存場所に残しています','#ff9b83');
+      continue;
+    }
+    if(confirm('以前の自動保存を、作品「'+m.title+'」として引き継ぎました。\n\n'
+      + '古い保存場所からは消します。古い版の組版台では、この原稿が見えなくなります。\n'
+      + '（キャンセルすると消さずに残し、次に起動したときにもう一度たずねます）')){
+      try{ await legacyDelete(o.src); }catch(e){}
+    }
+  }
 }
 function blank(){
   return {
@@ -5949,7 +6416,7 @@ addEventListener('keydown', e=>{
     e.preventDefault(); flowDeleteSel(); return;
   }
   if(!sel.size || editingId) return;
-  if(document.querySelector('#helpDlg[style*="flex"],#npcDlg[style*="flex"],#ccfDlg[style*="flex"],#tblDlg[style*="flex"],#ccfInDlg[style*="flex"],#ytDlg[style*="flex"]')) return;
+  if(document.querySelector('#prjDlg[style*="flex"],#helpDlg[style*="flex"],#npcDlg[style*="flex"],#ccfDlg[style*="flex"],#tblDlg[style*="flex"],#ccfInDlg[style*="flex"],#ytDlg[style*="flex"]')) return;
   e.preventDefault();
   const ids=[...sel];
   const L = selList();
@@ -9259,7 +9726,7 @@ document.getElementById('blkPaste').onclick=blkPasteDo;
 addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
   if(npcModalId || popId) return;
-  if(document.querySelector('#helpDlg[style*="flex"],#ccfDlg[style*="flex"],#tblDlg[style*="flex"],#ccfInDlg[style*="flex"],#ytDlg[style*="flex"]')) return;
+  if(document.querySelector('#prjDlg[style*="flex"],#helpDlg[style*="flex"],#ccfDlg[style*="flex"],#tblDlg[style*="flex"],#ccfInDlg[style*="flex"],#ytDlg[style*="flex"]')) return;
   if(e.__escHandled) return;                       // 編集の解除で使われた分は数えない
   const a=document.activeElement;
   if(a && (a.isContentEditable||a.tagName==='INPUT'||a.tagName==='TEXTAREA')) return;
@@ -9489,15 +9956,22 @@ document.getElementById('imgClearFloat').onclick=()=>{
 document.getElementById('jsonFile').onchange=e=>{
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader();
-  r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d.pages&&!d.blocks) throw 0;
-      S=normalize(d); lastCell=null; mergeUserTpls(); pgSel.clear(); sel.clear(); editingId=null; syncSettings(); render();
-      past.length=0; future.length=0; committed=null; histCommit();
-      unsaved=false; setStatus('読み込みました','var(--ok)'); }
-    catch(_){ alert('このファイルは読み込めませんでした。この組版台で保存したJSONを選んでください。'); } };
+  e.target.value='';        // 同じファイルをもう一度選んでも読み込めるように
+  r.onload=async()=>{
+    let d=null;
+    try{ d=JSON.parse(r.result); if(!d || (!d.pages&&!d.blocks)) d=null; }catch(_){ d=null; }
+    if(!d){ alert('このファイルは読み込めませんでした。この組版台で保存したJSONを選んでください。'); return; }
+    /* 読み込んだ原稿は、いまの作品を上書きせず、新しい作品として足す。
+       作品の置き場が無いときだけは1作品しか持てないので、置き換えてよいかたずねる */
+    if(!prjKV && !confirm('このブラウザでは作品を1つしか持てません。いまの原稿を、読み込んだ原稿で置き換えますか？')) return;
+    await prjNew(d, prjKV ? '新しい作品として読み込みました' : '読み込みました');
+  };
   r.readAsText(f);
 };
-document.getElementById('btnReset').onclick=()=>{
+document.getElementById('btnReset').onclick=async()=>{
   if(!confirm('すべての内容を消して最初からやり直します。よろしいですか？')) return;
+  /* 消す前の姿を過去の版に残しておく（作品の一覧の「過去の版」から戻せる） */
+  if(prjKV && prjId){ await saveNow(); try{ await genSnap(prjId); }catch(e){} }
   S=blank(); sel.clear(); pgSel.clear(); editingId=null; syncSettings(); render(); save();
 };
 function syncSettings(){
@@ -9967,10 +10441,23 @@ const HELP = [
 </ul>
 <h4>保存</h4>
 <ul>
-<li>編集内容はこのブラウザに自動保存されます。</li>
-<li>ツールバーの<b>保存</b>（<code>Ctrl</code>+<code>S</code>）で、いつでもファイルに書き出せます。大切な原稿はこちらでも残してください。</li>
+<li>編集内容はこのブラウザに自動保存されます。打ち終えて0.7秒、打ち続けていても3秒ごとに保存します。</li>
+<li>タブを閉じたり再読み込みしたりしても、打った字は残ります。保存しきれなかった分は控えておき、次に開いたときに戻します。</li>
+<li>ツールバーの<b>保存</b>（<code>Ctrl</code>+<code>S</code>）で、ファイルに残せます。大切な原稿はこちらでも残してください。</li>
+<li>Chrome・Edge では、はじめの<b>保存</b>でファイルの置き場所を選ぶと、以後は自動保存のたびにそのファイルにも書きます。ブラウザのデータが消えても、そのファイルを<b>開く</b>で戻せます。書く許可が切れたときは、上に帯が出るので<b>再開する</b>を押してください。</li>
+<li>保存に失敗すると、上に赤い帯が出て、直るまで消えません。</li>
 <li>ファイルに保存していない変更があると、ステータスに「未保存の変更あり」と出ます。</li>
-<li>画像やフォントで内容が大きくなると自動保存を省略します。そのときは「保存」でファイルに残してください。</li>
+<li><b>開く</b>で読み込んだファイルは、いまの作品を上書きせず、新しい作品として足されます。</li>
+</ul>
+<h4>作品</h4>
+<ul>
+<li>シナリオ（作品）はいくつでもこのブラウザに置いておけます。ツールバーの<b>作品</b>で一覧を出し、開く・新しく作る・複製・削除ができます。一覧には、最後にファイルへ保存した日時も出ます。</li>
+<li>起動すると一覧が出ます。最後に開いていた作品が選ばれているので、そのまま<b>開く</b>か <code>Enter</code> で続きから書けます。<code>↑</code> <code>↓</code> で選び直せます。</li>
+<li>同じ作品は1つのタブでしか開けません。ほかのタブで開いている作品には「別のタブで編集中」と出ます。</li>
+<li><b>過去の版</b>：作品ごとに、開いたとき・書いているあいだ10分ごと・「全部消して最初から」の直前の姿を、10個まで残します。戻すと新しい作品になり、いまの作品はそのまま残ります。</li>
+<li><b>削除</b>した作品は<b>ゴミ箱</b>に入り、30日のあいだは戻せます。</li>
+<li>作品を切り替えると、元に戻す（<code>Ctrl</code>+<code>Z</code>）の履歴はその作品の分から始まります。</li>
+<li>このブラウザで作品の置き場（IndexedDB）が使えないときは、これまでどおり1作品だけを保存します。その場合、画像やフォントで内容が大きくなると自動保存を省略します。</li>
 </ul>`],
 
  ['keys','キー操作', `
@@ -10562,17 +11049,281 @@ document.getElementById('mkColophon').onclick=()=>{
   render(); save(); setStatus('奥付ページを作りました','var(--ok)');
 };
 
-/* ================= 起動 ================= */
-(async()=>{
-  initNpcLists();
-  S = normalize(await load());
+/* ================= 作品の切り替え ================= */
+/* 原稿を画面に出し直す。元に戻す履歴は作品ごとに初めから */
+function prjShow(d){
+  S = normalize(d);
   lastCell = null;
   mergeUserTpls();          // このブラウザに覚えさせたテンプレを足す
-  applyPanes(loadPanes());
+  pgSel.clear(); sel.clear(); editingId=null;
   syncSettings(); render();
-  bgWrap.querySelector('[data-bg="none"]').classList.add('on');
+  past.length=0; future.length=0; committed=null;
   histCommit();                       // ここを履歴の出発点にする
-  unsaved=false; setStatus('準備できました');
+  unsaved=false;
+}
+/* いまの作品を書き切って（ファイルにも）、鍵を手放す */
+async function prjLeave(){
+  await saveNow();
+  if(fileTimer){ clearTimeout(fileTimer); fileTimer=null; await fileWrite(); }
+  await fileQ;
+  if(lockRel){ lockRel(); lockRel=null; }
+}
+const PRJ_BUSY='この作品は別のタブで編集中のため開けません。そちらのタブを閉じてから開いてください。';
+async function prjOpen(id, wait){
+  if(id===prjId) return true;
+  const rel=await lockTake(id, wait);
+  if(!rel){ setStatus(PRJ_BUSY,'#ff9b83'); return false; }
+  try{ await jnlApply(id); }catch(e){}   // 閉じる瞬間の控えが残っていれば、開く前に置き場へ戻す
+  let d=null;
+  try{ const raw=await prjRead(id); d = raw ? JSON.parse(raw) : null; }catch(e){ d=null; }
+  if(!d){ rel(); setStatus('この作品は読み込めませんでした','#ff9b83'); return false; }
+  await prjLeave();                   // 打ちかけの分を、いまの作品に書き切ってから移る
+  prjId=id; lockRel=rel; prjRemember(id);
+  saveFail(false);
+  prjShow(d);
+  prjPost('open');
+  await fileLoad(id);
+  genSnap(id).catch(()=>{});          // 開いたときの姿を過去の版に残す
+  setStatus('作品「'+(S.title||'無題のシナリオ')+'」を開きました','var(--ok)');
+  return true;
+}
+/* 新しい作品を作って開く。d が無ければ見本の原稿 */
+async function prjNew(d, msg){
+  const id=uid();
+  const rel=(await lockTake(id)) || (()=>{});
+  await prjLeave();
+  prjId=id; lockRel=rel; prjRemember(id);
+  saveFail(false);
+  prjShow(d||null);
+  savePending=true; await prjFlush();   // 作ったらすぐ置き場に書く（一覧に出るように）
+  await fileLoad(id);
+  setStatus(msg||'新しい作品を作りました','var(--ok)');
+}
+function prjSorted(a){ return a.slice().sort((x,y)=>(y.upd||0)-(x.upd||0)); }
+let prjPick=null;           // 一覧で選んでいる作品（過去の版では版の時刻）
+let prjView='list';         // 'list' / 'gens'（過去の版） / 'trash'（ゴミ箱）
+let prjGenOf=null;          // 過去の版を見ている作品
+const prjDlg=document.getElementById('prjDlg');
+function prjDlgOn(){ return prjDlg.style.display==='flex'; }
+function prjWhen(t){
+  if(!t) return '';
+  const d=new Date(t), p=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'/'+p(d.getMonth()+1)+'/'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+function prjWhenShort(t){
+  const d=new Date(t), p=n=>String(n).padStart(2,'0');
+  return (d.getMonth()+1)+'/'+d.getDate()+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+function prjSize(n){
+  n=+n||0;
+  return n>=1024*1024 ? (Math.round(n/1024/1024*10)/10)+'MB相当' : Math.max(1,Math.round(n/1024))+'KB相当';
+}
+function prjRowHTML(key, on, cells){
+  return '<div class="prjRow'+(on?' on':'')+'" role="option" tabindex="-1" data-id="'+esc(key)+'" aria-selected="'+on+'">'+cells+'</div>';
+}
+function prjBtns(){
+  const has=!!prjPick, busy=!!(document.querySelector('#prjList .prjRow.on[data-busy]'));
+  const set=(id,dis)=>{ document.getElementById(id).disabled=dis; };
+  set('prjNew', !prjKV);
+  set('prjDup', !prjKV || !has);
+  set('prjGens', !prjKV || !has || !document.querySelector('#prjList .prjRow.on[data-gens]'));
+  set('prjDel', !prjKV || !has || busy);
+  set('prjTrashBtn', !prjKV);
+  set('prjOpenBtn', !prjKV || !has || busy);
+  set('prjGenRestore', !has);
+  set('prjTrashRestore', !has);
+  document.getElementById('prjClose').disabled = !!prjKV && !prjId;   // 開いている作品が無いうちは閉じられない
+  prjDlg.querySelectorAll('[data-v]').forEach(x=>{ x.style.display = x.dataset.v===prjView ? 'contents' : 'none'; });
+}
+async function prjDlgPaint(){
+  const box=document.getElementById('prjList'), note=document.getElementById('prjNote');
+  note.style.color='';
+  if(!prjKV){
+    prjView='list';
+    note.textContent='このブラウザでは作品の置き場を使えないため、作品を1つだけ保存します。';
+    box.innerHTML='<div class="prjRow on"><span class="t">'+esc(S.title||'無題のシナリオ')+'</span></div>';
+    prjBtns(); return;
+  }
+  await saveNow();                    // いまの作品の題名・更新日時を一覧に反映させる
+  if(prjView==='gens'){
+    const m=(await prjAll()).find(x=>x.id===prjGenOf);
+    const gens=((m&&m.gens)||[]).slice().reverse();
+    if(!gens.some(g=>String(g.t)===String(prjPick))) prjPick = gens.length ? String(gens[0].t) : null;
+    note.textContent='作品「'+((m&&m.title)||'無題のシナリオ')+'」の過去の版です。戻すと新しい作品になり、いまの作品はそのまま残ります。';
+    box.innerHTML = gens.map(g=>prjRowHTML(String(g.t), String(g.t)===String(prjPick),
+      '<span class="t">'+prjWhen(g.t)+'</span><span class="z">'+prjSize(g.z)+'</span>')).join('');
+  } else if(prjView==='trash'){
+    const list=(await prjTrash()).sort((x,y)=>y.del-x.del);
+    if(!list.some(x=>x.id===prjPick)) prjPick=(list[0]||{}).id||null;
+    note.textContent = list.length ? 'ゴミ箱に入れた作品は30日たつと消えます。' : 'ゴミ箱は空です。';
+    box.innerHTML = list.map(m=>{
+      const left=Math.max(1, Math.ceil((m.del+TRASH_DAYS*864e5-Date.now())/864e5));
+      return prjRowHTML(m.id, m.id===prjPick, '<span class="t">'+esc(m.title||'無題のシナリオ')+'</span>'
+        + '<span class="d">'+prjWhen(m.del)+'</span><span class="z">あと'+left+'日</span>');
+    }).join('');
+  } else {
+    const list=prjSorted(await prjList()), busy=await lockBusy();
+    if(!list.some(x=>x.id===prjPick)) prjPick = list.some(x=>x.id===prjId) ? prjId : ((list.find(x=>!busy.has(x.id))||list[0]||{}).id||null);
+    note.textContent = list.length+' 作品。ダブルクリックか Enter で開きます。作品はこのブラウザの中に保存されます。大切な原稿は「保存」でファイルにも残してください。';
+    box.innerHTML = list.map(m=>prjRowHTML(m.id, m.id===prjPick,
+        '<span class="t">'+esc(m.title||'無題のシナリオ')+'</span>'
+      + (busy.has(m.id)?'<span class="busy">別のタブで編集中</span>':'')
+      + '<span class="d">'+prjWhen(m.upd)+'</span>'
+      + '<span class="f">ファイル：'+(m.fileAt?prjWhenShort(m.fileAt):'未保存')+'</span>'
+      + '<span class="z">'+prjSize(m.size)+'</span>')
+      .replace('<div class="prjRow', '<div'+(busy.has(m.id)?' data-busy="1"':'')+((m.gens||[]).length?' data-gens="1"':'')+' class="prjRow')).join('');
+  }
+  const on=box.querySelector('.prjRow.on'); if(on) on.scrollIntoView({block:'nearest'});
+  prjBtns();
+}
+function prjNoteErr(t){ const n=document.getElementById('prjNote'); n.textContent=t; n.style.color='#ff9b83'; }
+function prjDlgShow(){
+  prjPick=prjId; prjView='list';
+  prjDlg.style.display='flex';
+  prjDlgPaint().then(()=>{ const b=document.getElementById('prjOpenBtn'); if(!b.disabled) b.focus(); });
+}
+function prjDlgHide(){
+  if(prjKV && !prjId) return;         // 開いている作品が無いうちは、一覧から選んでもらう
+  prjDlg.style.display='none';
+}
+async function prjDlgOpenPick(){
+  if(!prjKV || !prjPick || prjView!=='list') return;
+  if(prjPick===prjId){ prjDlgHide(); return; }
+  if((await lockBusy()).has(prjPick)){ prjNoteErr(PRJ_BUSY); setStatus(PRJ_BUSY,'#ff9b83'); return; }
+  if(await prjOpen(prjPick)){ prjDlgHide(); return; }
+  const why=document.getElementById('status').textContent;   // 開けなかったわけ（prjOpen が出したもの）
+  await prjDlgPaint(); prjNoteErr(why);
+}
+document.getElementById('btnPrj').onclick=prjDlgShow;
+document.getElementById('prjClose').onclick=prjDlgHide;
+prjDlg.addEventListener('click', e=>{ if(e.target===prjDlg) prjDlgHide(); });
+document.getElementById('prjList').addEventListener('click', e=>{
+  const r=e.target.closest('.prjRow[data-id]'); if(!r) return;
+  prjPick=r.dataset.id;
+  document.querySelectorAll('#prjList .prjRow').forEach(x=>{ const on=x===r; x.classList.toggle('on',on); x.setAttribute('aria-selected',on); });
+  prjBtns();
+});
+document.getElementById('prjList').addEventListener('dblclick', e=>{
+  const r=e.target.closest('.prjRow[data-id]'); if(!r) return;
+  prjPick=r.dataset.id;
+  if(prjView==='list') prjDlgOpenPick();
+});
+document.getElementById('prjOpenBtn').onclick=prjDlgOpenPick;
+document.getElementById('prjNew').onclick=async()=>{ await prjNew(null); prjDlgHide(); };
+document.getElementById('prjDup').onclick=async()=>{
+  if(!prjPick) return;
+  await saveNow();
+  let d=null; try{ d=JSON.parse(await prjRead(prjPick)); }catch(e){}
+  if(!d){ setStatus('この作品は複製できませんでした','#ff9b83'); return; }
+  const title=(d.title||'無題のシナリオ')+'（写し）';
+  d.title=title;
+  const m=await prjWrite(uid(), JSON.stringify(d), title);
+  prjPick=m.id;
+  setStatus('「'+title+'」を作りました','var(--ok)');
+  prjDlgPaint();
+};
+document.getElementById('prjDel').onclick=async()=>{
+  if(!prjPick) return;
+  const m=(await prjList()).find(x=>x.id===prjPick); if(!m) return;
+  if((await lockBusy()).has(m.id)){ prjNoteErr(PRJ_BUSY); return; }
+  if(!confirm('作品「'+(m.title||'無題のシナリオ')+'」をゴミ箱に入れます。30日のあいだは「ゴミ箱」から戻せます。')) return;
+  const wasCur = m.id===prjId;
+  if(wasCur){ await prjLeave(); }            // 書き切ってから手放す（ゴミ箱の作品は中身が最新のまま残る）
+  await prjToTrash(m.id);
+  setStatus('作品「'+(m.title||'無題のシナリオ')+'」をゴミ箱に入れました','var(--ok)');
+  if(wasCur){
+    prjId=null; fileH=null; fileId=null; fileState=null; barPaint();
+    const busy=await lockBusy();
+    let ok=false;
+    for(const x of prjSorted(await prjList())){ if(!busy.has(x.id) && await prjOpen(x.id)){ ok=true; break; } }
+    if(!ok) await prjNew(null);
+  }
+  prjPick=prjId;
+  prjDlgPaint();
+};
+document.getElementById('prjGens').onclick=()=>{ if(!prjPick) return; prjGenOf=prjPick; prjView='gens'; prjPick=null; prjDlgPaint(); };
+document.getElementById('prjTrashBtn').onclick=()=>{ prjView='trash'; prjPick=null; prjDlgPaint(); };
+prjDlg.querySelectorAll('.prjBack').forEach(b=>b.onclick=()=>{ prjPick = prjView==='gens' ? prjGenOf : prjId; prjView='list'; prjDlgPaint(); });
+document.getElementById('prjGenRestore').onclick=async()=>{
+  if(!prjPick || !prjGenOf) return;
+  let raw=null, d=null;
+  try{ raw=await genRead(prjGenOf, prjPick); d=JSON.parse(raw); }catch(e){ d=null; }
+  if(!d){ setStatus('この版は戻せませんでした','#ff9b83'); return; }
+  const title=(d.title||'無題のシナリオ')+'（'+prjWhen(+prjPick)+'の版）';
+  d.title=title;
+  const m=await prjWrite(uid(), JSON.stringify(d), title);
+  setStatus('「'+title+'」を作りました','var(--ok)');
+  prjView='list'; prjPick=m.id; prjDlgPaint();
+};
+document.getElementById('prjTrashRestore').onclick=async()=>{
+  if(!prjPick) return;
+  const id=prjPick;
+  await prjRestore(id);
+  setStatus('作品をゴミ箱から戻しました','var(--ok)');
+  prjView='list'; prjPick=id; prjDlgPaint();
+};
+document.getElementById('saveBarBtn').onclick=async()=>{
+  if(saveErr){
+    if(inflight!=null || !savePending) savePending=true;   // 書けなかった分を、いまの姿でもう一度書く
+    await saveNow();
+  } else if(fileState==='paused') await fileResume();
+};
+addEventListener('keydown', e=>{
+  if(!prjDlgOn()) return;
+  /* 一覧を出しているあいだは、キーを裏の原稿（書式・削除・コピーなど）へ届けない。
+     既定の働き（Tab での移動、ボタンの Enter）は止めないので、そのまま効く */
+  e.stopPropagation();
+  if(e.key==='Escape'){ e.preventDefault(); if(prjView!=='list'){ prjDlg.querySelector('.prjBack').click(); } else prjDlgHide(); return; }
+  if(e.target && e.target.closest && e.target.closest('button') && e.key==='Enter') return;
+  const rows=[...document.querySelectorAll('#prjList .prjRow[data-id]')];
+  const i=rows.findIndex(r=>r.dataset.id===String(prjPick));
+  if(e.key==='ArrowDown' || e.key==='ArrowUp'){
+    e.preventDefault();
+    const n=rows[Math.max(0, Math.min(rows.length-1, i+(e.key==='ArrowDown'?1:-1)))];
+    if(n) n.click(), n.scrollIntoView({block:'nearest'});
+  } else if(e.key==='Enter'){ e.preventDefault(); if(prjView==='list') prjDlgOpenPick(); }
+}, true);
+
+/* ================= 起動 ================= */
+let persistAsked=null;      // ブラウザに「消さないで」と求めた結果（Promise）
+(async()=>{
+  initNpcLists();
+  applyPanes(loadPanes());
+  bgWrap.querySelector('[data-bg="none"]').classList.add('on');
+  await prjInit();
+  if(!prjKV){
+    /* 作品の置き場が使えない。これまでどおり1作品だけで動かす */
+    prjShow(await load());
+    setStatus('このブラウザでは作品を1つだけ保存します（作品の置き場を使えません）','#e8c66a');
+    return;
+  }
+  /* ブラウザが容量不足のときに、この保存データを勝手に消さないよう求める */
+  try{ if(navigator.storage && navigator.storage.persist) persistAsked=navigator.storage.persist().catch(()=>false); }catch(e){}
+  const notes=[];
+  await prjMigrate();
+  try{ const n=await prjRepair(); if(n) notes.push('一覧から外れていた作品を'+n+'件戻しました'); }catch(e){}
+  try{ const r=await jnlRecover(); if(r.length) notes.push('前回保存しきれなかった分を戻しました（'+r.join('、')+'）'); }catch(e){}
+  try{ await prjPurgeOld(); }catch(e){}
+  const list = await prjList();
+  if(!list.length && !(await prjTrash()).length){
+    /* はじめて使うとき。見本の原稿で1つめの作品を作る */
+    await prjNew(null, '準備できました');
+    return;
+  }
+  /* 最後に開いていた作品を裏に開いておき、その上で一覧からどれを開くか選んでもらう。
+     別のタブで編集中の作品は飛ばす。開ける作品が無ければ、何も書かない仮の原稿を出しておく */
+  const last = prjLast();
+  const order = [list.find(x=>x.id===last)].concat(prjSorted(list)).filter((x,i,a)=>x && a.indexOf(x)===i);
+  let opened=false;
+  /* 最後に開いていた作品は、前のページが鍵を手放すまで少し待つ（再読み込みの直後のため） */
+  if(order[0] && order[0].id===last && await prjOpen(last, 3000)) opened=true;
+  if(!opened){
+    const busy = await lockBusy();
+    for(const m of order){ if(busy.has(m.id)) continue; if(await prjOpen(m.id)){ opened=true; break; } }
+  }
+  if(!opened) prjShow(null);
+  setStatus(notes.length ? notes.join('。') : '準備できました', notes.length ? '#e8c66a' : undefined);
+  prjDlgShow();
 })();
 </script>
 </body>
