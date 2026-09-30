@@ -1291,6 +1291,13 @@ input.npc-artw{width:3.4em;font-family:inherit;font-size:1em;background:#fff !im
 .t-npc .skwrap select.npc-cat{flex:0 0 6.5em;font-size:.85em;color:#6d6353;min-width:0}
 .t-npc .skwrap select.npc-skname{flex:1 1 auto;min-width:0}
 .t-npc input.npc-i.npc-arg{flex:0 0 5.5em;min-width:0;border-bottom:1px solid rgba(35,32,28,.4)}
+/* 種別つき技能は「〈専門知識:」＋空欄＋「〉」を続けて並べ、1つの技能名として読ませる。
+   選び口と空欄は中身の長さに合わせた幅にする（間に隙間ができないように） */
+.t-npc .skwrap select.npc-skname.sk-pre{flex:0 0 auto;min-width:0;text-align:left;text-align-last:left}
+.t-npc .skwrap input.npc-i.npc-skname.sk-name{flex:0 1 auto;min-width:4em}
+.t-npc .skwrap input.npc-i.npc-arg.sk-arg{flex:0 0 auto;min-width:4em;max-width:14em;padding:0 .1em}
+.t-npc .skwrap .sk-post{flex:0 0 auto;white-space:nowrap}
+.t-npc .skwrap .sk-fill{flex:1 1 auto}
 .t-npc .refcell select.npc-s{width:100%;min-width:0}
 .npc-skilltable td>input.npc-i{width:100%;min-width:0;text-align:center}
 .t-npc .npc-res .v{display:flex;flex-direction:row;align-items:center;gap:1mm;padding:.5mm 1mm}
@@ -2167,6 +2174,50 @@ function withArg(name, arg){
   const a=String(arg||'').trim();
   return a ? name+':'+a : name;
 }
+/* 種別つき技能の編集欄の幅（em）。全角は1字1em、半角はおよそ0.55em で見積もる */
+function skEm(t){
+  let w=0; for(const ch of String(t||'')) w += /[\x20-\x7e]/.test(ch) ? .55 : 1;
+  return Math.round(w*100)/100;
+}
+/* 種別つき技能の編集欄：「〈専門知識:」の選び口＋空欄＋「〉」を1つながりで出す。
+   pre は選び口に出す前半、post は空欄のあとの後半 */
+function skArgBox(path, arg, post){
+  return '<input class="npc-i npc-arg sk-arg" type="text" data-npcfield="'+path+'" value="'+esc(arg||'')+'"'
+    + ' style="width:'+Math.max(4, skEm(arg)+.6)+'em" aria-label="種別">'
+    + (post ? '<span class="sk-post">'+esc(post)+'</span>' : '')
+    + '<span class="sk-fill"></span>';
+}
+function skPreStyle(pre){ return ' style="width:calc('+skEm(pre)+'em + 1.6em)"'; }
+/* 選び口と空欄の幅を、画面に出た字の幅に合わせる。
+   字数からの見積もり（skEm）は書体によってずれ、区切りの「:」が隠れることがあったので、
+   出てから実際の書体で測り直す */
+const skCanvas=document.createElement('canvas').getContext('2d');
+function skTextW(el, t){
+  const cs=getComputedStyle(el);
+  skCanvas.font=cs.font;
+  const ls=parseFloat(cs.letterSpacing)||0;
+  return skCanvas.measureText(t).width + ls*[...t].length;
+}
+function skFit(el){
+  const cs=getComputedStyle(el), fs=parseFloat(cs.fontSize)||13;
+  const pad=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0)+(parseFloat(cs.borderLeftWidth)||0)+(parseFloat(cs.borderRightWidth)||0);
+  if(el.tagName==='SELECT'){
+    const o=el.options[el.selectedIndex];
+    el.style.width=Math.ceil(skTextW(el, o?o.text:'')+pad+fs*2.2)+'px';     // ▾の場所（Chrome で約20px）
+  } else {
+    el.style.width=Math.ceil(Math.max(skTextW(el, el.value||''), fs*4)+pad+fs*.3)+'px';
+  }
+}
+function skFitAll(root){ (root||document).querySelectorAll('select.sk-pre,input.sk-arg,input.sk-name').forEach(skFit); }
+/* 技能欄は描き直しのたびに作り直されるので、増えたときにまとめて測る */
+let skFitReq=0;
+new MutationObserver(()=>{ if(skFitReq) return; skFitReq=requestAnimationFrame(()=>{ skFitReq=0; skFitAll(); }); })
+  .observe(document.documentElement,{childList:true,subtree:true});
+/* 空欄に打つと、その場で幅を合わせる */
+document.addEventListener('input', e=>{
+  const t=e.target;
+  if(t && t.classList && (t.classList.contains('sk-arg') || t.classList.contains('sk-name'))) skFit(t);
+}, true);
 /* CoCは版で能力値の桁が違う（6版=3D6等の素の値／7版=×5した百分率）ので候補リストを分ける */
 const COC6_LIST = {str:'dl-coc6a',con:'dl-coc6a',pow:'dl-coc6a',dex:'dl-coc6a',app:'dl-coc6a',siz:'dl-coc6b',int:'dl-coc6b',edu:'dl-coc6e'};
 const COC7_LIST = {str:'dl-coc7a',con:'dl-coc7a',pow:'dl-coc7a',dex:'dl-coc7a',app:'dl-coc7a',siz:'dl-coc7b',int:'dl-coc7b',edu:'dl-coc7b'};
@@ -2452,16 +2503,17 @@ function emokloreHTML(np, A, edit, mode){
       + '<option value="">系統</option>'
       + EMO_CATS.map(c=>'<option value="'+esc(c)+'"'+(sk.cat===c?' selected':'')+'>'+esc(c)+'</option>').join('')
       + '</select>';
-    /* 種別を入れたら、選択肢の表示も〈専門知識:歴史〉のように置き換える */
-    const label = d => (d.arg && d.n===sk.n && String(sk.arg||'').trim())
-      ? d.n.replace('○○', String(sk.arg).trim()) : d.n;
-    const nameSel = '<select class="npc-s npc-skname" data-npcfield="emoklore.skills.'+i+'.n">'
+    /* 種別つき技能を選んでいるときは、選び口には「〈専門知識:」までを出し、
+       すぐ後ろの空欄と「〉」で1つの技能名にする（完成形と入力欄を二重に出さない） */
+    const parts = (def && def.arg && def.n===sk.n) ? def.n.split('○○') : null;
+    const label = d => (parts && d.n===sk.n) ? parts[0] : d.n;
+    const nameSel = '<select class="npc-s npc-skname'+(parts?' sk-pre':'')+'" data-npcfield="emoklore.skills.'+i+'.n"'
+      + (parts ? skPreStyle(parts[0]) : '') + '>'
       + '<option value="">技能を選ぶ</option>'
       + cands.map(d=>'<option value="'+esc(d.n)+'"'+(sk.n===d.n?' selected':'')+'>'+esc(label(d))+'</option>').join('')
       + ((sk.n && !cands.some(d=>d.n===sk.n)) ? '<option value="'+esc(sk.n)+'" selected>'+esc(sk.n)+'</option>' : '')
       + '</select>';
-    const argIn = (def && def.arg)
-      ? npcIn('emoklore.skills.'+i+'.arg', sk.arg, {cls:'npc-arg', ph:'種別'}) : '';
+    const argIn = parts ? skArgBox('emoklore.skills.'+i+'.arg', sk.arg, parts[1]||'') : '';
     return '<div class="skwrap">'+catSel + nameSel + argIn+'</div>';
   };
   const rows = e.skills.map((sk,i)=>({sk:sk,i:i}))
@@ -2548,7 +2600,7 @@ function dx3rdHTML(np, A, edit){
       /* 種別のない技能にも同じ位置に空の枠を置く。
          そうしないと数値の欄が1つ手前の列に寄って、行ごとに桁がずれる */
       const argCell = def.arg
-        ? (edit ? npcIn('dx3rd.sarg.'+def.k, arg, {cls:'dxarg', ph:'種別'})
+        ? (edit ? npcIn('dx3rd.sarg.'+def.k, arg, {cls:'dxarg'})
                 : '<span class="dxargv">'+roText(arg,'○○')+'</span>')
         : '<span class="dxsp"></span>';
       return '<span class="dxsk"><span class="k">'+esc(label)+'</span>'
@@ -2709,18 +2761,21 @@ function cocHTML(np, A, edit){
       + cocCats(c.ver).map(x=>'<option value="'+esc(x)+'"'+(sk.cat===x?' selected':'')+'>'+esc(x)+'</option>').join('')
       + '</select>';
     const cands = cocSkillsOf(c.ver, sk.cat);
+    /* 種別つき技能は「運転:」の選び口＋空欄で1つの技能名にする（完成形と入力欄を二重に出さない） */
+    const needArg = cocNeedsArg(c.ver, sk.n);
     const nameBox = sk.free
-      ? npcIn('coc.skills.'+i+'.n', sk.n, {cls:'npc-skname', ph:'技能名を書く'})
-        + '<button type="button" class="npc-mini" data-cocfree="'+i+'" data-v="0" title="一覧から選ぶ">一覧</button>'
-      : '<select class="npc-s npc-skname" data-npcfield="coc.skills.'+i+'.n">'
+      ? npcIn('coc.skills.'+i+'.n', sk.n, {cls:'npc-skname'+(needArg?' sk-name':''), ph:'技能名を書く'})
+        + (needArg ? '<span class="sk-post">:</span>' : '')
+      : '<select class="npc-s npc-skname'+(needArg?' sk-pre':'')+'" data-npcfield="coc.skills.'+i+'.n"'
+        + (needArg ? skPreStyle(sk.n+':') : '') + '>'
         + '<option value="">技能を選ぶ</option>'
-        + cands.map(x=>'<option value="'+esc(x)+'"'+(sk.n===x?' selected':'')+'>'+esc(x)+'</option>').join('')
-        + ((sk.n && cands.indexOf(sk.n)<0) ? '<option value="'+esc(sk.n)+'" selected>'+esc(sk.n)+'</option>' : '')
+        + cands.map(x=>'<option value="'+esc(x)+'"'+(sk.n===x?' selected':'')+'>'+esc((needArg && sk.n===x) ? x+':' : x)+'</option>').join('')
+        + ((sk.n && cands.indexOf(sk.n)<0) ? '<option value="'+esc(sk.n)+'" selected>'+esc(needArg ? sk.n+':' : sk.n)+'</option>' : '')
         + '<option value="__free__">自分で書く…</option>'
         + '</select>';
-    const argBox = cocNeedsArg(c.ver, sk.n)
-      ? npcIn('coc.skills.'+i+'.arg', sk.arg, {cls:'npc-arg', ph:'種別'}) : '';
-    return '<div class="skwrap">'+catSel + nameBox + argBox + '</div>';
+    const argBox = needArg ? skArgBox('coc.skills.'+i+'.arg', sk.arg, '') : '';
+    const back = sk.free ? '<button type="button" class="npc-mini" data-cocfree="'+i+'" data-v="0" title="一覧から選ぶ">一覧</button>' : '';
+    return '<div class="skwrap">'+catSel + nameBox + argBox + back + '</div>';
   };
   const rows = c.skills.map((s,i)=>({s:s,i:i})).filter(r=>edit||String(r.s.n||'').trim()).map(({s,i})=>'<tr>'
     + '<td class="tl skillcell">'+(edit?skillCell(s,i):roText(withArg(s.n,s.arg),'—'))+'</td>'
