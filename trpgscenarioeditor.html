@@ -10303,17 +10303,29 @@ body.notoc #tocBtn{left:10px}
   padding:1px 9px;font:inherit;font-size:11px;cursor:pointer;opacity:.55;letter-spacing:.04em}
 .copybtn:hover{opacity:1;background:#a8331f}
 .blkpad.p-table,.blkpad.p-npc{position:relative}
-@media print{ #popOv,#tocBtn,.copybtn,#cmtRail{display:none !important} .appx{display:block} #nav{display:none}
+/* クリックでコピー。コピーされる範囲に、マウスを重ねると薄く色をつける */
+.cpu-on{background:rgba(168,51,31,.07);box-shadow:0 0 0 1.5px rgba(168,51,31,.22);border-radius:2px}
+.cpu-done{background:rgba(95,174,126,.22) !important;box-shadow:0 0 0 1.5px rgba(95,174,126,.6) !important;transition:background .2s}
+#cpuToast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#23201c;color:#f7f3ea;
+  padding:6px 16px;border-radius:5px;font-size:12px;letter-spacing:.06em;z-index:60;opacity:0;pointer-events:none;transition:opacity .2s}
+#cpuToast.on{opacity:.92}
+@media print{ #popOv,#tocBtn,.copybtn,#cmtRail,#cpuToast{display:none !important} .appx{display:block} #nav{display:none}
+  .cpu-on,.cpu-done{background:none !important;box-shadow:none !important}
   .cmt{border-bottom:0} .cmt-n{display:none} }`;
   const js = `
 <script>
 (function(){
   var ov=document.getElementById('popOv'), inn=document.getElementById('popIn');
   function copyText(s){
-    if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(s);
-    var ta=document.createElement('textarea'); ta.value=s; ta.style.position='fixed'; ta.style.opacity='0';
-    document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(e){} ta.remove();
-    return Promise.resolve();
+    /* クリップボードの API が使えない・断られたときは、昔ながらの写し方に切り替える */
+    function fb(){
+      var ta=document.createElement('textarea'); ta.value=s; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select(); var ok=false; try{ ok=document.execCommand('copy'); }catch(e){} ta.remove();
+      var sel=window.getSelection && window.getSelection(); if(sel) sel.removeAllRanges();
+      return ok ? Promise.resolve() : Promise.reject(new Error('copy'));
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(s).catch(fb);
+    return fb();
   }
   document.addEventListener('click',function(e){
     var t=e.target;
@@ -10346,6 +10358,97 @@ body.notoc #tocBtn{left:10px}
       if(d){ copyText(d.textContent); var o=cb.textContent; cb.textContent='コピーしました';
         setTimeout(function(){cb.textContent=o;},1400); }
       return; }
+  });
+  /* ---- クリックでコピー ----
+     コピーの単位は、クリックした場所で決める。
+       表の升目 … その升目だけ
+       判定の枠（> 技能：）… 枠の中の文章だけ
+       描写文・会話文・注釈・処理系 … 小見出し（■◇）があれば、その小見出しの下の文章だけ。
+                                        無ければ段落まるごと（処理系の見出し語は含めない）
+     見出し・キャラクターシート・画像・流れ図などはコピーしない。
+     ドラッグで選んだとき・ダブルクリック・選んだ範囲を外すためのクリックではコピーせず、
+     ふつうの範囲指定のままにする。 */
+  var CPU_BLK = ['t-desc','t-dialog','t-note','t-proc'];
+  var CPU_HEAD = /(^|\\s)(bx-h|bx-hs|bx-h1|bx-h2|bx-h3)(\\s|$)/;
+  function cpuIsHead(el){ return el && el.nodeType===1 && (CPU_HEAD.test(el.className||'') || /(^|\\s)t-lb(\\s|$)/.test(el.className||'')); }
+  function cpuUnit(t){
+    if(!t || !t.closest) return null;
+    if(t.closest('#nav,#tocBtn,#popX,a,button,input,select,textarea,[data-cmt],[data-popopen],.copybtn,.cmt-card')) return null;
+    var c = t.closest('.tbl .cellblk, .bx-tbl td, .bx-tbl th');
+    if(c) return [c];
+    var nest = t.closest('.bx-in');
+    if(nest){ if(t.closest('.bx-in > .t-lb')) return null; return [nest]; }
+    var blk = t.closest('.blk'); if(!blk) return null;
+    var ok=false; for(var i=0;i<CPU_BLK.length;i++) if(blk.classList.contains(CPU_BLK[i])) ok=true;
+    if(!ok) return null;
+    var kids = []; for(var j=0;j<blk.children.length;j++) kids.push(blk.children[j]);
+    var heads = kids.filter(cpuIsHead);
+    if(!heads.length) return [blk];
+    /* 小見出しや見出し語で区切った、そのあいだの部分を1つの単位にする */
+    var child = t; while(child && child.parentNode!==blk) child = child.parentNode;
+    if(!child || child===blk || cpuIsHead(child)) return null;
+    var k = kids.indexOf(child), a=k, z=k;
+    while(a>0 && !cpuIsHead(kids[a-1])) a--;
+    while(z<kids.length-1 && !cpuIsHead(kids[z+1])) z++;
+    return kids.slice(a, z+1);
+  }
+  /* 文字を取り出す。ルビの読み・注の番号・ボタン・見出し語は入れない */
+  function cpuText(el){
+    var out='';
+    (function walk(n){
+      if(n.nodeType===3){ out += n.nodeValue; return; }
+      if(n.nodeType!==1) return;
+      var tg=n.tagName;
+      if(tg==='RT'||tg==='RP'||tg==='BUTTON'||tg==='SCRIPT'||tg==='STYLE') return;
+      if(/(^|\\s)(cmt-n|t-lb|copybtn)(\\s|$)/.test(n.className||'')) return;
+      if(tg==='BR'){ out+='\\n'; return; }
+      var blockish = /^(DIV|P|LI|UL|OL|TR|TABLE)$/.test(tg);
+      if(blockish && out && out.slice(-1)!=='\\n') out+='\\n';
+      for(var i=0;i<n.childNodes.length;i++){
+        walk(n.childNodes[i]);
+        if((tg==='TR') && i<n.childNodes.length-1 && out.slice(-1)!=='\\t') out+='\\t';
+      }
+      if(blockish && out.slice(-1)!=='\\n') out+='\\n';
+    })(el);
+    return out.replace(/[ \\t]+\\n/g,'\\n').replace(/\\n{3,}/g,'\\n\\n').replace(/^\\n+|\\s+$/g,'');
+  }
+  var cpuHover=[], cpuDown=null, cpuTimer=null, cpuToastT=null;
+  function cpuMark(list, cls, on){ for(var i=0;i<list.length;i++) list[i].classList.toggle(cls, on); }
+  document.addEventListener('mouseover', function(e){
+    var u = cpuUnit(e.target);
+    if(cpuHover.length && (!u || u[0]!==cpuHover[0])) cpuMark(cpuHover,'cpu-on',false);
+    cpuHover = u || [];
+    if(u) cpuMark(u,'cpu-on',true);
+  });
+  document.addEventListener('pointerdown', function(e){
+    var s=window.getSelection && window.getSelection();
+    cpuDown = {x:e.clientX, y:e.clientY, sel: !!(s && !s.isCollapsed)};
+  }, true);
+  function cpuToast(msg){
+    var t=document.getElementById('cpuToast');
+    if(!t){ t=document.createElement('div'); t.id='cpuToast'; document.body.appendChild(t); }
+    t.textContent=msg; t.classList.add('on');
+    clearTimeout(cpuToastT); cpuToastT=setTimeout(function(){ t.classList.remove('on'); },1300);
+  }
+  document.addEventListener('click', function(e){
+    clearTimeout(cpuTimer);
+    if(e.button!==0 || e.detail>1) return;                    // ダブル・トリプルクリックは語や段落を選ぶため
+    var d=cpuDown; cpuDown=null;
+    if(d && (Math.abs(e.clientX-d.x)>4 || Math.abs(e.clientY-d.y)>4 || d.sel)) return;
+    var s=window.getSelection && window.getSelection();
+    if(s && !s.isCollapsed) return;                           // 範囲を選んでいる
+    var u=cpuUnit(e.target); if(!u) return;
+    /* ダブルクリックの1回目かもしれないので、少し待ってからコピーする */
+    cpuTimer=setTimeout(function(){
+      var s2=window.getSelection && window.getSelection();
+      if(s2 && !s2.isCollapsed) return;
+      var txt=u.map(cpuText).filter(function(x){return x;}).join('\\n');
+      if(!txt) return;
+      copyText(txt).then(function(){
+        cpuMark(u,'cpu-done',true); setTimeout(function(){ cpuMark(u,'cpu-done',false); },650);
+        cpuToast('コピーしました');
+      }, function(){ cpuToast('コピーできませんでした'); });
+    }, 280);
   });
   document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&ov) ov.classList.remove('on'); });
   try{ if(localStorage.getItem('trpg-notoc')==='1'){ document.body.classList.add('notoc');
@@ -10822,6 +10925,7 @@ const HELP = [
 <ul>
 <li><b>印刷 / PDF</b>：ページだけが印刷されます。編集用の表示（左のテキスト、ボタン、閉じた区画）は出ません。</li>
 <li><b>閲覧HTMLを書き出す</b>：目次つきの1枚のHTMLになります。追加したフォントも埋め込まれます。</li>
+<li>閲覧HTMLでは、<b>段落をクリックするだけでコピー</b>できます。表は升目ごと、処理系は小見出しごとに、その中の文章だけがコピーされます（ルビの読み・見出し・NPCシートは入りません）。ドラッグでのふつうの範囲指定もそのまま使えます。</li>
 <li>編集中の内容そのものは「保存」でJSONとして残せます。読み込めば続きから編集できます。</li>
 </ul>`]
 ];
