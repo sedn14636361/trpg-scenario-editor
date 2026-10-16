@@ -1,0 +1,44 @@
+# main に入ったものを GitHub Pages へ出す。
+# アプリは 1 ファイルで完結しているので、ビルドはせず、必要なファイルを並べて送るだけにしている。
+name: GitHub Pages に公開
+
+on:
+  push:
+    branches: [main]
+  # Actions の画面から手で走らせることもできる
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 公開が重なったときは、走っている途中のものを止めずに後ろへ並べる
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # 公開するのはアプリ本体と画像と LICENSE だけ。README などリポジトリの中身は載せない。
+      # index.html にも同じものを置き、サイトの入口 (…/trpg-scenario-editor/) でアプリが開くようにする。
+      - name: 公開するファイルを並べる
+        run: |
+          mkdir _site
+          cp trpgscenarioeditor.html _site/
+          cp trpgscenarioeditor.html _site/index.html
+          cp -r docs LICENSE _site/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
