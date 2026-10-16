@@ -73,6 +73,19 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 #uiTip{position:fixed;z-index:61;display:none;background:#f3efe6;color:#1f1b14;font-size:12px;padding:5px 9px;
   border-radius:4px;box-shadow:0 4px 14px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap}
 #uiTip small{color:#6b5d3e;margin-left:8px}
+/* 行の頭で / を打ったときの候補 */
+#slMenu{position:fixed;z-index:95;display:none;width:330px;max-height:340px;overflow:auto;background:#1b202b;
+  border:1px solid #3a4252;border-radius:7px;box-shadow:0 10px 28px rgba(0,0,0,.6);padding:4px;font-size:13px}
+#slMenu .sh{font-size:10px;color:var(--muted);letter-spacing:.1em;padding:6px 8px 3px}
+#slMenu .it{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:5px;color:var(--text);cursor:pointer}
+#slMenu .it.on{background:#2c3342;box-shadow:inset 2px 0 0 var(--brass)}
+#slMenu .gl{flex:0 0 46px;height:26px;display:flex;align-items:center;justify-content:center;background:#0e1219;
+  border:1px solid var(--line);border-radius:4px;color:var(--brass);font-size:12px;white-space:pre;overflow:hidden}
+#slMenu .tx{flex:1;min-width:0}
+#slMenu .tx small{display:block;color:var(--muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#slMenu .cm{color:var(--muted);font-size:11px;font-family:ui-monospace,monospace}
+#slMenu .ft{border-top:1px solid var(--line);margin-top:4px;padding:6px 8px 3px;font-size:10px;color:var(--muted);line-height:1.8}
+@media print{ #slMenu{display:none !important} }
 .pane{display:none}
 .pane.on{display:block}
 .hint{color:var(--muted);font-size:11px;line-height:1.6;margin:6px 0}
@@ -556,7 +569,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.4.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.5.0</span>
     <button id="btnSide" title="右の道具欄（設定・ページ・文書）を出し入れします">&#9776;</button>
     <button id="btnPages" title="右下にページ一覧を出し入れします（Ctrl+Shift+P）">ページ一覧</button>
     <span class="seggrp">
@@ -5233,6 +5246,202 @@ function slashFireTA(ta, e){
   if(hit.inside) ta.selectionStart = ta.selectionEnd = ta.selectionEnd-1;
   return true;
 }
+/* ================= / の候補 =================
+   行の頭で / （日本語入力のままなら ／）を打つと、入れ子の書式の候補を出す。
+   続けて打った文字で絞り込む。手がかりは合図の名前（ko → komidashi。頭から合うものだけ）・
+   ひらがなの読み（みだし → ■見出し・◇小見出し）・表示名の3つ。読みと表示名は途中に含まれていても合う。
+   ↑↓で選んで Enter か Tab で入れる。Esc か、合うものがなくなれば閉じて、打った文字はそのまま残す。
+   入れたあとの原稿は「/合図＋空白」で入れたときとまったく同じ印になる。
+   日本語キーボードの / キーは、日本語入力がオンだと「・」になる。「・」は箇条書きの印なので合図にはせず、
+   全角の ／ を合図に加えて、日本語入力のままでも使えるようにしている。 */
+const SLASH_READ = {midashi:'みだし', komidashi:'こみだし', chushaku:'ちゅうしゃく', hantei:'はんてい',
+  kaiwa:'かいわ', hyou:'ひょう', betsumado:'べつまど', kajou:'かじょう', bangou:'ばんごう',
+  sentaku:'せんたく', sagedan:'さげだん'};
+const SLASH_ITEMS = RICH_MARKS.map(([mk, lb, ds])=>{
+  const e = SLASH_MARKS.find(x=>x[1]===mk), cmds = e ? e[0] : [];
+  return {mk, lb, ds, cmd:cmds[0]||'', cmds, words:cmds.map(c=>SLASH_READ[c]||'').concat([lb]).filter(Boolean)};
+});
+/* 全角の英数字は半角に、カタカナはひらがなにそろえてから比べる（日本語入力のまま打っても合うように） */
+function slashNorm(t){
+  return String(t||'').normalize('NFKC').toLowerCase()
+    .replace(/[ァ-ヶ]/g, c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+}
+let slashMenu = null;     // 出している候補 {el, ta, back, list, i}。出していなければ null
+/* 候補を出してよい欄か。入れ子の書式が効く段落（描写文・注釈・処理系、表の升目）と、
+   その中身を書く入力欄（別窓の文章・表の広い窓の升目・設定欄の升目と処理系の中身）に限る */
+function slashField(t){
+  if(!t || !t.closest) return null;
+  if(t.tagName==='TEXTAREA'){
+    if(t.id==='popEdit' || (t.dataset.tbcell!=null && t.closest('#tblDlgBody'))
+       || (t.closest('#propBody') && (t.dataset.cell!=null || t.dataset.p==='btext'))) return {el:t, ta:true};
+    return null;
+  }
+  const el = t.closest('.srctext[contenteditable="true"],[data-btext][contenteditable="true"]');
+  if(!el) return null;
+  if(el.classList.contains('srctext')){
+    const ts = tsrcOf(el);
+    if(ts) return ts.name ? null : {el, ta:false};       // 表の名前の欄では出さない
+  }
+  const f = findBlock(el.dataset.btext || el.dataset.id);
+  return (f && RICH_TYPES.includes(f.b.type)) ? {el, ta:false} : null;
+}
+/* カーソルより前の文字。<br> は改行として数える（Shift+Enter の改行が <br> になることがあるため） */
+function slashBefore(fd){
+  if(fd.ta){
+    const ta = fd.el;
+    return ta.selectionStart===ta.selectionEnd ? ta.value.slice(0, ta.selectionStart) : null;
+  }
+  const s = getSelection(); if(!s.rangeCount) return null;
+  const r = s.getRangeAt(0);
+  if(!r.collapsed || !fd.el.contains(r.startContainer)) return null;
+  const p = r.cloneRange(); p.selectNodeContents(fd.el); p.setEnd(r.startContainer, r.startOffset);
+  const d = document.createElement('div'); d.appendChild(p.cloneContents());
+  d.querySelectorAll('br').forEach(b=>b.replaceWith('\n'));
+  return d.textContent;
+}
+function slashCheck(fd){
+  const before = fd ? slashBefore(fd) : null;
+  if(before==null){ closeSlash(); return; }
+  const line = before.slice(before.lastIndexOf('\n')+1);
+  const m = line.match(/^[ 　\t]*[\/／]([^\s　\/／]{0,16})$/);
+  if(!m){ closeSlash(); return; }
+  const q = slashNorm(m[1]);
+  /* ローマ字の合図は頭から合うものだけ（ha で chushaku の「sha」に合ってしまわないように） */
+  const list = SLASH_ITEMS.filter(x=>!q || x.cmds.some(k=>k.startsWith(q)) || x.words.some(k=>slashNorm(k).includes(q)));
+  if(!list.length){ closeSlash(); return; }
+  /* 絞り込んでも、選んでいたものが残っていればそのまま選んでおく */
+  const was = (slashMenu && slashMenu.el===fd.el) ? slashMenu.list[slashMenu.i] : null;
+  /* 別名で合ったときは、その別名を見せる（/ch で「選択」が出るのは /check に合ったから、とわかるように） */
+  const shown = list.map(x=>(q && x.cmds.find(k=>k.startsWith(q))) || x.cmd);
+  slashMenu = {el:fd.el, ta:fd.ta, back:m[1].length+1, list, shown, i:Math.max(0, was ? list.indexOf(was) : 0)};
+  drawSlash();
+}
+function closeSlash(){
+  slashMenu = null;
+  const m = document.getElementById('slMenu'); if(m) m.style.display='none';
+}
+function drawSlash(){
+  let m = document.getElementById('slMenu');
+  if(!m){
+    m = document.createElement('div'); m.id='slMenu'; m.setAttribute('role','listbox');
+    document.body.appendChild(m);
+    m.addEventListener('mousedown', e=>e.preventDefault());       // 打っている欄から焦点を外さない
+    m.addEventListener('click', e=>{ const it=e.target.closest('[data-i]'); if(it) applySlash(+it.dataset.i); });
+    m.addEventListener('mousemove', e=>{
+      const it=e.target.closest('[data-i]');
+      if(it && slashMenu && +it.dataset.i!==slashMenu.i){ slashMenu.i=+it.dataset.i; paintSlash(); }
+    });
+  }
+  m.innerHTML = '<div class="sh">入れ子の書式（行の頭の印）</div>'
+    + slashMenu.list.map((x,i)=>'<div class="it" role="option" data-i="'+i+'">'
+        + '<span class="gl">'+esc(x.mk.trim())+'</span>'
+        + '<span class="tx">'+esc(x.lb)+'<small>'+esc(x.ds)+'</small></span>'
+        + '<span class="cm">/'+esc(slashMenu.shown[i])+'</span></div>').join('')
+    + '<div class="ft">↑↓ 選ぶ　Enter 入れる　Esc 閉じる<br>続けて打つと絞り込めます（ko・みだし など）</div>';
+  m.style.display='block';
+  paintSlash();
+  placeSlash();
+}
+function paintSlash(){
+  const m = document.getElementById('slMenu'); if(!m || !slashMenu) return;
+  m.querySelectorAll('.it').forEach(x=>{
+    const on = +x.dataset.i===slashMenu.i;
+    x.classList.toggle('on', on); x.setAttribute('aria-selected', on);
+    if(on) x.scrollIntoView({block:'nearest'});
+  });
+}
+/* 入力欄（textarea）はカーソルの位置を直接は測れないので、同じ大きさ・同じ文字の見えない写しを作って測る */
+function taCaretRect(ta){
+  const cs = getComputedStyle(ta), d = document.createElement('div');
+  ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','textIndent','tabSize','wordBreak','overflowWrap',
+   'paddingTop','paddingRight','paddingBottom','paddingLeft',
+   'borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth','borderStyle','boxSizing']
+    .forEach(k=>{ d.style[k] = cs[k]; });
+  Object.assign(d.style, {position:'fixed', left:'0', top:'0', visibility:'hidden', whiteSpace:'pre-wrap',
+    overflow:'hidden', width:ta.offsetWidth+'px'});
+  d.textContent = ta.value.slice(0, ta.selectionStart);
+  const sp = document.createElement('span'); sp.textContent = '​'; d.appendChild(sp);
+  document.body.appendChild(d);
+  const r = ta.getBoundingClientRect();
+  const top = r.top + sp.offsetTop - ta.scrollTop, left = r.left + sp.offsetLeft - ta.scrollLeft;
+  const h = sp.offsetHeight || parseFloat(cs.lineHeight) || 16;
+  d.remove();
+  return {left, top, bottom:top+h};
+}
+/* カーソルのすぐ下に出す。下に入りきらなければ上に出す */
+function placeSlash(){
+  const m = document.getElementById('slMenu'); if(!m || !slashMenu) return;
+  let rc;
+  if(slashMenu.ta) rc = taCaretRect(slashMenu.el);
+  else {
+    const s = getSelection();
+    const r = s.rangeCount ? s.getRangeAt(0) : null;
+    rc = r ? (r.getClientRects()[0] || r.getBoundingClientRect()) : null;
+    if(!rc || (!rc.width && !rc.height)) rc = slashMenu.el.getBoundingClientRect();
+  }
+  const mw = m.offsetWidth, mh = m.offsetHeight;
+  let top = rc.bottom + 6;
+  if(top + mh > innerHeight - 8 && rc.top - 6 - mh > 8) top = rc.top - 6 - mh;
+  m.style.top  = Math.max(8, Math.min(top, innerHeight - mh - 8))+'px';
+  m.style.left = Math.max(8, Math.min(rc.left - 12, innerWidth - mw - 8))+'px';
+}
+/* 選んだ印で「/と続けて打った文字」を置き換える。
+   execCommand を通すので、カーソルの位置も「元に戻す」もブラウザに任せられ、入力の知らせも届く */
+function applySlash(i){
+  const sm = slashMenu; if(!sm) return;
+  const it = sm.list[i==null ? sm.i : i];
+  closeSlash();
+  if(!it || !sm.el.isConnected) return;
+  const inside = it.mk==='「」';
+  if(sm.ta){
+    const ta = sm.el, c = ta.selectionStart;
+    ta.focus(); ta.setSelectionRange(c - sm.back, c);
+    if(!document.execCommand('insertText', false, it.mk)){
+      ta.setRangeText(it.mk, c - sm.back, c, 'end');
+      ta.dispatchEvent(new Event('input', {bubbles:true}));
+    }
+    if(inside) ta.selectionStart = ta.selectionEnd = ta.selectionEnd - 1;
+  }else{
+    sm.el.focus();
+    const s = getSelection();
+    for(let k=0; k<sm.back; k++) s.modify('extend','backward','character');
+    document.execCommand('insertText', false, it.mk);
+    if(inside) s.modify('move','backward','character');
+  }
+}
+/* 打つたびに、候補を出すか・絞り込むか・閉じるかを決める。
+   各欄の入力の処理（原稿への書き戻しなど）がすんだあとに見るよう、document で受ける */
+document.addEventListener('input', e=>{
+  const fd = slashField(e.target);
+  if(fd) slashCheck(fd);
+  else if(slashMenu) closeSlash();
+});
+/* 候補を出しているあいだの ↑↓・Enter・Tab・Esc は、候補の操作に使う。
+   段落を分ける Enter や、選択を外す Esc より先に受け取る */
+document.addEventListener('keydown', e=>{
+  if(!slashMenu) return;
+  if(e.isComposing || e.keyCode===229) return;           // 日本語入力の変換中の Enter は変換を決めるためのもの
+  const n = slashMenu.list.length;
+  if(e.key==='ArrowDown' || e.key==='ArrowUp'){
+    e.preventDefault(); e.stopPropagation();
+    slashMenu.i = (slashMenu.i + (e.key==='ArrowDown' ? 1 : n-1)) % n; paintSlash(); return;
+  }
+  if((e.key==='Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) || (e.key==='Tab' && !e.shiftKey)){
+    e.preventDefault(); e.stopPropagation(); applySlash(); return;
+  }
+  if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); e.__escHandled = true; closeSlash(); }
+}, true);
+/* 左右の矢印や Home・End でカーソルが動いたら、まだ / の続きにいるかを見直す */
+document.addEventListener('keyup', e=>{
+  if(slashMenu && /^(ArrowLeft|ArrowRight|Home|End)$/.test(e.key)) slashCheck(slashField(slashMenu.el));
+}, true);
+/* 候補の外を押したとき・欄から離れたときは閉じる。スクロールしたら位置を合わせ直す */
+document.addEventListener('pointerdown', e=>{
+  if(slashMenu && !e.target.closest('#slMenu')) closeSlash();
+}, true);
+document.addEventListener('focusout', e=>{ if(slashMenu && e.target===slashMenu.el) closeSlash(); });
+document.addEventListener('scroll', ()=>{ if(slashMenu) placeSlash(); }, true);
+addEventListener('resize', ()=>{ if(slashMenu) placeSlash(); });
 /* 行の頭についている印。書式を付け替えるとき、まずこれを外す */
 const RICH_HEAD_RE = /^[ 　\t]*(?:[■◆]|[◇]|[※＊]|[＞>]|[・･]|[-*+][ \t]*\[[ xX]?\]|[-*+][ \t]|\d+[.．)）]|[□☐]|[＠@]|#{1,3})[ 　\t]*/;
 /* その印がどの書式のものかを返す。付け直しと「もう一度押して外す」の判定に使う */
@@ -10713,6 +10922,7 @@ const HELP = [
 <h4>入れ子の書式（行の頭の印）</h4>
 <p>箇条書きは独立した書式ではなく、<b>本文の中に置く入れ子の書式</b>です。行の頭に印を入れると、その行だけ別の書式になります。<b>描写文・注釈・処理系・別窓の中身・キャラシのメモ／タブ</b>で使えます。<br>
 段落を選ぶと<b>右の設定欄</b>に「入れ子の書式」のボタンが出ます。押すと、いまカーソルのある行の頭に印を入れます（本文に触れていなければ末尾に新しい行として足します）。</p>
+<p>打ちながら入れるときは、行の頭で <code>/</code> を打ちます。<b>候補の一覧</b>が出るので、<code>↑</code><code>↓</code>で選んで <code>Enter</code> か <code>Tab</code> で入れます（マウスで押しても入ります）。続けて打つと絞り込めます。手がかりは、合図の名前（<code>/ko</code> → 小見出し）、ひらがなの読み（<code>/みだし</code> → 見出し・小見出し）、表示名です。<code>Esc</code> で閉じると、打った文字はそのまま残ります。日本語入力のままなら全角の <code>／</code> でも出ます（日本語キーボードの <code>/</code> キーは、日本語入力がオンだと「・」になるためです）。<code>/komidashi</code> のように最後まで打って空白を押しても、これまでどおり入ります。</p>
 <table>
 <tr><th><code>- </code>で始まる行</th><td><b>箇条書き（中黒）</b>。markdown と同じ書き方です（<code>*</code> <code>+</code> も同じ）。うしろに空白が要ります（<code>-5度</code> のような文はそのままです）。</td></tr>
 <tr><th><code>1.</code> <code>2.</code> で始まる行</th><td><b>箇条書き（番号）</b>。書いた番号がそのまま出ます。markdown と同じです。</td></tr>
