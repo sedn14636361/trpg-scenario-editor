@@ -32,7 +32,10 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 #top .brand{font-weight:700;letter-spacing:.18em;color:var(--brass);margin-right:6px;white-space:nowrap}
 #buildStamp{font-size:10px;color:var(--muted);margin-right:8px;white-space:nowrap;opacity:.75}
 #top .sp{flex:1}
-#status{color:var(--muted);font-size:11px;min-width:90px;text-align:right}
+/* 状態の表示は幅を決めておく。文言の長さで伸び縮みすると、左のボタンがそのたびに動くため。
+   入りきらない長い文言は末尾を … にし、指を乗せると全文が出る */
+#status{flex:0 0 230px;width:230px;color:var(--muted);font-size:11px;text-align:right;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .seggrp{display:flex;border:1px solid var(--line);border-radius:5px;overflow:hidden}
 .seggrp button{border:0;border-radius:0;padding:6px 12px}
 .seggrp button+button{border-left:1px solid var(--line)}
@@ -569,7 +572,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.7.1</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.7.2</span>
     <button id="btnPages" title="右下にページ一覧を出し入れします（Ctrl+Shift+P）">ページ一覧</button>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
@@ -3459,7 +3462,7 @@ let editingId = null;         // ブロック編集モードで中身を編集�
 let pageMap = [];             // ページ番号 → そのページに載ったブロックIDの配列
 
 const KEY='trpg-typeset-v2';
-function setStatus(t,c){const e=document.getElementById('status');e.textContent=t;e.style.color=c||'var(--muted)';}
+function setStatus(t,c){const e=document.getElementById('status');e.textContent=t;e.title=t;e.style.color=c||'var(--muted)';}
 let saveTimer=null;
 let unsaved=false;          // 最後にファイルへ保存してから変更があったか
 
