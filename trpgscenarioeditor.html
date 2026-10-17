@@ -569,8 +569,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.7.0</span>
-    <button id="btnSide" title="右の道具欄（設定・ページ・文書）を出し入れします">&#9776;</button>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.7.1</span>
     <button id="btnPages" title="右下にページ一覧を出し入れします（Ctrl+Shift+P）">ページ一覧</button>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
@@ -588,7 +587,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
       <button id="btnOpen" title="保存したファイルを読み込みます">開く</button>
     </span>
     <button id="btnPrint" title="ブラウザの印刷からPDFにできます">印刷 / PDF</button>
-    <button id="btnExport" title="配布用の閲覧HTMLを書き出します">書き出す</button>
+    <button id="btnExport" title="配布用の閲覧HTMLを出力します">HTML</button>
     <button id="btnHelp" title="使い方">ヘルプ</button>
     <span id="status">&#8212;</span>
   </div>
@@ -814,13 +813,13 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 
 <div id="outDlg" style="display:none;position:fixed;inset:0;z-index:74;background:rgba(0,0,0,.7);align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;width:min(420px,94vw);padding:18px 20px">
-    <b id="outTitle" style="color:var(--brass);font-size:13px">書き出す</b>
-    <label class="f" style="margin-top:14px">出すページ</label>
+    <b id="outTitle" style="color:var(--brass);font-size:13px">HTML出力</b>
+    <label class="f" style="margin-top:14px">出力</label>
     <div class="row" style="gap:12px">
       <label style="display:flex;gap:5px;align-items:center;flex:0 0 auto">
-        <input type="radio" name="outsc" value="all" checked> <span id="outAll">全部</span></label>
+        <input type="radio" name="outsc" value="all" checked> <span id="outAll">全てのページを出力</span></label>
       <label style="display:flex;gap:5px;align-items:center;flex:0 0 auto">
-        <input type="radio" name="outsc" value="range"> 範囲</label>
+        <input type="radio" name="outsc" value="range"> 範囲を指定して出力</label>
     </div>
     <div class="row" style="margin-top:8px;align-items:center;gap:6px">
       <input type="number" id="outFrom" min="1" style="width:70px;flex:0 0 auto">
@@ -828,7 +827,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
       <input type="number" id="outTo" min="1" style="width:70px;flex:0 0 auto">
       <span class="hint" style="flex:0 0 auto">ページ</span>
     </div>
-    <div id="outShapeRow"><label class="f">形</label>
+    <div id="outShapeRow"><label class="f">形式</label>
       <div class="row" style="gap:12px">
         <label style="display:flex;gap:5px;align-items:center;flex:0 0 auto">
           <input type="radio" name="outshape" value="page" checked> ページごと</label>
@@ -837,13 +836,9 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
       </div>
       <div class="hint" id="outShapeNote" style="margin:4px 0 0"></div>
     </div>
-    <div id="outTocRow"><label class="f">目次</label>
-      <div class="hint" style="margin:0">目次はいつも付きます。読む側で出し入れでき、
-        ネタバレよけに見出しを伏せた状態から始まります。</div>
-    </div>
     <div class="grid2" style="margin-top:16px">
       <button id="outCancel">やめる</button>
-      <button id="outGo" class="on">出す</button>
+      <button id="outGo" class="on">出力する</button>
     </div>
   </div>
 </div>
@@ -6354,8 +6349,7 @@ function renderSrc(force){
   }else{
     srcList.innerHTML = srcRowsHTML(S.blocks);
   }
-  document.getElementById('modeNote').innerHTML = '文章に触れた段落が選択されます'
-    + '<button id="modeHelp" title="使い方を見る">?</button>';
+  document.getElementById('modeNote').innerHTML = '<button id="modeHelp" title="使い方を見る">?</button>';
   const mh=document.getElementById('modeHelp');
   if(mh) mh.onclick=()=>document.getElementById('btnHelp').click();
 }
@@ -8715,7 +8709,6 @@ npcOn('click', e=>{
    要素ごと差し替えると、技能名からTabで移ってきた直後にフォーカスが飛んで
    入力が失われるため、options の中身だけを書き換える。 */
 /* ================= サイドパネル ================= */
-document.getElementById('btnSide').onclick=()=>toggleDock();
 document.getElementById('viewAll').onclick=()=>setSrcView('all');
 document.getElementById('viewPage').onclick=()=>setSrcView('page');
 function setSrcView(v){
@@ -9432,7 +9425,7 @@ function propsToc(b){
       + '<button data-p="tocscope" data-v="chapter"'+(t.scope==='chapter'?' class="on"':'')+'>この章だけ</button></div>',
       t.scope==='chapter'
         ? 'すぐ上の見出し1から、次の見出し1の手前までの見出しを載せます。章ごとの細かい目次に使えます。'
-        : '原稿ぜんたいの見出しを載せます。')
+        : '文書全体の見出しを載せます。')
     + pRow('目次の見出し語',
       '<input type="text" data-p="toclb" value="'+esc(t.lb)+'" placeholder="目　次">',
       '空にすると見出しそのものを出しません。')
@@ -10569,13 +10562,11 @@ let outMode='export';
 function openOut(mode){
   outMode=mode;
   const n=pageMap.length;
-  document.getElementById('outTitle').textContent = mode==='print' ? '印刷 / PDF' : '閲覧HTMLを書き出す';
-  document.getElementById('outAll').textContent = '全'+n+'ページ';
+  document.getElementById('outTitle').textContent = mode==='print' ? '印刷 / PDF' : 'HTML出力';
   document.getElementById('outFrom').max=n; document.getElementById('outTo').max=n;
   if(!document.getElementById('outFrom').value) document.getElementById('outFrom').value=1;
   if(!document.getElementById('outTo').value || +document.getElementById('outTo').value>n)
     document.getElementById('outTo').value=n;
-  document.getElementById('outTocRow').style.display = mode==='export' ? '' : 'none';
   document.getElementById('outShapeRow').style.display = mode==='export' ? '' : 'none';
   let shape = 'page'; try{ shape = localStorage.getItem('trpg-outshape')==='flow' ? 'flow' : 'page'; }catch(e){}
   document.querySelector('input[name="outshape"][value="'+shape+'"]').checked = true;
@@ -10585,7 +10576,7 @@ function openOut(mode){
 function outShape(){ return document.querySelector('input[name="outshape"]:checked').value; }
 function outShapeNote(){
   document.getElementById('outShapeNote').textContent = outShape()==='flow'
-    ? 'ページの区切りをなくし、スクロールだけで読める1枚にします。別窓は巻末の「追記」へのリンクになり、飛んだ先から「戻る」で戻れます。'
+    ? 'ページの区切りをなくし、スクロールだけで読める1枚にします。'
     : '紙面と同じ A4 のページを並べます。';
 }
 document.querySelectorAll('input[name="outshape"]').forEach(r=>r.addEventListener('change', ()=>{
@@ -10744,6 +10735,8 @@ body.notoc #tocBtn{left:10px}
   padding:1px 9px;font:inherit;font-size:11px;cursor:pointer;opacity:.55;letter-spacing:.04em}
 .copybtn:hover{opacity:1;background:#a8331f}
 .blkpad.p-table,.blkpad.p-npc{position:relative}
+.pg-hit{animation:pghit 1.6s ease}
+@keyframes pghit{0%{background:rgba(211,165,52,.45)}100%{background:transparent}}
 @media print{ #popOv,#tocBtn,.copybtn,#cmtRail{display:none !important} .appx{display:block} #nav{display:none}
   .cmt{border-bottom:0} .cmt-n{display:none} }`;
   /* 区切りなしの1枚。画面ぜんたいを1枚の紙にして、目次もその紙の左に罫線で区切って置く */
@@ -10874,6 +10867,21 @@ body.fx.notoc #doc{margin-left:0}
       return; }
   });
   document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&ov) ov.classList.remove('on'); });
+  /* ページごとの書き出しで、目次から見出しへ飛ぶとき。見出しを画面の上端に合わせると
+     ページの途中から表示されてしまうので、見出しのあるページの頭を画面の上に合わせる。
+     見出しが画面の下のほうに隠れるときだけ、見出しが見える位置まで送る */
+  if(!document.body.classList.contains('fx')) document.addEventListener('click',function(e){
+    var a=e.target.closest&&e.target.closest('a[href^="#b"]'); if(!a) return;
+    var el=document.getElementById(a.getAttribute('href').slice(1)); if(!el) return;
+    var pg=el.closest('.page'); if(!pg) return;
+    e.preventDefault();
+    var y=pg.getBoundingClientRect().top+scrollY-20;
+    var hy=el.getBoundingClientRect().top+scrollY;
+    if(hy-y > innerHeight*0.75) y=hy-innerHeight*0.35;
+    scrollTo(0, Math.max(0, y));
+    var h=el.closest('.blkpad')||el; h.classList.remove('pg-hit'); void h.offsetWidth; h.classList.add('pg-hit');
+    if(history.replaceState) history.replaceState(null,'',a.getAttribute('href'));
+  });
   try{ if(localStorage.getItem('trpg-notoc')==='1'){ document.body.classList.add('notoc');
     var tb=document.getElementById('tocBtn');
     if(tb){ tb.title='目次を出す'; tb.setAttribute('aria-label','目次を出す'); } } }catch(_){}
@@ -10975,7 +10983,7 @@ const HELP = [
 <h4>書きかたと選びかた</h4>
 <p>モードの切り替えはありません。本文はいつでもそのまま打てて、<b>文章に触れた段落がそのまま選択されます</b>。つまみや書式名の欄を押しても選べます。どれも選んでいない状態にしたいときは、<code>Esc</code>をもう一度押すか、本文欄の余白を押すか、右上の段落の操作の<b>選択を外す</b>を使います（何も選んでいなければ、書式は末尾に新しく足します）。<code>Enter</code>で次の段落、段落の先頭で<code>Backspace</code>で前の段落とつながります。</p>
 <h4>画面の並び</h4>
-<p>左から<b>書式ツールバー・本文のテキスト・紙面・道具欄</b>の順に並びます。よく触るものほど広く、たまにしか触らないものは奥にしまってあります。</p>
+<p>左から<b>書式ツールバー・本文のテキスト・紙面・プロパティ等</b>の順に並びます。よく触るものほど広く、たまにしか触らないものは奥にしまってあります。</p>
 <table>
 <tr><th>左・書式ツールバー</th><td>書式を選ぶ（＝段落を足す／変える）。関連の近い書式を1つのアイコンにまとめてあり、
 押すと中身が横に開きます（もう一度押すと閉じます）。右下に三角のあるアイコンは中に複数入っています。
@@ -10984,20 +10992,15 @@ const HELP = [
 （上へ・下へ・複製・下に追加・結合・ブロックをコピー・貼り付け・文章をコピー・選択を外す・削除）。
 その下に、書式ごとの欄（表・キャラシ・画像・処理系など）と、どの段落にも共通の欄（入れ子の書式、ルビ、2段のときの置き方、コメント、文字の色、字下げ、この段落だけの余白）が出ます。</td></tr>
 <tr><th>右下・ページ</th><td>選んだ段落のページの段組、表紙・奥付づくり、背景。</td></tr>
-<tr><th>右下・文書</th><td>シナリオ名、紙面の余白、文字サイズ、フォントなど、原稿ぜんたいの設定。</td></tr>
+<tr><th>右下・文書</th><td>シナリオ名、紙面の余白、文字サイズ、フォントなど、文書全体の設定。</td></tr>
 <tr><th>右下・ページ一覧</th><td>1ページずつ見て、そのページの見出しへ飛べます（「段組とページ」を参照）。</td></tr>
 </table>
-<p>右下の<b>ページ・文書・ページ一覧</b>は、ふだんは見出しだけにたたんであります。押すと開き、もう一度押すとたたみます。
-上の <b>&#9776;</b> で右の道具欄ぜんたいを出し入れできます。</p>
+<p>右下の<b>ページ・文書・ページ一覧</b>は、ふだんは見出しだけに格納してあります。押すと開き、もう一度押すと格納します。</p>
 <h4>本文の表示</h4>
 <table>
 <tr><th>全体</th><td>本文を続けて表示します。通して読み書きするとき。</td></tr>
 <tr><th>ページ単位</th><td>どの段落がどのページに載るかを、区切り線つきで表示します。ページ数を調整するとき。</td></tr>
 </table>
-<h4>選んだところの色</h4>
-<p>段落を選ぶと薄い金色が敷かれます。この色は<b>書式そのものより下</b>に置いてあるので、見出し1のような濃い背景と白い文字でも、読めなくなりません。</p>
-<h4>ページの先頭</h4>
-<p>ページのいちばん上に来たものは、上の余白が自動で落ちます。見出し1をページの頭に置いたとき、上に隙間が空かず、紙面の余白のところから始まります。表紙だけは、紙面の中ほどに置きたいのでそのままです。個別に指定したいときは「この段落だけの余白」が優先されます。</p>
 <h4>表</h4>
 <p>書式ツールバーの<b>図表 → 表</b>（<code>Ctrl</code>+<code>Alt</code>+<code>X</code>）で入ります。書きたいところを押してそのまま打てます。表の上のボタンで行と列を増減します。表の名前は表の上に直接書き込めます。</p>
 <h4>2つの見た目</h4>
@@ -11009,7 +11012,7 @@ const HELP = [
 <tr><th>出力</th><td>出力の文をそのままコピーします。Discordやココフォリアのチャットに貼れます。</td></tr>
 <tr><th>出力の文</th><td>押すと編集欄が開きます。<b>roll-table形式</b>を選ぶと表から自動で作られ、<b>自分で書く</b>を選べば好きな文にできます。</td></tr>
 </table>
-<p>roll-table形式は、ココフォリアの <code>/roll-table</code> に合わせて「1行目に表の名前、2行目にダイス式、以降 <code>出目:結果</code>」で作ります。表の1列目が数字（<code>1</code> や <code>1-3</code>）なら、それを出目として使います。結果の中の改行は、BCDiceの決まりに合わせて <code>\n</code> と書き出します。お使いの環境がちがう書き方なら、<b>自分で書く</b>に切り替えて直せます。</p>
+<p>roll-table形式は、ココフォリアの <code>/roll-table</code> に合わせて「1行目に表の名前、2行目にダイス式、以降 <code>出目:結果</code>」で作ります。表の1列目が数字（<code>1</code> や <code>1-3</code>）なら、それを出目として使います。結果の中の改行は、BCDiceの決まりに合わせて <code>\n</code> と書き出します。お使いの環境が違う書き方なら、<b>自分で書く</b>に切り替えて直せます。</p>
 <h4>別窓</h4>
 <p>紙面には<b>ボタンだけ</b>を置き、長い文章はその中にしまう書式です（<code>Ctrl</code>+<code>Alt</code>+<code>W</code>）。ページ数を増やさずに、込み入った資料を持たせられます。</p>
 <ul>
@@ -11018,8 +11021,8 @@ const HELP = [
 本窓と同じ並びなので、後ろの本窓に戻る必要はありません。</li>
 <li>仕切りをつかむと、それぞれの幅を変えられます。二度押しで元の幅に戻ります。</li>
 <li>窓の右上の <b>&#9776;</b>・<b>テキスト</b>・<b>設定欄</b> で、それぞれの欄を出し入れできます。
-画面が狭くて4つとも並びきらないときは、はじめだけ<b>テキスト欄をたたんで</b>開きます
-（同じ中身は右の紙面にも出ているので、たたんだままでも書けます）。
+画面が狭くて4つとも並びきらないときは、はじめだけ<b>テキスト欄を格納して</b>開きます
+（同じ中身は右の紙面にも出ているので、格納したままでも書けます）。
 いちど自分で出し入れすれば、その後はその決めのままです。</li>
 <li>この窓は<b>本窓のテキスト欄を覆わない位置</b>に出ます。紙面の段落をつかんで、この窓へ運べるようにするためです。
 窓は帯をつかんで動かせ、四辺・四隅のどこをつかんでも大きさを変えられます。</li>
@@ -11043,7 +11046,7 @@ const HELP = [
 <p>紙面の余白から左ドラッグすると、これまでどおり段落をまとめて選べます。</p>
 <h4>幅の調整</h4>
 <ul>
-<li>境目をつかんで動かすと、本文・紙面・右の道具欄の幅を変えられます。</li>
+<li>境目をつかんで動かすと、本文・紙面・右のプロパティ等の幅を変えられます。</li>
 <li>境目を<b>ダブルクリック</b>すると既定の幅に戻ります。</li>
 <li>幅、ツールバーをしまったか、右下でどのタブを開いているかは、このブラウザに覚えさせます。窓を狭くすると、本文・紙面・道具欄が上下に並びます。</li>
 </ul>
@@ -11191,7 +11194,7 @@ const HELP = [
 <li><b>&#9650;</b>・<b>&#9660;</b>（一覧の中で <code>↑</code>・<code>↓</code>、<code>PageUp</code>・<code>PageDown</code>）で前後のページに切り替わります。ボタンには行き先のページの見出しが添えてあります。</li>
 <li>切り替えると紙面もそのページへ移ります。逆に紙面をスクロールすると、一覧も見ているページに合わせて変わります。</li>
 <li>見出しを押すとその段落を選び、本文と紙面がそこへ移ります。縮小したページを押すと、そのページの最初の段落を選びます。</li>
-<li>もう一度押すとたたみます。開いているかどうかは、このブラウザに覚えさせます。</li>
+<li>もう一度押すと格納します。開いているかどうかは、このブラウザに覚えさせます。</li>
 </ul>
 <h4>まとめて選ぶ・動かす</h4>
 <ul>
@@ -11217,7 +11220,7 @@ const HELP = [
 <h4>目次</h4>
 <p>目次を選ぶと、右の設定欄で中身を決められます。</p>
 <ul>
-<li><b>載せる範囲</b>：<b>全体</b>は原稿ぜんたいの見出しを、<b>この章だけ</b>はすぐ上の見出し1から次の見出し1の手前までの見出しを載せます。章ごとの細かい目次を、いくつでも置けます。見出し1を選んで書式ツールバーの「本の部品 → 目次」を押すと、その章の頭に「この章だけ」の目次が入ります（うしろに改ページは入りません）。</li>
+<li><b>載せる範囲</b>：<b>全体</b>は文書全体の見出しを、<b>この章だけ</b>はすぐ上の見出し1から次の見出し1の手前までの見出しを載せます。章ごとの細かい目次を、いくつでも置けます。見出し1を選んで書式ツールバーの「本の部品 → 目次」を押すと、その章の頭に「この章だけ」の目次が入ります（うしろに改ページは入りません）。</li>
 <li><b>見出し語</b>：「目　次」の文字を変えられます。空にすると見出しそのものを出しません。</li>
 <li><b>何を載せるか</b>：タイトル・見出し1〜3・サブ・シーン移行から選びます。押すたびに載せる／載せないが切り替わります（既定は見出し1〜3）。</li>
 <li><b>体裁</b>：ページ番号と、項目とページ番号をつなぐ点線を、それぞれ出し入れできます。</li>
@@ -11360,7 +11363,7 @@ const HELP = [
 <h3>印刷と書き出し</h3>
 <ul>
 <li><b>印刷 / PDF</b>：ページだけが印刷されます。編集用の表示（左のテキスト、ボタン、閉じた区画）は出ません。</li>
-<li><b>閲覧HTMLを書き出す</b>：目次つきの1枚のHTMLになります。追加したフォントも埋め込まれます。書き出す窓の<b>形</b>で2通りから選べます。
+<li><b>HTML</b>（閲覧HTMLの出力）：目次つきの1枚のHTMLになります。追加したフォントも埋め込まれます。HTML出力の窓の<b>形式</b>で2通りから選べます。
   <ul>
   <li><b>ページごと</b>：紙面と同じA4のページを並べます。別窓はボタンを押すと窓が開きます。</li>
   <li><b>区切りなしの1枚</b>：ページの区切り（改ページ・改段・ページ番号・2段組）をなくし、画面ぜんたいを1枚の紙にして、スクロールだけで読めるようにします。左の目次も紙の一部です。
@@ -11427,7 +11430,7 @@ function setDockW(w){
 function applyPanes(v){
   v = v || {};
   if(v.dock>0) setDockW(clampPane(v.dock,240,520));
-  if(v.dockOpen===false) toggleDock(false, true);
+  /* 出し入れのボタン（☰）はなくしたので、前に隠したまま終えていても必ず出す */
   if(v.tbarMini) document.getElementById('tbar').classList.add('mini');
   layoutVars();
   const src=document.getElementById('srcPane');
