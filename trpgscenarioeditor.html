@@ -338,6 +338,11 @@ kbd{background:#0e1219;border:1px solid var(--line);border-radius:3px;padding:0 
 #subBody{flex:1;display:none;overflow:auto;min-height:0;border-top:1px solid var(--line)}
 #sub.open #subBody{display:block}
 #subBody section.pane{padding:12px}
+.varrow{display:flex;gap:4px;align-items:center;margin:0 0 4px}
+.varrow input{min-width:0;padding:4px 6px;font-size:12px}
+.varrow input[data-vk="n"]{flex:0 0 70px}.varrow input[data-vk="def"]{flex:0 0 80px}.varrow input[data-vk="note"]{flex:1}
+.varrow button{flex:0 0 auto;padding:2px 7px}
+.varrow.ho{font-size:12px;color:var(--muted);gap:8px}.varrow.ho code{color:var(--brass)}
 #propSlot #propBox{display:block !important}
 #propSlot #propTtl,#propSlot #propHr{display:none}
 #blkCommon{border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
@@ -572,7 +577,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.7.2</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.8.0</span>
     <button id="btnPages" title="右下にページ一覧を出し入れします（Ctrl+Shift+P）">ページ一覧</button>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
@@ -750,6 +755,13 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
             <div><span class="hint">最初のページの番号</span><input type="number" id="footFrom" min="0" value="1"></div>
             <div><span class="hint">使える記号</span><div class="hint" style="line-height:1.5">{title} 題名<br>{page} 番号<br>{total} 総数</div></div>
           </div>
+          <label class="f">変数（出力したHTMLで名前などを入れられる）</label>
+          <div id="varList"></div>
+          <div class="row" style="margin-top:6px"><button id="varAdd">変数を足す</button></div>
+          <div id="varFound"></div>
+          <div class="hint">本文などに <b>{名前}</b> と書いた場所が、出力したHTMLで入れた値に置き換わります。
+            置き換わるのは<b>ここに登録した名前と、HO1・HO2 のような「HO＋数字」だけ</b>です（HO＋数字は登録しなくても使えます）。
+            ココフォリアの <code>{SAN}</code> のような書き方は登録しなければそのまま残ります。</div>
           <label class="f">本文の文字サイズ（pt）</label>
           <input type="number" id="baseSize" min="7" max="14" step="0.5" value="10">
           <hr>
@@ -1120,6 +1132,24 @@ const DOC_CSS = `
 .t-proc.bx-fill{background:var(--bxf)}
 .t-lb{display:block;font-size:.75em;letter-spacing:.28em;font-weight:700;margin-bottom:1mm;outline:none;white-space:pre-wrap}
 .t-proc .t-lb{color:var(--bxc)}
+/* 情報ブロック。プレイヤーに渡す情報をまとめる枠。中身は1ボタンで写せる */
+.t-info{position:relative;line-height:1.8;padding:2.5mm 3.5mm;border-left:3px solid #2f5d73;background:rgba(47,93,115,.07)}
+.t-info .t-lb{color:#2f5d73}
+/* ハンドアウト。番号（HO1）・題・推奨技能・本文。番号は {HO1} の変数（PC名）にもなる */
+.t-handout{position:relative;line-height:1.8;padding:3.5mm 4.5mm;border:1.4px solid #23201c;border-radius:1px}
+.ho-h{display:flex;align-items:baseline;gap:3mm;flex-wrap:wrap;border-bottom:1px solid rgba(35,32,28,.55);padding-bottom:1.5mm;margin-bottom:2mm}
+.ho-n{font-weight:700;font-size:1.2em;letter-spacing:.06em;color:#a8331f}
+.ho-t{font-weight:700;font-size:1.05em}
+.ho-pc{margin-left:auto;font-size:.82em;color:#6f6450;display:flex;align-items:baseline;gap:1.5mm}
+.ho-pc .vin{width:9em;border:0;border-bottom:1px solid #a8331f;background:transparent;font:inherit;font-size:1.1em;color:#a8331f;padding:0 1mm}
+.ho-pc .vin:focus{outline:0;background:rgba(168,51,31,.06)}
+.ho-pc code{font-family:inherit;color:#a8331f}
+.ho-rec{font-size:.85em;color:#6f6450;margin:0 0 1mm}
+/* 変数を置き換えた文字。値が入っていないあいだは既定値を淡く出す */
+.v{color:#a8331f;border-bottom:1px dotted #a8331f}
+.v.unset{color:#9a8e74;border-bottom-color:#b9ab8c}
+.blkpad.p-info,.blkpad.p-handout{position:relative}
+@media print{ .ho-pc .vin{border:0} .v{border-bottom:0;color:inherit} }
 .t-lb:empty::before{content:attr(data-ph);color:#b9ad97;font-weight:400;letter-spacing:.04em}
 /* コメントの付いた文字。読む邪魔をしないよう、薄い下線と小さな番号だけ */
 .cmt{border-bottom:1px dotted rgba(168,51,31,.75);cursor:help;outline:none}
@@ -1510,6 +1540,11 @@ input.npc-artw{width:3.4em;font-family:inherit;font-size:1em;background:#fff !im
 .colsw{flex:1;height:22px;border:1px solid rgba(255,255,255,.25);border-radius:4px;padding:0;min-width:0}
 .colsw:hover{border-color:var(--brass)}
 #stage .copybtn,#printAppendix .copybtn,#pagesBody .copybtn{display:none !important}
+.blkcopy{position:absolute;right:2mm;top:1.8mm;z-index:2;border:1px solid currentColor;border-radius:999px;background:#f7f3ea;color:#2f5d73;padding:0 9px;font:11px system-ui,sans-serif;line-height:1.7;cursor:pointer;opacity:.75}
+.t-handout .blkcopy{color:#23201c;top:auto;bottom:2mm}
+.blkcopy:hover{opacity:1}
+#pagesBody .blkcopy,#printAppendix .blkcopy{display:none}
+@media print{ .blkcopy{display:none !important} }
 /* 紙の上に出るボタン。編集画面の button の既定色のままだと、
    紙の文字色と同じ濃さになって読めなくなる */
 .copybtn{position:absolute;right:0;top:-1.6em;border:0;border-radius:3px;
@@ -1768,7 +1803,9 @@ const TYPES = [
   {k:'popup',    n:'別窓',      s:'W', g:'差し込み'},
   {k:'toc',      n:'目次',      s:'M', g:'差し込み'},
   {k:'cover',    n:'表紙',      s:'C', g:'差し込み'},
-  {k:'colophon', n:'奥付',      s:'K', g:'差し込み'}
+  {k:'colophon', n:'奥付',      s:'K', g:'差し込み'},
+  {k:'info',     n:'情報',      s:'L', g:'差し込み'},
+  {k:'handout',  n:'ハンドアウト',s:'Y', g:'差し込み'}
 ];
 const TYPE_GROUPS = ['本文','見出し','区切り','差し込み'];
 /* 段落の上下の余白（mm）。ここだけを直せば紙面ぜんたいに効く。
@@ -1781,12 +1818,87 @@ const SPACE = {
   proc:{t:3,b:3},                       scene:{t:4.5,b:3},
   hr:{t:4,b:4},      vr:{t:3,b:3},      npc:{t:3.5,b:3.5},
   image:{t:3,b:3},   table:{t:3,b:3},   popup:{t:2.5,b:2.5},
-  flow:{t:4,b:4},
+  flow:{t:4,b:4},    info:{t:3,b:3},    handout:{t:4,b:4},
   toc:{t:0,b:2},     colophon:{t:8,b:0},break:{t:0,b:0}, colbr:{t:0,b:0}
 };
 const SP = k => SPACE[k] || {t:0,b:2};
+/* ハンドアウトの中身。no は番号（HO1）で、そのまま {HO1} の変数（PC名）にもなる。
+   ttl は題、rec は推奨技能、def はPC名を入れていないときに出す文字 */
+const VAR_NAME_RE = /^[A-Za-z0-9_぀-ヿ一-鿿]{1,16}$/;
+const VAR_RESERVED = ['title','page','total'];   // フッターの記号と同じ名前は使わない
+/* 登録した変数。n は名前（{HO1} の HO1）、def は値を入れていないときの表示、note は説明 */
+function cleanVars(a){
+  const seen = new Set();
+  return (Array.isArray(a)?a:[]).map(v=>({n:String((v||{}).n||'').trim(), def:String((v||{}).def||''), note:String((v||{}).note||'')}))
+    .filter(v=>{ if(!v.n || seen.has(v.n)) return false; seen.add(v.n); return true; });   // 名前が空・重なりは除く
+}
+/* 置き換える変数の一覧。ハンドアウトの番号（PC名）を先に、文書で登録したものをあとに並べる */
+function varList(){
+  const out = [], seen = new Set();
+  allBlocks().filter(b=>b.type==='handout').forEach(b=>{
+    const h = ensureHo(b); if(seen.has(h.no)) return; seen.add(h.no);
+    out.push({n:h.no, def:h.def, note:(h.ttl.trim()?h.ttl+'のPC':'ハンドアウトのPC'), ho:true});
+  });
+  (S.vars||[]).forEach(v=>{
+    if(!VAR_NAME_RE.test(v.n) || VAR_RESERVED.includes(v.n) || seen.has(v.n)) return;
+    seen.add(v.n); out.push({n:v.n, def:v.def, note:v.note});
+  });
+  /* {HO1} のような「HO＋数字」は、ハンドアウトの枠がなくても登録なしで変数にする */
+  const all = JSON.stringify(S.blocks, (k,v)=> (k==='img'||k==='data') ? undefined : v);
+  const re = /\{(HO\d{1,3})\}/g; let m;
+  while((m = re.exec(all))) if(!seen.has(m[1])){ seen.add(m[1]); out.push({n:m[1], def:'', note:'ハンドアウトのPC', auto:true}); }
+  /* HO＋数字を番号の順に先に並べ、ほかの名前は登録した順にそのあとへ */
+  const hoN = v => { const x = /^HO(\d+)$/.exec(v.n); return x ? +x[1] : Infinity; };
+  return out.map((v,i)=>({v,i})).sort((a,b)=> (hoN(a.v)-hoN(b.v)) || (a.i-b.i)).map(x=>x.v);
+}
+/* 文中に {○○} と書いてあるのに、まだ登録していない名前（登録の候補として出す） */
+function varCandidates(){
+  const reg = new Set(varList().map(v=>v.n)), out = new Set();
+  const re = /\{([A-Za-z0-9_぀-ヿ一-鿿]{1,16})\}/g;
+  /* 段落の中身をまとめて文字にして探す（画像の中身は大きいので除く） */
+  const all = JSON.stringify(S.blocks, (k,v)=> (k==='img'||k==='data') ? undefined : v);
+  let m; while((m = re.exec(all))) if(!reg.has(m[1]) && !VAR_RESERVED.includes(m[1])) out.add(m[1]);
+  return [...out];
+}
+function ensureHo(b){
+  const h = (b.ho && typeof b.ho==='object') ? b.ho : (b.ho = {});
+  h.no  = String(h.no==null?'':h.no).trim();
+  h.ttl = String(h.ttl||''); h.rec = String(h.rec||''); h.def = String(h.def||'');
+  h.pc = !!h.pc;                   // 枠の中に「PC名」の欄を出すか（オプション。出さなくても {HO1} は使える）
+  if(!VAR_NAME_RE.test(h.no) || VAR_RESERVED.includes(h.no)){
+    /* 番号がなければ、まだ使っていない HO1, HO2 … を振る */
+    const used = new Set((typeof S!=='undefined' && S ? allBlocks() : []).filter(x=>x!==b && x.type==='handout' && x.ho).map(x=>x.ho.no));
+    let n=1; while(used.has('HO'+n)) n++;
+    h.no = 'HO'+n;
+  }
+  return h;
+}
+/* ハンドアウトの見出し。edit は編集画面（PC名は {HO1} と出す）、そうでなければ書き出し（PC名を入れる欄） */
+function hoHeadHTML(b, edit){
+  const h = ensureHo(b);
+  const pc = edit ? '<code>{'+esc(h.no)+'}</code>'
+    : '<input class="vin" data-v="'+esc(h.no)+'" placeholder="'+esc(h.def||h.no)+'" aria-label="'+esc(h.no)+'のPC名">';
+  return '<div class="ho-h"><span class="ho-n">'+esc(h.no)+'</span>'
+    + (h.ttl.trim()?'<span class="ho-t">'+esc(h.ttl)+'</span>':'')
+    + (h.pc ? '<span class="ho-pc">PC名 '+pc+'</span>' : '')+'</div>'
+    + (h.rec.trim()?'<div class="ho-rec">推奨技能：'+esc(h.rec)+'</div>':'');
+}
+/* 情報ブロック・ハンドアウトの「コピー」で写す文（本文だけ。ルビの記号は外す） */
+/* （名前の重なりに注意：copyPlain はクリップボードへ書く別の関数としてある） */
+function blockCopyText(b){ return rubyPlain(String(b.text||'')).replace(/\n+$/,''); }
+document.addEventListener('click', e=>{
+  const c = e.target.closest && e.target.closest('[data-copyblk]'); if(!c) return;
+  e.preventDefault(); e.stopPropagation();
+  const f = findBlock(c.dataset.copyblk); if(!f) return;
+  const t = blockCopyText(f.b);
+  const done = ()=>{ const o=c.textContent; c.textContent='コピーしました'; setTimeout(()=>{ c.textContent=o; }, 1400);
+    setStatus('本文をコピーしました','var(--ok)'); };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, ()=>setStatus('コピーできませんでした','#ff9b83'));
+  else { const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }catch(_){} ta.remove(); }
+}, true);
 /* 囲みの見出し語。既定はこれだが、紙面の上で書き換えられる */
-const LABEL_DEF = {proc:'技能判定'};
+const LABEL_DEF = {proc:'技能判定', info:'情報'};
 const LABEL_PICKS = ['技能判定','共鳴判定','行動判定','行為判定','正気度判定','FS判定','判定','特殊ルール','演出','GM向け'];
 function blockLabel(b){
   return b.lb!=null ? String(b.lb) : (LABEL_DEF[b.type]||'');
@@ -4001,7 +4113,7 @@ function blank(){
   return {
     title:'無題のシナリオ', padV:18, padH:16, base:10, defCols:1,
     foot:{num:true, text:'', from:1},
-    fonts:[], fontBody:'', fontHead:'', bxTpl:[],
+    fonts:[], fontBody:'', fontHead:'', bxTpl:[], vars:[],
     pages:[ {id:uid(), bg:{preset:'bg-paper',img:null,fit:'cover',opa:35}, cols:1} ],
     blocks:[
       newBlock('title','無題のシナリオ'),
@@ -4019,6 +4131,7 @@ function blank(){
    旧形式（ページの中にブロックがあった形）と新形式の両方から呼ぶ。
    片方だけに書いていたせいで、旧形式の箇条書きが変換されずに残っていた。 */
 function fixBlock(nb){
+  if(nb.type==='handout') ensureHo(nb);
   nb.ind = Math.max(0, Math.min(4, parseInt(nb.ind,10)||0));
   if(Array.isArray(nb.mk)) nb.mk = tidyMarks(nb.mk); else if(nb.mk!=null) delete nb.mk;
   if(nb.type==='flow') nb.cols=1;
@@ -4089,6 +4202,7 @@ function normalize(d){
     fonts: Array.isArray(d.fonts)?d.fonts.filter(f=>f&&f.name&&f.data):[],
     bxTpl: (Array.isArray(d.bxTpl)?d.bxTpl:[]).map(bxTplClean).filter(Boolean),
     fontBody: d.fontBody||'', fontHead: d.fontHead||'',
+    vars: cleanVars(d.vars),
     pages: [], blocks: []
   };
   const oldStyle = Array.isArray(d.pages) && d.pages.length && Array.isArray(d.pages[0].blocks);
@@ -4890,6 +5004,15 @@ function blockEl(b, pageCols, prevType){
     el.style.cssText += procStyle(b);
     el.innerHTML = (lb?'<div class="t-lb">'+esc(lb)+'</div>':'') + richBlockHTML(b);
   }
+  else if(b.type==='info'){
+    const lb=blockLabel(b).trim();
+    el.innerHTML = (lb?'<div class="t-lb">'+esc(lb)+'</div>':'') + richBlockHTML(b)
+      + '<button type="button" class="blkcopy" data-copyblk="'+b.id+'" title="本文をコピーします">コピー</button>';
+  }
+  else if(b.type==='handout'){
+    el.innerHTML = hoHeadHTML(b, true) + richBlockHTML(b)
+      + '<button type="button" class="blkcopy" data-copyblk="'+b.id+'" title="本文をコピーします">コピー</button>';
+  }
   /* 描写文・注釈も、入れ子の記号が使われていればその組み立てを通す。
      使われていなければ今までとまったく同じ描き方にする */
   else if((b.type==='desc'||b.type==='note') && hasRich(b.text)){
@@ -5184,7 +5307,7 @@ const RICH_TALK = /^\s*(?:([^「『、。！？\s]{1,10})\s*)?[「『][\s\S]*[�
 /* 入れ子の書式が使える書式 */
 /* 入れ子の書式を通す書式。会話文はそれ自体が入れ子の書式なので入れない
    （入れると、押しても記号のまま残る食い違いが起きる） */
-const RICH_TYPES = ['desc','note','proc'];
+const RICH_TYPES = ['desc','note','proc','info','handout'];
 /* 行の頭に入れる印。設定欄（右）のボタンに並べる */
 const RICH_MARKS = [
   ['- ',          '- 箇条',  '箇条書き（中黒）にします。markdown と同じ書き方です'],
@@ -6257,7 +6380,7 @@ function srcRowHTML(b){
     return '<div class="src'+(sel.has(b.id)?' pick':'')+(editingId===b.id?' editing':'')
       + (b.ind?' i'+Math.min(4,b.ind):'')+'" data-id="'+b.id+'" data-type="'+b.type+'">'
       + '<div class="srchandle" title="クリックで選択／ドラッグで移動">&#10303;</div>'
-      + '<div class="srcgut" data-l="'+esc(TYPE_NAME(b.type))+'"'+(b.cols===1?' data-span="全幅"':'')+'></div>'
+      + '<div class="srcgut" data-l="'+esc(b.type==='handout' ? ensureHo(b).no : TYPE_NAME(b.type))+'"'+(b.cols===1?' data-span="全幅"':'')+'></div>'
       + inner + '</div>';
   }
 }
@@ -8392,7 +8515,7 @@ function renderFlowWinText(){
   if(svg) svg.innerHTML = flowCanvasSVG(fl);
 }
 /* 別窓の中に足せる書式。よく使うものだけを並べる */
-const POP_ADD = ['desc','dialog','note','proc','h2','h3','hr','table','image','popup'];
+const POP_ADD = ['desc','dialog','note','proc','info','h2','h3','hr','table','image','popup'];
 function setPopMode(p){
   const blk = popIsBlocks(p);
   document.getElementById('popRich').style.display      = blk ? 'none' : 'flex';
@@ -8751,9 +8874,10 @@ const TOOL_GROUPS = [
   {n:'図表',     ks:['table','flow','image']},
   {n:'NPCシート',ks:['npc']},
   {n:'別窓',     ks:['popup']},
-  {n:'本の部品', ks:['cover','toc','colophon']}
+  {n:'本の部品', ks:['cover','toc','colophon']},
+  {n:'情報',     ks:['info','handout']}
 ];
-const TOOL_SEP = {1:1, 4:1, 7:1};          // この番号のアイコンのあとに区切り線を引く
+const TOOL_SEP = {1:1, 4:1, 7:1, 8:1};          // この番号のアイコンのあとに区切り線を引く
 /* アイコンは 24×24 の線画。仮のもので、あとから描き直してよい */
 const TOOL_ICON = {
   desc:    '<path d="M5 7h14M5 11h14M5 15h14M5 19h9"/>',
@@ -8776,7 +8900,9 @@ const TOOL_ICON = {
   popup:   '<rect x="3" y="7" width="13" height="13"/><path d="M11 3h10v10M21 3l-9 9"/>',
   toc:     '<path d="M4 7h10M4 12h10M4 17h10"/><path d="M17 7h3M17 12h3M17 17h3" stroke-dasharray="1 1.5"/>',
   cover:   '<path d="M6 3h12v18H6z"/><path d="M9 8h6M9 11h6"/>',
-  colophon:'<path d="M6 3h12v18H6z"/><path d="M9 14h6M9 17h6"/>'
+  colophon:'<path d="M6 3h12v18H6z"/><path d="M9 14h6M9 17h6"/>',
+  info:    '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r=".9"/>',
+  handout: '<rect x="4" y="5" width="16" height="14" rx="1"/><path d="M7 9h5M7 13h10M7 16h7"/><path d="M15 8.5h2" stroke-width="2.4"/>'
 };
 function toolIcon(k){ return '<svg class="tic" viewBox="0 0 24 24" aria-hidden="true">'+(TOOL_ICON[k]||'')+'</svg>'; }
 const toolType = k => TYPES.find(t=>t.k===k);
@@ -8967,6 +9093,7 @@ function setType(k){
       if(!nx || nx.type==='break') L.splice(i+1,0,newBlock('desc',''));
     }
     if(k==='popup'){ ensurePopup(f.b); }
+    if(k==='handout'){ ensureHo(f.b); }
     if(k==='image' && !f.b.img){ imgReplaceId=f.b.id; document.getElementById('imgFile').click(); }
   });
   editingId=null; render(); save();
@@ -9021,6 +9148,7 @@ function addTyped(k){
   if(k==='break'||k==='toc'||k==='flow') nb.cols=1;
   if(k==='colbr') nb.cols=2;
   if(k==='popup'){ ensurePopup(nb); }
+  if(k==='handout'){ ensureHo(nb); }
   /* 別窓の中の段落を触っていたときは、その別窓の中に足す。
      何も選んでいなくても、別窓のウィンドウを開いていればその中へ */
   const L = homeList() || selList();
@@ -9288,6 +9416,7 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
       propId=null; re(); return;
     }
     if(k==='tocpn'){   const t=ensureToc(b); t.pn=!t.pn;     propId=null; re(); return; }
+    if(k==='hopc'){ const h=ensureHo(b); h.pc=!h.pc; propId=null; re(); return; }
     if(k==='tocscope'){ ensureToc(b).scope = v==='chapter' ? 'chapter' : 'all'; propId=null; re(); return; }
     if(k==='tocdots'){ const t=ensureToc(b); t.dots=!t.dots; propId=null; re(); return; }
     if(k==='tocmode'){ b.tocMode = v||''; delete b.tocOff;   propId=null; re(); return; }
@@ -9329,6 +9458,16 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
     }
     if(np && (k==='name'||k==='kana'||k==='role')){ np[k]=v; soft(); return; }
     if(k==='toclb'){  ensureToc(b).lb = v; soft(); return; }
+    if(k==='infolb'){ b.lb = v; soft(); return; }
+    if(k==='hottl'||k==='horec'||k==='hodef'){ ensureHo(b)[k.slice(2)] = v; soft(); return; }
+    if(k==='hono'){
+      /* 番号は変数の名前になるので、使える文字だけのときに受け取る（ほかのハンドアウトと重ねない） */
+      const nv = String(v||'').trim();
+      const dup = allBlocks().some(x=>x!==b && x.type==='handout' && x.ho && x.ho.no===nv);
+      if(VAR_NAME_RE.test(nv) && !VAR_RESERVED.includes(nv) && !dup){ ensureHo(b).no = nv; soft(); }
+      else setStatus(dup ? 'その番号はほかのハンドアウトで使っています' : '番号は英数字・かな・漢字の16字までです','#ff9b83');
+      return;
+    }
     if(k==='tocown'){ b.tl = v; soft(); return; }
     if(k==='btext'){ b.text=v; soft(); return; }
     if(k==='dsp'){ b.sp=v; soft(); return; }
@@ -9388,6 +9527,8 @@ function openBlockPreview(b){
               : b.type==='table' ? tableInnerHTML(b)
               : b.type==='popup' ? popupViewHTML(b.pop)
               : b.type==='proc'  ? (lbp?'<div class="t-lb">'+esc(lbp)+'</div>':'')+richBlockHTML(b)
+              : b.type==='info'  ? (blockLabel(b).trim()?'<div class="t-lb">'+esc(blockLabel(b).trim())+'</div>':'')+richBlockHTML(b)
+              : b.type==='handout' ? hoHeadHTML(b, true)+richBlockHTML(b)
               : rubyHTML(b.text);
   document.getElementById('prevTitle').textContent = TYPE_NAME(b.type)+'の出来上がり';
   document.getElementById('prevBody').innerHTML =
@@ -9406,13 +9547,16 @@ function propsRich(b){
 }
 /* 書式ごとの欄。ここが空の書式でも、共通の設定（下の #blkCommon）は出る */
 function propsHTML(b){
-  const h = (RICH_TYPES.includes(b.type) && b.type!=='proc') ? propsRich(b)
+  /* 描写文・注釈は入れ子の書式のボタンだけ。処理系・情報・ハンドアウトは自分の欄のあとに出す */
+  const h = (b.type==='desc' || b.type==='note') ? propsRich(b)
     : b.type==='dialog' ? pRow('話し手',
         '<input type="text" data-p="dsp" value="'+esc(b.sp||'')+'" placeholder="なくても構いません">')
     : b.type==='table'  ? propsTable(b)
     : b.type==='npc'    ? propsNpc(b)
     : b.type==='popup'  ? propsPopup(b)
     : b.type==='proc'   ? propsProc(b) + propsRich(b)
+    : b.type==='info'   ? propsInfo(b) + propsRich(b)
+    : b.type==='handout'? propsHandout(b) + propsRich(b)
     : b.type==='image'  ? propsImage(b)
     : b.type==='flow'   ? propsFlow(b)
     : b.type==='toc'    ? propsToc(b)
@@ -9503,6 +9647,21 @@ function propsCellOwner(b){
       + '<button data-p="cellrowdel" class="danger">この行を消す</button>'
       + '<button data-p="cellcoldel" class="danger">この列を消す</button></div>',
     '表そのものの見た目・名前を変えるときは、表を選んでください。');
+}
+function propsInfo(b){
+  return pRow('見出し語', '<input type="text" data-p="infolb" value="'+esc(b.lb==null?'情報':b.lb)+'" placeholder="情報">',
+    '空にすると見出し語を出しません。「コピー」で写すのは本文だけです。');
+}
+function propsHandout(b){
+  const h = ensureHo(b);
+  return pRow('番号', '<input type="text" data-p="hono" value="'+esc(h.no)+'" placeholder="HO1">',
+      'この番号がそのまま変数 <b>{'+esc(h.no)+'}</b>（このハンドアウトのPC名）になります。出力したHTMLで名前を入れると、文中の {'+esc(h.no)+'} がすべてその名前に変わります。')
+    + pRow('PC名の入力欄', '<div class="row"><button data-p="hopc"'+(h.pc?' class="on"':'')+'>枠の中に出す</button></div>',
+      'オプションです。出すと、出力したHTMLのこの枠の中でもPC名を入れられます。出さなくても {'+esc(h.no)+'} は左の「登場人物」の欄で入れられます。')
+    + pRow('題', '<input type="text" data-p="hottl" value="'+esc(h.ttl)+'" placeholder="例：古書店の常連">')
+    + pRow('推奨技能', '<input type="text" data-p="horec" value="'+esc(h.rec)+'" placeholder="例：〈図書館〉〈目星〉">', '空なら出しません。')
+    + pRow('PC名を入れていないときの表示', '<input type="text" data-p="hodef" value="'+esc(h.def)+'" placeholder="'+esc(h.no)+'">',
+      '空なら番号（'+esc(h.no)+'）を出します。');
 }
 function pRow(label, inner, hint){
   return '<label class="f">'+esc(label)+'</label>'+inner
@@ -10418,7 +10577,7 @@ document.getElementById('btnReset').onclick=async()=>{
   S=blank(); sel.clear(); pgSel.clear(); editingId=null; syncSettings(); render(); save();
 };
 function syncSettings(){
-  applyFonts(); buildFontUI();
+  applyFonts(); buildFontUI(); buildVarUI();
   document.getElementById('docTitle').value=S.title||'';
   document.getElementById('padV').value=S.padV;
   document.getElementById('padH').value=S.padH;
@@ -10429,6 +10588,51 @@ function syncSettings(){
     document.getElementById('footText').value = f.text||'';
   document.getElementById('footFrom').value = f.from||1;
 }
+/* 文書タブの変数の欄。ハンドアウトから来たものは名前と説明だけを見せ、直すのはハンドアウトの設定で */
+function buildVarUI(){
+  const box = document.getElementById('varList'); if(!box || !S) return;
+  const hos = varList().filter(v=>v.ho || v.auto);
+  box.innerHTML = hos.map(v=>'<div class="varrow ho"><code>{'+esc(v.n)+'}</code><span>'+esc(v.note)
+      + (v.ho ? '（ハンドアウト）' : '（本文に書いた HO＋数字から自動）')+'</span></div>').join('')
+    + (S.vars||[]).map((v,i)=>'<div class="varrow">'
+      + '<input type="text" data-vi="'+i+'" data-vk="n" value="'+esc(v.n)+'" placeholder="名前（例：KP）" title="名前。本文には {名前} と書きます">'
+      + '<input type="text" data-vi="'+i+'" data-vk="def" value="'+esc(v.def)+'" placeholder="既定値" title="値を入れていないときに出す文字">'
+      + '<input type="text" data-vi="'+i+'" data-vk="note" value="'+esc(v.note)+'" placeholder="説明" title="出力したHTMLで入力欄の下に出す説明">'
+      + '<button data-vdel="'+i+'" title="この変数を消す">×</button></div>').join('')
+    + (!hos.length && !(S.vars||[]).length ? '<div class="hint" style="margin:0">まだありません。</div>' : '');
+  const cand = varCandidates();
+  document.getElementById('varFound').innerHTML = cand.length
+    ? '<div class="hint" style="margin:8px 0 4px">本文で見つかった、まだ登録していない名前：</div><div class="row">'
+      + cand.map(n=>'<button data-vfound="'+esc(n)+'" title="変数として登録します">＋ {'+esc(n)+'}</button>').join('') + '</div>'
+    : '';
+}
+(function initVarUI(){
+  const pane = document.querySelector('#subBody .pane[data-p="doc"]') || document;
+  pane.addEventListener('input', e=>{
+    const el = e.target.closest('[data-vi]'); if(!el) return;
+    const v = (S.vars||[])[+el.dataset.vi]; if(!v) return;
+    v[el.dataset.vk] = el.value; save();
+  });
+  /* 名前は変数として使える形のときだけ受け取る。使えない名前は欄を赤くして知らせる */
+  pane.addEventListener('change', e=>{
+    const el = e.target.closest('[data-vk="n"]'); if(!el) return;
+    const n = el.value.trim(), dup = varList().filter(v=>v.n===n).length > (S.vars.some(v=>v.n===n)?1:0);
+    const ok = VAR_NAME_RE.test(n) && !VAR_RESERVED.includes(n);
+    el.style.borderColor = ok ? '' : 'var(--vermilion)';
+    if(!ok) setStatus('名前は英数字・かな・漢字の16字までです（title・page・total は使えません）','#ff9b83');
+    else if(dup) setStatus('同じ名前がすでにあります','#ff9b83');
+    buildVarUI();
+  });
+  pane.addEventListener('click', e=>{
+    const a = e.target.closest('#varAdd, [data-vdel], [data-vfound]'); if(!a) return;
+    S.vars = S.vars || [];
+    if(a.id==='varAdd') S.vars.push({n:'', def:'', note:''});
+    else if(a.dataset.vdel!=null) S.vars.splice(+a.dataset.vdel, 1);
+    else S.vars.push({n:a.dataset.vfound, def:'', note:''});
+    save(); buildVarUI();
+    if(a.id==='varAdd'){ const ins = document.querySelectorAll('#varList [data-vk="n"]'); if(ins.length) ins[ins.length-1].focus(); }
+  });
+})();
 function dl(blob,name){
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),3000);
@@ -10520,6 +10724,13 @@ function blockStaticHTML(b, cols, pull, top, anchor, edit){
       const lb=blockLabel(b).trim();
       return ow+'<div'+anchor+' class="'+cl+procClass(b)+'" style="'+procStyle(b)+st2+'">'
         + (lb?'<div class="t-lb">'+esc(lb)+'</div>':'') + richBlockHTML(b) + '</div></div>';
+    }
+    if(b.type==='info'||b.type==='handout'){
+      const lb = b.type==='info' ? blockLabel(b).trim() : '';
+      return ow+'<div'+anchor+' class="'+cl+'" style="'+st2+'">'
+        + '<button type="button" class="copybtn" data-for="cp'+b.id+'">コピー</button>'
+        + (b.type==='handout' ? hoHeadHTML(b, edit) : (lb?'<div class="t-lb">'+esc(lb)+'</div>':''))
+        + richBlockHTML(b) + '</div></div>';
     }
     if((b.type==='desc'||b.type==='note') && hasRich(b.text))
       return ow+'<div'+anchor+' class="'+cl+' hasrich" style="'+st2+'">'+richBlockHTML(b)+'</div></div>';
@@ -10683,6 +10894,8 @@ function doExport(a,b,flow){
      閉じタグだけを無害にする。 */
   const sesc = t => String(t).replace(/<\/(script)/gi, '<\\/$1');
   const dataBits = allBlocks().map(x=>{
+    if(x.type==='info' || x.type==='handout')
+      return '<script type="text/plain" class="outdata" id="cp'+x.id+'">'+sesc(blockCopyText(x))+'<\/script>';
     if(x.type==='table'){
       const t=x.tbl||newTable();
       const txt = String(t.out||'').trim() || rollTableText(t);
@@ -10781,6 +10994,70 @@ body.fx.notoc #doc{margin-left:0}
 @media (max-width:1000px){ #nav.fx-nav{position:static;width:auto;border-right:0;border-bottom:1px solid rgba(35,32,28,.16)}
   .fx #doc{margin-left:0;padding:28px 18px 100vh} }
 @media print{ #fxBack,.fx-up,.fx-back{display:none !important} .fx #doc{margin:0;padding:0} .fx-paper .page-bg{display:none} }`;
+  /* 変数。左の目次の上に「登場人物（変数）」の欄を出し、入れた値で文中の {名前} を置き換える */
+  const VARS = varList().map(v=>({n:v.n, def:v.def, note:v.note}));
+  const varPanel = VARS.length ? '<div id="vx"><h2>登場人物（変数）</h2>'
+    + VARS.map(v=>'<label><b>'+esc(v.n)+'</b><input class="vin" data-v="'+esc(v.n)+'" placeholder="'+esc(v.def||v.n)+'"></label>'
+      + (v.note.trim()?'<small>'+esc(v.note)+'</small>':'')).join('') + '</div>' : '';
+  const varCss = `
+#vx{margin:0 0 16px;padding:0 0 12px;border-bottom:1px solid #2f3747}
+#vx h2{font-size:11px;letter-spacing:.2em;color:#8d97ac;margin:0 0 8px;font-weight:400}
+#vx label{display:flex;align-items:center;gap:8px;margin:0 0 5px;font-size:12px}
+#vx label b{flex:0 0 auto;min-width:34px;color:#d3a534;font:11px ui-monospace,monospace}
+#vx .vin{flex:1;min-width:0;border:0;border-bottom:1px solid #4a5468;background:transparent;color:#fff;padding:3px 2px;font:inherit;font-size:13px}
+#vx .vin:focus{outline:0;border-bottom-color:#d3a534}
+#vx small{display:block;font-size:10px;color:#8d97ac;margin:-3px 0 6px 42px}
+.fx #vx{border-bottom-color:rgba(35,32,28,.16)}
+.fx #vx h2,.fx #vx small{color:#7a6d52}
+.fx #vx label b{color:#a8331f}
+.fx #vx .vin{color:#23201c;border-bottom-color:rgba(35,32,28,.35)}
+.fx #vx .vin:focus{border-bottom-color:#a8331f}`;
+  const varJs = VARS.length ? `
+<script>
+(function(){
+  var V=${JSON.stringify(VARS).replace(/</g,'\\u003c')}, KEY='trpg-vars:'+${JSON.stringify(S.title||'')}, val={}, by={};
+  try{ val=JSON.parse(localStorage.getItem(KEY)||'{}')||{}; }catch(e){}
+  V.forEach(function(v){ by[v.n]=v; });
+  var re=new RegExp('\\\\{('+V.map(function(v){return v.n;}).join('|')+')\\\\}','g');
+  function shown(n){ var x=String(val[n]||'').trim(); return x || by[n].def || n; }
+  /* 写すときにも、入れた値に置き換える */
+  window.varText=function(s){ return String(s).replace(re,function(m,n){ return shown(n); }); };
+  /* 文中の {名前} を、値を入れられる印に包む（入力欄・スクリプト・目次の伏字は除く） */
+  var skip={SCRIPT:1,STYLE:1,TEXTAREA:1,INPUT:1};
+  (function walk(el){
+    for(var c=el.firstChild;c;c=c.nextSibling){
+      if(c.nodeType===1){ if(!skip[c.tagName] && c.id!=='vx') walk(c); continue; }
+      if(c.nodeType!==3 || c.nodeValue.indexOf('{')<0) continue;
+      re.lastIndex=0; if(!re.test(c.nodeValue)) continue;
+      var f=document.createDocumentFragment(), s=c.nodeValue, last=0; re.lastIndex=0; var m;
+      while((m=re.exec(s))){ f.appendChild(document.createTextNode(s.slice(last,m.index)));
+        var sp=document.createElement('span'); sp.className='v'; sp.setAttribute('data-v',m[1]); f.appendChild(sp); last=re.lastIndex; }
+      f.appendChild(document.createTextNode(s.slice(last)));
+      var nx=c.nextSibling; el.replaceChild(f,c); c=nx ? nx.previousSibling : el.lastChild;
+    }
+  })(document.body);
+  /* 目次の見出し（伏字のもとになる data-t）も置き換える */
+  var ts=document.querySelectorAll('[data-t]');
+  for(var i=0;i<ts.length;i++) ts[i].setAttribute('data-t0', ts[i].getAttribute('data-t'));
+  function upd(){
+    var ss=document.querySelectorAll('span.v[data-v]');
+    for(var i=0;i<ss.length;i++){ var n=ss[i].getAttribute('data-v'); ss[i].textContent=shown(n); ss[i].classList.toggle('unset', !String(val[n]||'').trim()); }
+    for(var j=0;j<ts.length;j++) ts[j].setAttribute('data-t', window.varText(ts[j].getAttribute('data-t0')));
+    if(window.setTocMask) window.setTocMask(document.body.classList.contains('tocmask'));
+  }
+  var ins=document.querySelectorAll('input.vin[data-v]');
+  for(var k=0;k<ins.length;k++) ins[k].value = val[ins[k].getAttribute('data-v')]||'';
+  /* 左の欄とハンドアウトの「PC名」は同じ値を見る */
+  document.addEventListener('input', function(e){
+    var t=e.target; if(!t.classList || !t.classList.contains('vin')) return;
+    var n=t.getAttribute('data-v'); val[n]=t.value;
+    for(var k=0;k<ins.length;k++) if(ins[k]!==t && ins[k].getAttribute('data-v')===n) ins[k].value=t.value;
+    try{ localStorage.setItem(KEY, JSON.stringify(val)); }catch(_){}
+    upd();
+  });
+  upd();
+})();
+<\/script>` : '';
   const flowJs = `
 <script>
 (function(){
@@ -10865,7 +11142,7 @@ body.fx.notoc #doc{margin-left:0}
     if(t.className==='cmt-x'){ document.getElementById('cmtRail').classList.remove('on'); return; }
     var cb=t.closest&&t.closest('.copybtn');
     if(cb){ var d=document.getElementById(cb.getAttribute('data-for'));
-      if(d){ copyText(d.textContent); var o=cb.textContent; cb.textContent='コピーしました';
+      if(d){ copyText(window.varText ? window.varText(d.textContent) : d.textContent); var o=cb.textContent; cb.textContent='コピーしました';
         setTimeout(function(){cb.textContent=o;},1400); }
       return; }
   });
@@ -10927,12 +11204,13 @@ body.tocmask .nv .nvt{color:#5b6478;letter-spacing:.05em}
 .blk{scroll-margin-top:30px}
 @media (max-width:1000px){#nav{position:static;width:auto;height:auto;bottom:auto}#doc{margin-left:0}}
 @media print{#nav{display:none}#doc{margin:0;padding:0;display:block}.pagebox{margin:0}.page{box-shadow:none}}
-`+extraCss+(flow?flowCss:'')+`
+`+extraCss+varCss+(flow?flowCss:'')+`
 </style></head><body class="tocmask`+(flow?' fx':'')+`">
 `+'<button id="tocBtn" type="button" title="目次を隠す" aria-label="目次を隠す">'
 + '<i></i><i></i><i></i></button>'
 + (flow ? '<div class="page fx-paper '+fxCls+'"><div class="page-bg '+fxCls+'"></div>' : '')
 + '<nav id="nav"'+(flow?' class="fx-nav"':'')+'><h1>'+esc(S.title||'目次')+'</h1>'
++ varPanel
 + '<button id="tocMask" type="button">見出しを見せる</button>'
 + nav+navAppx+'</nav>'
 + (flow
@@ -10942,7 +11220,7 @@ body.tocmask .nv .nvt{color:#5b6478;letter-spacing:.05em}
       + '<div id="popOv"><div id="popWrap"><button id="popX" type="button">閉じる</button>'
       + '<div id="popBox"><div id="popIn"></div></div></div></div>')
 + '<div id="cmtRail"></div>'
-+ popData + dataBits + cmtData + js + (flow ? flowJs : '') + '</body></html>';
++ popData + dataBits + cmtData + js + varJs + (flow ? flowJs : '') + '</body></html>';
   dl(new Blob([html],{type:'text/html'}), (S.title||'scenario').replace(/[\\/:*?"<>|]/g,'_')+'.html');
   setStatus('閲覧HTMLを書き出しました（'+(flow?'区切りなしの1枚・':'')+'P.'+(a+1)+'〜'+(b+1)+'）','var(--ok)');
 }
@@ -11122,7 +11400,19 @@ const HELP = [
 
  ['blocks','書式と段落', `
 <h3>書式と段落</h3>
-<p>書式は左の<b>書式ツールバー</b>で選びます。関連の近いものを9つのアイコンにまとめてあります：<b>本文</b>（描写文・会話文・注釈・処理系）、<b>見出し</b>（見出し1〜3・シーン移行）、<b>表題</b>（タイトル・サブ）、<b>線</b>（罫線・縦線）、<b>改め</b>（改ページ・改段）、<b>図表</b>（表・流れ図・画像）、<b>NPCシート</b>、<b>別窓</b>、<b>本の部品</b>（表紙・目次・奥付）。アイコンを押すと中身が開き、選ぶとその書式になります。段落を<b>選んでいれば</b>その書式に変わり、<b>何も選んでいなければ</b>いちばん後ろに新しく足されます。いま選んでいる段落の書式を含むアイコンは金色になります。</p>
+<p>書式は左の<b>書式ツールバー</b>で選びます。関連の近いものを10のアイコンにまとめてあります：<b>本文</b>（描写文・会話文・注釈・処理系）、<b>見出し</b>（見出し1〜3・シーン移行）、<b>表題</b>（タイトル・サブ）、<b>線</b>（罫線・縦線）、<b>改め</b>（改ページ・改段）、<b>図表</b>（表・流れ図・画像）、<b>NPCシート</b>、<b>別窓</b>、<b>本の部品</b>（表紙・目次・奥付）、<b>情報</b>（情報・ハンドアウト）。アイコンを押すと中身が開き、選ぶとその書式になります。段落を<b>選んでいれば</b>その書式に変わり、<b>何も選んでいなければ</b>いちばん後ろに新しく足されます。いま選んでいる段落の書式を含むアイコンは金色になります。</p>
+<h4>情報ブロック</h4>
+<p>プレイヤーに渡す情報をまとめる枠です（<code>Ctrl</code>+<code>Alt</code>+<code>L</code>）。見出し語（例：「情報：古い日記」）と本文を持ち、本文には入れ子の書式も使えます。枠の右上の<b>コピー</b>で、<b>本文だけ</b>をクリップボードに写せます。出力したHTMLにもコピーのボタンが付くので、セッション中にチャットへそのまま貼れます。印刷・PDFにはボタンは出ません。</p>
+<h4>ハンドアウト</h4>
+<p>番号（HO1）・題・推奨技能・本文を持つ枠です（<code>Ctrl</code>+<code>Alt</code>+<code>Y</code>）。番号は自動で HO1、HO2… と振られ、右の設定で変えられます。情報ブロックと同じく<b>コピー</b>で本文だけを写せます。番号はそのまま変数 <code>{HO1}</code>（そのハンドアウトのPC名）になります。設定の<b>PC名の入力欄</b>をオンにすると、出力したHTMLのこの枠の中でも名前を入れられます（オプションです）。</p>
+<h4>変数（{HO1} など）</h4>
+<p>本文・見出し・表・別窓など、どこにでも <code>{名前}</code> と書いておくと、<b>出力したHTMLで入れた値に置き換わります</b>。たとえば <code>{HO1}は机の上の日記に目を留める。</code> と書いておけば、HTMLを開いた人が HO1 の欄に「佐藤 千景」と入れた時点で、文中の <code>{HO1}</code> がすべて「佐藤 千景」になります。</p>
+<ul>
+<li>置き換わるのは、<b>HO1・HO2 のような「HO＋数字」</b>（ハンドアウトの枠がなくても、書くだけで使えます）と、右下の「文書」の<b>変数</b>の欄で<b>登録した名前</b>（例：<code>{KP}</code>）だけです。ココフォリアの <code>{SAN}</code> のような書き方は、登録しなければそのまま残ります。</li>
+<li>「文書」の変数の欄には、本文で見つかったまだ登録していない名前が並ぶので、押せば登録できます。既定値（値を入れていないときに出す文字）と説明も付けられます。</li>
+<li>出力したHTMLでは、左の目次の上に<b>登場人物（変数）</b>の欄が出ます。入れた値はそのブラウザに覚えさせるので、開き直しても残ります。値を入れるまでは既定値（なければ名前）を淡く出します。コピーで写す文にも、入れた値が入ります。</li>
+<li>制作画面と印刷・PDFでは <code>{HO1}</code> のまま表示します。</li>
+</ul>
 <p>ただし、<b>罫線・縦線・改ページ・改段・目次・画像・流れ図・表・NPCシート・別窓</b>は段落の文字を使わないので、<b>文字の書いてある段落</b>を選んでいるときは、その段落を変えずに<b>すぐ下へ新しく足します</b>（書いた文字が消えないように）。選んでいる段落が空っぽなら、その段落が変わります。罫線・縦線・改ページ・改段なら、足したあとも打っていた段落のまま書き続けられます。同じことが <code>Ctrl</code>+<code>Alt</code>+各キーでもできます。</p>
 <p>左の一覧では書式名が行の左に出ます（この文字はコピーには含まれません）。</p>
 <h4>表紙ページと奥付</h4>
@@ -11373,7 +11663,7 @@ const HELP = [
     別窓は巻末の「追記」へのリンクになります。目次や別窓で飛んだときは、右下の<b>↩ 戻る</b>で飛ぶ前の場所へ戻れます（続けて飛んだときは1つずつさかのぼります）。
     目次ブロックに載っている見出しには<b>↑ 目次へ</b>（章の目次なら<b>↑ 章の目次へ</b>）が付き、追記の節には<b>↩ 本文へ戻る</b>が付きます。
     自由配置の画像は、そのページの頭に中央そろえで入ります。</li>
-  </ul></li>
+  </ul>どちらの形式でも、変数（<code>{HO1}</code> など）があれば左の目次の上に<b>登場人物（変数）</b>の欄が出ます。</li>
 <li>編集中の内容そのものは「保存」でJSONとして残せます。読み込めば続きから編集できます。</li>
 </ul>`]
 ];
@@ -11465,6 +11755,7 @@ function setSub(v, quiet){
   document.getElementById('subFold').innerHTML = subCur ? '&#9662;' : '&#9652;';
   document.getElementById('btnPages').classList.toggle('on', subCur==='list');
   if(subCur==='list') setPagesView(pagesView);
+  if(subCur==='doc') buildVarUI();
   if(!quiet) savePanes();
 }
 document.getElementById('subTabs').addEventListener('click', e=>{
