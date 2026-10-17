@@ -569,7 +569,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.6.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.7.0</span>
     <button id="btnSide" title="右の道具欄（設定・ページ・文書）を出し入れします">&#9776;</button>
     <button id="btnPages" title="右下にページ一覧を出し入れします（Ctrl+Shift+P）">ページ一覧</button>
     <span class="seggrp">
@@ -827,6 +827,15 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
       <span class="hint" style="flex:0 0 auto">〜</span>
       <input type="number" id="outTo" min="1" style="width:70px;flex:0 0 auto">
       <span class="hint" style="flex:0 0 auto">ページ</span>
+    </div>
+    <div id="outShapeRow"><label class="f">形</label>
+      <div class="row" style="gap:12px">
+        <label style="display:flex;gap:5px;align-items:center;flex:0 0 auto">
+          <input type="radio" name="outshape" value="page" checked> ページごと</label>
+        <label style="display:flex;gap:5px;align-items:center;flex:0 0 auto">
+          <input type="radio" name="outshape" value="flow"> 区切りなしの1枚</label>
+      </div>
+      <div class="hint" id="outShapeNote" style="margin:4px 0 0"></div>
     </div>
     <div id="outTocRow"><label class="f">目次</label>
       <div class="hint" style="margin:0">目次はいつも付きます。読む側で出し入れでき、
@@ -4753,7 +4762,7 @@ const TOC_PICKS = [
   ['scene',    'シーン移行', 3],
   ['subtitle', 'サブ',     2]
 ];
-function newToc(){ return {lb:'目　次', pick:['h1','h2','h3'], pn:true, dots:true}; }
+function newToc(){ return {lb:'目　次', pick:['h1','h2','h3'], pn:true, dots:true, scope:'all'}; }
 function ensureToc(b){
   const t = (b.toc && typeof b.toc==='object') ? b.toc : (b.toc = newToc());
   t.lb = (t.lb==null) ? '目　次' : String(t.lb);
@@ -4761,7 +4770,25 @@ function ensureToc(b){
   if(!t.pick.length) t.pick = ['h1','h2','h3'];
   t.pn = t.pn!==false;
   t.dots = t.dots!==false;
+  t.scope = t.scope==='chapter' ? 'chapter' : 'all';   // 'chapter' はこの章（すぐ上の見出し1から次の見出し1まで）だけ
   return t;
+}
+/* 目次ブロックがある章の段落。すぐ上の見出し1の次から、次の見出し1の手前まで。
+   見出し1より前に置いた目次なら、原稿の頭から最初の見出し1の手前まで */
+function chapterIds(tocB){
+  const L = S.blocks, i = L.indexOf(tocB);
+  const ids = new Set(); if(i<0) return ids;
+  let a = i; while(a>0 && L[a-1].type!=='h1') a--;
+  let z = i; while(z<L.length-1 && L[z+1].type!=='h1') z++;
+  for(let k=a;k<=z;k++) ids.add(L[k].id);
+  return ids;
+}
+/* その目次ブロックに載る項目。範囲が「この章だけ」なら、その章の見出しに絞る */
+function tocEntriesFor(b){
+  const t = ensureToc(b), e = tocEntries(t.pick);
+  if(t.scope!=='chapter') return e;
+  const ids = chapterIds(b);
+  return e.filter(x=>ids.has(x.id));
 }
 /* 目次に出す文字。見出しそのものとは別に決められる（b.tl）。
    b.tocOff が立っている段落は、どの目次にも載せない */
@@ -4815,7 +4842,7 @@ function pageOfBlockOrNull(id){
 }
 function tocInnerHTML(b){
   const t = b ? ensureToc(b) : newToc();
-  const e = tocEntries(t.pick);
+  const e = b ? tocEntriesFor(b) : tocEntries(t.pick);
   const head = String(t.lb||'').trim();
   return (head ? '<div class="toc-h">'+esc(head)+'</div>' : '')
     + '<div class="toc-list'+(t.dots?'':' nodots')+'">' + e.map(x=>
@@ -8962,9 +8989,12 @@ function insertTypedAfter(k){
   const fs = [...sel].map(findBlock).filter(Boolean); if(!fs.length) return;
   let a = fs[fs.length-1];
   fs.forEach(f=>{ if(f.list===a.list && f.list.indexOf(f.b) > a.list.indexOf(a.b)) a = f; });
-  if(k==='toc' && S.blocks.some(b=>b.type==='toc')
+  /* 見出し1のすぐ下に足す目次は、その章の目次にする。章ごとにいくつあってもよい */
+  const chapterToc = k==='toc' && a.b.type==='h1' && a.list===S.blocks;
+  if(k==='toc' && !chapterToc && S.blocks.some(b=>b.type==='toc' && ensureToc(b).scope==='all')
      && !confirm('目次はすでにあります。もう1つ作りますか？')) return;
   const nb = newBlock(k,'');
+  if(chapterToc){ const t=ensureToc(nb); t.scope='chapter'; t.lb='この章の目次'; t.pick=['h2','h3','scene']; }
   if(k==='npc'){ nb.cols=1; ensureNpc(nb); }
   if(k==='table') ensureTable(nb);
   if(k==='popup') ensurePopup(nb);
@@ -8972,7 +9002,7 @@ function insertTypedAfter(k){
   if(k==='colbr') nb.cols=2;                       // 段の流れの中に置かないと段を送れない
   const L = a.list, i = L.indexOf(a.b), add = [nb];
   /* 目次は 1 ページを取るので、うしろで改ページする（末尾に足すときと同じ） */
-  if(k==='toc'){ const br=newBlock('break',''); br.cols=1; add.push(br); }
+  if(k==='toc' && !chapterToc){ const br=newBlock('break',''); br.cols=1; add.push(br); }
   /* 改ページのうしろに段落がなければ、書き続けられるよう空の段落を置く（作り変えるときと同じ） */
   if(k==='break'){ const nx=L[i+1]; if(!nx || nx.type==='break') add.push(newBlock('desc','')); }
   L.splice(i+1, 0, ...add);
@@ -9262,6 +9292,7 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
       propId=null; re(); return;
     }
     if(k==='tocpn'){   const t=ensureToc(b); t.pn=!t.pn;     propId=null; re(); return; }
+    if(k==='tocscope'){ ensureToc(b).scope = v==='chapter' ? 'chapter' : 'all'; propId=null; re(); return; }
     if(k==='tocdots'){ const t=ensureToc(b); t.dots=!t.dots; propId=null; re(); return; }
     if(k==='tocmode'){ b.tocMode = v||''; delete b.tocOff;   propId=null; re(); return; }
     if(k==='toclv'){   b.tocLv = +v||0;                       propId=null; re(); return; }
@@ -9395,8 +9426,14 @@ function propsHTML(b){
 /* 目次ブロックの設定。何を載せるか、見出し語、体裁 */
 function propsToc(b){
   const t = ensureToc(b);
-  const e = tocEntries(t.pick);
-  return pRow('目次の見出し語',
+  const e = tocEntriesFor(b);
+  return pRow('載せる範囲',
+      '<div class="row"><button data-p="tocscope" data-v="all"'+(t.scope==='all'?' class="on"':'')+'>全体</button>'
+      + '<button data-p="tocscope" data-v="chapter"'+(t.scope==='chapter'?' class="on"':'')+'>この章だけ</button></div>',
+      t.scope==='chapter'
+        ? 'すぐ上の見出し1から、次の見出し1の手前までの見出しを載せます。章ごとの細かい目次に使えます。'
+        : '原稿ぜんたいの見出しを載せます。')
+    + pRow('目次の見出し語',
       '<input type="text" data-p="toclb" value="'+esc(t.lb)+'" placeholder="目　次">',
       '空にすると見出しそのものを出しません。')
     + pRow('何を載せるか',
@@ -10477,7 +10514,7 @@ function blockStaticHTML(b, cols, pull, top, anchor, edit){
     if(b.type==='npc')  return ow+'<div class="'+cl+'" style="'+st2+'">'
       + '<button type="button" class="copybtn" data-for="ccf'+b.id+'">ccfoliaのコマ</button>'
       + npcInnerHTML(b,false,'static')+'</div></div>';
-    if(b.type==='toc')  return ow+'<div class="'+cl+'" style="'+st2+'">'+tocInnerHTML(b)+'</div></div>';
+    if(b.type==='toc')  return ow+'<div'+(anchor||'')+' class="'+cl+'" style="'+st2+'">'+tocInnerHTML(b)+'</div></div>';
     if(b.type==='image')return ow+'<div class="'+cl+'" style="'+st2+'">'+imageInnerHTML(b)+'</div></div>';
     if(b.type==='table')return ow+'<div class="'+cl+'" style="'+st2+'">'
       + '<button type="button" class="copybtn" data-for="out'+b.id+'">出力をコピー</button>'
@@ -10500,6 +10537,8 @@ function blockStaticHTML(b, cols, pull, top, anchor, edit){
       ? '<span class="sp">'+esc(b.sp)+'</span>' : '';
     return ow+'<div'+anchor+' class="'+cl+'" style="'+st2+'">'+spk+rubyHTMLwithComments(b)+'</div></div>';
 }
+/* 書き出しで飛び先（id）を付ける段落。目次に載せられる書式と、目次そのもの */
+const ANCHOR_TYPES = ['title','subtitle','h1','h2','h3','scene','toc'];
 function pageStaticHTML(i, withAnchor){
   const ids = pageMap[i]||[];
   const st = S.pages[i] || S.pages[S.pages.length-1];
@@ -10513,7 +10552,7 @@ function pageStaticHTML(i, withAnchor){
     const pull = gapPull(prevType, b.type); prevType = b.type;
     let top='';
     if(!topDone && b.type!=='break' && b.type!=='colbr'){ top=' pagetop'; topDone=true; }
-    const anchor = (withAnchor && ['title','h1','h2','h3'].includes(b.type)) ? ' id="b'+b.id+'"' : '';
+    const anchor = (withAnchor && ANCHOR_TYPES.includes(b.type)) ? ' id="b'+b.id+'"' : '';
     return blockStaticHTML(b, st.cols, pull, top, anchor);
   }).join('');
   const freeShape = freeImgs(i).map(b=>freeShapeHTML(b, st.cols)).join('');
@@ -10537,8 +10576,21 @@ function openOut(mode){
   if(!document.getElementById('outTo').value || +document.getElementById('outTo').value>n)
     document.getElementById('outTo').value=n;
   document.getElementById('outTocRow').style.display = mode==='export' ? '' : 'none';
+  document.getElementById('outShapeRow').style.display = mode==='export' ? '' : 'none';
+  let shape = 'page'; try{ shape = localStorage.getItem('trpg-outshape')==='flow' ? 'flow' : 'page'; }catch(e){}
+  document.querySelector('input[name="outshape"][value="'+shape+'"]').checked = true;
+  outShapeNote();
   document.getElementById('outDlg').style.display='flex';
 }
+function outShape(){ return document.querySelector('input[name="outshape"]:checked').value; }
+function outShapeNote(){
+  document.getElementById('outShapeNote').textContent = outShape()==='flow'
+    ? 'ページの区切りをなくし、スクロールだけで読める1枚にします。別窓は巻末の「追記」へのリンクになり、飛んだ先から「戻る」で戻れます。'
+    : '紙面と同じ A4 のページを並べます。';
+}
+document.querySelectorAll('input[name="outshape"]').forEach(r=>r.addEventListener('change', ()=>{
+  outShapeNote(); try{ localStorage.setItem('trpg-outshape', outShape()); }catch(e){}
+}));
 function closeOut(){ document.getElementById('outDlg').style.display='none'; }
 document.getElementById('outCancel').onclick=closeOut;
 document.getElementById('outDlg').addEventListener('click',e=>{ if(e.target.id==='outDlg') closeOut(); });
@@ -10555,7 +10607,7 @@ function outRange(){
 document.getElementById('outGo').onclick=()=>{
   const [a,bb]=outRange();
   closeOut();
-  if(outMode==='print') doPrint(a,bb); else doExport(a,bb);
+  if(outMode==='print') doPrint(a,bb); else doExport(a,bb, outShape()==='flow');
 };
 /* 印刷は、範囲の外のページに印をつけて隠してから呼ぶ */
 function doPrint(a,b){
@@ -10568,16 +10620,68 @@ function doPrint(a,b){
 }
 
 /* ================= 閲覧HTMLの書き出し ================= */
-function doExport(a,b){
+/* 区切りなしの1枚の本文。ページの区切り（改ページ・改段・ページ番号・2段組）を外して1本に流す。
+   自由配置の画像は位置を持てないので、そのページの頭に中央そろえで差し込む */
+function flowBodyHTML(idx){
+  let prevType=null, topDone=false;
+  return idx.map(i=>{
+    const free = freeImgs(i).map(b=>'<div class="blkpad p-image span"><div class="blk t-image" style="width:'
+      + fnum(imgWmm(b))+'mm;margin:0 auto">'+imageInnerHTML(b)+'</div></div>').join('');
+    return free + (pageMap[i]||[]).map(id=>{
+      const f=findBlock(id); if(!f) return '';
+      const b=f.b;
+      if(b.type==='break' || b.type==='colbr') return '';
+      const pull = gapPull(prevType, b.type); prevType = b.type;
+      let top=''; if(!topDone){ top=' pagetop'; topDone=true; }
+      const anchor = ANCHOR_TYPES.includes(b.type) ? ' id="b'+b.id+'"' : '';
+      return blockStaticHTML(b, 1, pull, top, anchor);
+    }).join('');
+  }).join('');
+}
+/* 区切りなしの1枚の巻末。別窓の中身を節にして並べ、本文へ戻るリンクを付ける */
+function flowAppendixHTML(){
+  const list = popupBlocks(); if(!list.length) return '';
+  return '<section class="fx-appx"><div class="blkpad p-h1 span"><div class="blk t-h1" id="appx">追記</div></div>'
+    + list.map(b=>{
+        const p=b.pop||{};
+        return '<div class="fx-pop" id="pop'+b.id+'"><div class="blkpad p-h2"><div class="blk t-h2">'+esc(p.label||'くわしく')
+          + '<a class="fx-back" href="#" data-back="'+b.id+'">↩ 本文へ戻る</a></div></div>'
+          + (popIsBlocks(p) ? popBlocksHTML(p.blocks)
+             : '<div class="blkpad p-desc"><div class="blk t-desc" style="white-space:normal">'+popupBodyHTML(p.body)+'</div></div>')
+          + '</div>';
+      }).join('') + '</section>';
+}
+/* 見出しから、その見出しを載せている目次へ戻るリンクの行き先。
+   章の目次に載っていればそちらを優先する（より近い目次へ戻れるように） */
+function flowUpMap(idx){
+  const inRange = new Set(); idx.forEach(i=>(pageMap[i]||[]).forEach(id=>inRange.add(id)));
+  const up = {};
+  S.blocks.filter(b=>b.type==='toc' && inRange.has(b.id)).forEach(tb=>{
+    const ch = ensureToc(tb).scope==='chapter';
+    tocEntriesFor(tb).forEach(x=>{
+      if(!inRange.has(x.id)) return;
+      if(up[x.id] && !ch) return;
+      up[x.id] = [tb.id, ch ? '↑ 章の目次へ' : '↑ 目次へ'];
+    });
+  });
+  return up;
+}
+function doExport(a,b,flow){
   const idx=[]; for(let i=a;i<=b;i++) idx.push(i);
-  const pages = idx.map(i=>'<div class="pagebox">'+pageStaticHTML(i,true)+'</div>').join('\n');
+  const pages = flow ? '' : idx.map(i=>'<div class="pagebox">'+pageStaticHTML(i,true)+'</div>').join('\n');
   /* 目次はいつも入れる。見出しがネタバレになるので、読む側で伏せられるようにする */
   const nav = tocEntries().filter(x=>x.page>=a+1 && x.page<=b+1)
     .map(x=>'<a class="nv l'+x.lv+'" href="#b'+x.id+'">'
       + '<span class="nvt" data-t="'+esc(x.text)+'">'+esc(x.text)+'</span>'
       + '<i>'+x.page+'</i></a>').join('');
   const pops = popupBlocks();
-  const popData = pops.map(pb=>'<div class="popbody" id="pop'+pb.id+'" hidden>'
+  /* 区切りなしの1枚では、左の目次の終わりに追記（別窓の中身）も並べる */
+  const navAppx = (flow && pops.length)
+    ? '<a class="nv l1" href="#appx"><span class="nvt" data-t="追記">追記</span></a>'
+      + pops.map(pb=>{ const lb=(pb.pop||{}).label||'くわしく';
+          return '<a class="nv l2" href="#pop'+pb.id+'"><span class="nvt" data-t="'+esc(lb)+'">'+esc(lb)+'</span></a>'; }).join('')
+    : '';
+  const popData = flow ? '' : pops.map(pb=>'<div class="popbody" id="pop'+pb.id+'" hidden>'
       + '<h3>'+esc((pb.pop||{}).label||'くわしく')+'</h3>'+popupViewHTML(pb.pop)+'</div>').join('');
   /* 表の出力文と、NPCシートのccfoliaコマを、押したときに使えるよう仕込んでおく */
   /* <script type="text/plain"> の中身は HTML として読まれないので、
@@ -10596,7 +10700,7 @@ function doExport(a,b){
     }
     return '';
   }).join('');
-  const appx = appendixHTML() ? '<div class="pagebox appx">'+appendixHTML()+'</div>' : '';
+  const appx = flow ? '' : (appendixHTML() ? '<div class="pagebox appx">'+appendixHTML()+'</div>' : '');
   const cmtData = allBlocks().flatMap(x=>blockComments(x).map((c,i)=>
     '<script type="text/plain" class="outdata" id="cm'+x.id+'-'+i+'">'+sesc(c.t)+'<\/script>')).join('');
   const extraCss = `
@@ -10642,6 +10746,91 @@ body.notoc #tocBtn{left:10px}
 .blkpad.p-table,.blkpad.p-npc{position:relative}
 @media print{ #popOv,#tocBtn,.copybtn,#cmtRail{display:none !important} .appx{display:block} #nav{display:none}
   .cmt{border-bottom:0} .cmt-n{display:none} }`;
+  /* 区切りなしの1枚。画面ぜんたいを1枚の紙にして、目次もその紙の左に罫線で区切って置く */
+  const st0 = S.pages[a] || S.pages[0] || {bg:{preset:'none'}};
+  const fxCls = st0.bg.preset==='none' ? '' : st0.bg.preset;
+  const flowCss = `
+body.fx{background:#f7f3ea}
+.fx-paper.page{display:block;width:auto;height:auto;min-height:100vh;overflow:visible;box-shadow:none}
+#nav.fx-nav{position:fixed;left:0;top:0;bottom:0;width:240px;background:transparent;color:#23201c;
+  border-right:1px solid rgba(35,32,28,.16);padding:58px 16px 24px 20px;z-index:9;overflow:auto}
+#nav.fx-nav h1{color:#a8331f;font-size:15px;letter-spacing:.16em;margin:0 0 14px}
+.fx .nv{color:#3a342a}
+.fx .nv:hover{background:rgba(35,32,28,.06);color:#000}
+.fx .nv.l0{color:#a8331f}.fx .nv.l3{color:#6f6450}
+body.fx.tocmask .nv .nvt{color:#a99d82}
+.fx #tocMask{background:transparent;border:1px solid rgba(35,32,28,.25);color:#3a342a}
+.fx #tocMask:hover{border-color:#a8331f;color:#a8331f}
+.fx #tocBtn{background:transparent;opacity:.75}
+.fx #tocBtn i{background:#23201c}
+.fx #tocBtn:hover{background:rgba(35,32,28,.08);opacity:1}
+/* 下に余白を取って、巻末の節へ飛んでも見出しが画面の上まで来るようにする */
+.fx #doc{display:block;margin-left:240px;padding:44px 32px 100vh}
+body.fx.notoc #doc{margin-left:0}
+.fx-body.page-body{height:auto;overflow:visible;max-width:178mm;margin:0 auto;padding:0 !important}
+.fx-body .blk{scroll-margin-top:28px}
+.fx .toc-line .pn,.fx .toc-line .dots,.fx .nv i{display:none}
+.fx-appx{margin-top:16mm;padding-top:8mm;border-top:1px dashed rgba(35,32,28,.3)}
+.fx-back,.fx-up{float:right;font-size:11px;font-weight:400;letter-spacing:.04em;color:inherit;text-decoration:none;
+  border:1px solid currentColor;border-radius:999px;padding:0 9px;margin:3px 0 0 8px;opacity:.55;font-family:system-ui,sans-serif}
+.fx-back:hover,.fx-up:hover{opacity:1}
+.fx-back{color:#a8331f;opacity:.85}
+.fx .pop-btn::after{content:" →"}
+#fxBack{position:fixed;right:22px;bottom:22px;z-index:20;display:none;align-items:center;gap:8px;background:#23201c;color:#f7f3ea;
+  border:0;border-radius:999px;padding:9px 16px;font:13px system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.3);cursor:pointer}
+#fxBack.on{display:flex}
+#fxBack small{color:#d3a534;font-size:11px}
+.fx-hit{animation:fxhit 1.6s ease}
+@keyframes fxhit{0%{background:rgba(211,165,52,.45)}100%{background:transparent}}
+@media (max-width:1000px){ #nav.fx-nav{position:static;width:auto;border-right:0;border-bottom:1px solid rgba(35,32,28,.16)}
+  .fx #doc{margin-left:0;padding:28px 18px 100vh} }
+@media print{ #fxBack,.fx-up,.fx-back{display:none !important} .fx #doc{margin:0;padding:0} .fx-paper .page-bg{display:none} }`;
+  const flowJs = `
+<script>
+(function(){
+  var UP=${JSON.stringify(flowUpMap(idx))}, stack=[], btn=document.getElementById('fxBack');
+  /* 見出しに、その見出しを載せている目次へ戻るリンクを付ける */
+  Object.keys(UP).forEach(function(id){
+    var el=document.getElementById('b'+id); if(!el) return;
+    el.setAttribute('data-h', el.textContent.trim());
+    var a=document.createElement('a'); a.className='fx-up'; a.href='#b'+UP[id][0]; a.textContent=UP[id][1];
+    el.appendChild(a);
+  });
+  /* いま読んでいる節（画面の上のほうにある、いちばん近い見出し） */
+  function here(){
+    var hs=document.querySelectorAll('.fx-body .t-title[id],.fx-body .t-h1[id],.fx-body .t-h2[id],.fx-body .t-h3[id],.fx-body .t-scene[id]'), lb='';
+    for(var i=0;i<hs.length;i++){ if(hs[i].getBoundingClientRect().top<=120) lb=hs[i].getAttribute('data-h')||hs[i].textContent.trim(); }
+    lb=lb||'はじめ'; return lb.length>12 ? lb.slice(0,12)+'…' : lb;
+  }
+  function show(){
+    btn.classList.toggle('on', stack.length>0);
+    if(stack.length) btn.querySelector('small').textContent='（'+stack[stack.length-1].lb+'へ）';
+  }
+  function flash(el){ var h=el.closest('.blkpad')||el; h.classList.remove('fx-hit'); void h.offsetWidth; h.classList.add('fx-hit'); }
+  /* 飛ぶ前の場所を積んでおき、「戻る」で1つずつさかのぼる */
+  function jump(id){
+    var el=document.getElementById(id); if(!el) return;
+    stack.push({y:scrollY, lb:here()}); if(stack.length>50) stack.shift();
+    el.scrollIntoView({block:'start'}); flash(el); show();
+  }
+  function back(fallback){
+    var s=stack.pop();
+    if(s) scrollTo(0, s.y);
+    else if(fallback){ var r=document.querySelector('[data-popopen="'+fallback+'"]'); if(r){ r.scrollIntoView({block:'center'}); flash(r); } }
+    show();
+  }
+  document.addEventListener('click', function(e){
+    var t=e.target;
+    var bk=t.closest&&t.closest('[data-back]');
+    if(bk){ e.preventDefault(); back(bk.getAttribute('data-back')); return; }
+    if(t.closest&&t.closest('#fxBack')){ back(); return; }
+    var p=t.closest&&t.closest('[data-popopen]');
+    if(p){ e.preventDefault(); jump('pop'+p.getAttribute('data-popopen')); return; }
+    var a=t.closest&&t.closest('a[href^="#"]');
+    if(a && a.getAttribute('href').length>1){ e.preventDefault(); jump(a.getAttribute('href').slice(1)); }
+  });
+})();
+<\/script>`;
   const js = `
 <script>
 (function(){
@@ -10727,20 +10916,24 @@ body.tocmask .nv .nvt{color:#5b6478;letter-spacing:.05em}
 .blk{scroll-margin-top:30px}
 @media (max-width:1000px){#nav{position:static;width:auto;height:auto;bottom:auto}#doc{margin-left:0}}
 @media print{#nav{display:none}#doc{margin:0;padding:0;display:block}.pagebox{margin:0}.page{box-shadow:none}}
-`+extraCss+`
-</style></head><body class="tocmask">
+`+extraCss+(flow?flowCss:'')+`
+</style></head><body class="tocmask`+(flow?' fx':'')+`">
 `+'<button id="tocBtn" type="button" title="目次を隠す" aria-label="目次を隠す">'
 + '<i></i><i></i><i></i></button>'
-+ '<nav id="nav"><h1>'+esc(S.title||'目次')+'</h1>'
++ (flow ? '<div class="page fx-paper '+fxCls+'"><div class="page-bg '+fxCls+'"></div>' : '')
++ '<nav id="nav"'+(flow?' class="fx-nav"':'')+'><h1>'+esc(S.title||'目次')+'</h1>'
 + '<button id="tocMask" type="button">見出しを見せる</button>'
-+ nav+'</nav>'
-+ '<main id="doc">'+pages+appx+'</main>'
-+ '<div id="popOv"><div id="popWrap"><button id="popX" type="button">閉じる</button>'
-  + '<div id="popBox"><div id="popIn"></div></div></div></div>'
++ nav+navAppx+'</nav>'
++ (flow
+    ? '<main id="doc"><div class="page-body fx-body" style="font-size:'+S.base+'pt">'+flowBodyHTML(idx)+flowAppendixHTML()+'</div></main></div>'
+      + '<button id="fxBack" type="button">↩ 戻る<small></small></button>'
+    : '<main id="doc">'+pages+appx+'</main>'
+      + '<div id="popOv"><div id="popWrap"><button id="popX" type="button">閉じる</button>'
+      + '<div id="popBox"><div id="popIn"></div></div></div></div>')
 + '<div id="cmtRail"></div>'
-+ popData + dataBits + cmtData + js + '</body></html>';
++ popData + dataBits + cmtData + js + (flow ? flowJs : '') + '</body></html>';
   dl(new Blob([html],{type:'text/html'}), (S.title||'scenario').replace(/[\\/:*?"<>|]/g,'_')+'.html');
-  setStatus('閲覧HTMLを書き出しました（P.'+(a+1)+'〜'+(b+1)+'）','var(--ok)');
+  setStatus('閲覧HTMLを書き出しました（'+(flow?'区切りなしの1枚・':'')+'P.'+(a+1)+'〜'+(b+1)+'）','var(--ok)');
 }
 
 /* ================= NPCシートの入力候補 ================= */
@@ -11024,6 +11217,7 @@ const HELP = [
 <h4>目次</h4>
 <p>目次を選ぶと、右の設定欄で中身を決められます。</p>
 <ul>
+<li><b>載せる範囲</b>：<b>全体</b>は原稿ぜんたいの見出しを、<b>この章だけ</b>はすぐ上の見出し1から次の見出し1の手前までの見出しを載せます。章ごとの細かい目次を、いくつでも置けます。見出し1を選んで書式ツールバーの「本の部品 → 目次」を押すと、その章の頭に「この章だけ」の目次が入ります（うしろに改ページは入りません）。</li>
 <li><b>見出し語</b>：「目　次」の文字を変えられます。空にすると見出しそのものを出しません。</li>
 <li><b>何を載せるか</b>：タイトル・見出し1〜3・サブ・シーン移行から選びます。押すたびに載せる／載せないが切り替わります（既定は見出し1〜3）。</li>
 <li><b>体裁</b>：ページ番号と、項目とページ番号をつなぐ点線を、それぞれ出し入れできます。</li>
@@ -11166,7 +11360,14 @@ const HELP = [
 <h3>印刷と書き出し</h3>
 <ul>
 <li><b>印刷 / PDF</b>：ページだけが印刷されます。編集用の表示（左のテキスト、ボタン、閉じた区画）は出ません。</li>
-<li><b>閲覧HTMLを書き出す</b>：目次つきの1枚のHTMLになります。追加したフォントも埋め込まれます。</li>
+<li><b>閲覧HTMLを書き出す</b>：目次つきの1枚のHTMLになります。追加したフォントも埋め込まれます。書き出す窓の<b>形</b>で2通りから選べます。
+  <ul>
+  <li><b>ページごと</b>：紙面と同じA4のページを並べます。別窓はボタンを押すと窓が開きます。</li>
+  <li><b>区切りなしの1枚</b>：ページの区切り（改ページ・改段・ページ番号・2段組）をなくし、画面ぜんたいを1枚の紙にして、スクロールだけで読めるようにします。左の目次も紙の一部です。
+    別窓は巻末の「追記」へのリンクになります。目次や別窓で飛んだときは、右下の<b>↩ 戻る</b>で飛ぶ前の場所へ戻れます（続けて飛んだときは1つずつさかのぼります）。
+    目次ブロックに載っている見出しには<b>↑ 目次へ</b>（章の目次なら<b>↑ 章の目次へ</b>）が付き、追記の節には<b>↩ 本文へ戻る</b>が付きます。
+    自由配置の画像は、そのページの頭に中央そろえで入ります。</li>
+  </ul></li>
 <li>編集中の内容そのものは「保存」でJSONとして残せます。読み込めば続きから編集できます。</li>
 </ul>`]
 ];
