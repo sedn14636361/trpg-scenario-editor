@@ -104,11 +104,10 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
   text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ---- 左：本文テキスト ---- */
-#srcPane{flex:0 0 calc((100% - var(--tbw,46px) - var(--dockw,300px) - 12px)/2);min-width:240px;display:flex;flex-direction:column;background:#101319;border-right:1px solid var(--line);min-height:0}
+#srcPane{flex:0 1 calc((100% - var(--tbw,46px) - var(--dockbase,300px) - 12px)/2);min-width:240px;display:flex;flex-direction:column;background:#101319;border-right:1px solid var(--line);min-height:0}
 #srcHead{flex:0 0 auto;padding:6px 10px;border-bottom:1px solid var(--line);color:var(--muted);font-size:11px;display:flex;align-items:center;gap:8px}
 #srcHead .sp{flex:1}
 #srcHead kbd{margin:0 1px}
-#srcHead #modeHelp{margin-left:6px;padding:0 6px;font-size:11px;border-radius:50%;line-height:16px}
 #srcViewSw{flex:0 0 auto}
 #srcViewSw button{padding:3px 10px;font-size:11px}
 /* ページ単位の表示で挟む見出し */
@@ -183,7 +182,7 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 .src.i4 .srctext{margin-left:56px}
 
 /* ---- 右：ページ ---- */
-#canvasWrap{flex:1;overflow:auto;background:#0b0e14;padding:20px 12px 80px;min-width:220px;position:relative}
+#canvasWrap{flex:1;overflow:auto;background:#0b0e14;padding:20px 12px 80px;min-width:160px;position:relative}
 /* いま書けている文字数。紙面の右下に、うっすらと置いておく */
 #charCount{position:fixed;right:calc(var(--dockw,300px) + 20px);bottom:10px;z-index:8;pointer-events:none;
   background:rgba(11,14,20,.78);color:var(--muted);border:1px solid var(--line);
@@ -277,6 +276,8 @@ kbd{background:#0e1219;border:1px solid var(--line);border-radius:3px;padding:0 
   #tbarIcons{display:flex;flex-direction:row;align-items:center}
   #tbar .sep{width:1px;height:26px;margin:0 5px}
   #dock{flex:0 0 auto !important;width:auto !important;max-height:36vh;border-left:0;border-top:1px solid var(--line)}
+  #drawer{flex:0 0 auto !important;width:auto !important;max-height:40vh;border-right:0;border-bottom:1px solid var(--line)}
+  #tbarSub{flex-direction:row;margin:0 0 0 auto;padding:0 0 0 4px;border-top:0;border-left:1px solid var(--line)}
   #charCount{right:14px}
   #srcPane{flex:1 1 45% !important;width:auto !important;border-right:0;border-bottom:1px solid var(--line);min-width:0}
   #canvasWrap{flex:1 1 55%;min-width:0}
@@ -309,7 +310,7 @@ kbd{background:#0e1219;border:1px solid var(--line);border-radius:3px;padding:0 
 #popProp #propTtl,#popProp #propHr{display:none}
 #popProp #blkCommon{border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
 /* ---- 右：道具欄 ----
-   上はいま選んでいる段落の設定（主役）。下はページ・文書・ページ一覧（脇役）で、ふだんはたたむ */
+   段落を選んでいるときだけ出る、いま選んでいる段落の設定。ページ・文書の設定は左の引き出しにある */
 #dock{flex:0 0 300px;width:300px;min-width:0;display:flex;flex-direction:column;min-height:0;overflow:hidden;
   background:var(--panel);border-left:1px solid var(--line)}
 #dock.hide{display:none}
@@ -319,6 +320,9 @@ kbd{background:#0e1219;border:1px solid var(--line);border-radius:3px;padding:0 
 #ppTtl{display:flex;align-items:baseline;gap:8px;min-width:0}
 #ppTtl b{color:var(--brass);font-size:15px;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #ppTtl span{color:var(--muted);font-size:11px;white-space:nowrap}
+/* 右上の × 。右の欄は段落を選んでいるときだけ出るので、閉じる＝選択を外す */
+#dockClose{margin-left:auto;align-self:center;flex:0 0 auto;border:0;background:transparent;color:var(--muted);font-size:17px;line-height:1;padding:2px 7px}
+#dockClose:hover{color:#fff;background:#252b38}
 #ppActs{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;margin-top:8px}
 #ppActs button{height:28px;padding:0;display:flex;align-items:center;justify-content:center;border:1px solid transparent;
   background:transparent;border-radius:4px;color:#cbd5e1}
@@ -329,16 +333,22 @@ kbd{background:#0e1219;border:1px solid var(--line);border-radius:3px;padding:0 
 #ppEmpty{display:none;padding:28px 10px;color:var(--muted);font-size:13px;line-height:1.8;text-align:center}
 #ppEmpty.on{display:block}
 #ppEmpty .big{font-size:30px;opacity:.35;margin-bottom:6px}
-#sub{flex:0 0 auto;display:flex;flex-direction:column;min-height:0;border-top:2px solid var(--line);background:#12161e}
-#sub.open{flex:0 0 42%}
-#sub.open.big{flex:0 0 60%}
-#subTabs{flex:0 0 auto;display:flex}
-#subTabs button{flex:1;border:0;border-radius:0;background:transparent;padding:7px 4px;color:var(--muted);font-size:11px}
-#subTabs button.on{color:var(--text);box-shadow:inset 0 2px 0 var(--brass);background:#1a1f2a;font-weight:400}
-#subTabs #subFold{flex:0 0 28px}
-#subBody{flex:1;display:none;overflow:auto;min-height:0;border-top:1px solid var(--line)}
-#sub.open #subBody{display:block}
+/* ---- 左の引き出し：ドキュメント設定・ページ一覧 ----
+   ツールバー左下のアイコンで開く。重ねずに原稿欄を押しのけるので、開いたまま段落を選んで設定できる */
+#drawer{flex:0 0 300px;width:300px;min-width:0;display:flex;flex-direction:column;min-height:0;overflow:hidden;
+  background:var(--panel);border-right:1px solid var(--line)}
+#drawer.hide{display:none}
+/* 引き出しを開いて窓の幅が足りないときは、原稿欄を 160px まで縮める */
+#main:has(#drawer:not(.hide)) #srcPane{min-width:160px}
+#drawerHead{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:8px 8px 8px 12px;border-bottom:1px solid var(--line);background:#141821}
+#drawerHead b{flex:1;color:var(--brass);font-size:15px;letter-spacing:.05em}
+#drawerHead button{border:0;background:transparent;color:var(--muted);font-size:17px;line-height:1;padding:2px 7px}
+#drawerHead button:hover{color:#fff;background:#252b38}
+#subBody{flex:1;overflow:auto;min-height:0}
+#tbarSub{margin-top:auto;padding-top:6px;border-top:1px solid var(--line);display:flex;flex-direction:column;align-items:center}
 #subBody section.pane{padding:12px}
+#subBody .dsh{margin:4px 0 2px;padding:0 0 4px;border-bottom:1px solid var(--line);color:var(--text);font-size:12px;letter-spacing:.12em}
+#subBody hr + .dsh,#subBody .dsh:not(:first-child){margin-top:18px}
 .varrow{display:flex;gap:4px;align-items:center;margin:0 0 4px}
 .varrow input{min-width:0;padding:4px 6px;font-size:12px}
 .varrow input[data-vk="n"]{flex:0 0 70px}.varrow input[data-vk="def"]{flex:0 0 80px}.varrow input[data-vk="note"]{flex:1}
@@ -485,7 +495,7 @@ kbd{background:#0e1219;border:1px solid var(--line);border-radius:3px;padding:0 
 /* 段落をつかんで窓の上へ持ってきたときの目印 */
 #popBlockWrap.dropok{outline:2px dashed var(--brass);outline-offset:-4px;background:#6a5c3a}
 #popSrc.dropok{outline:2px dashed var(--brass);outline-offset:-4px;background:#3a341f}
-/* 流れ図の編集窓。図そのものは紙面と同じ組み方（.fwc）を拡大して見せ、
+/* フローチャートの編集窓。図そのものは紙面と同じ組み方（.fwc）を拡大して見せ、
    その上に、つかむところ・選んだ印だけを重ねる */
 /* 紙の上と同じ色・大きさで見せる（大きさは renderFlowWin が文書の基準に合わせる） */
 #flowCanvas{position:relative;transform-origin:0 0;background:#f7f3ea;color:#23201c;
@@ -578,8 +588,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.9.0</span>
-    <button id="btnPages" title="右下にページ一覧を出し入れします（Ctrl+Shift+P）">ページ一覧</button>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.10.1</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -609,9 +618,111 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
     <nav id="tbar" aria-label="書式">
       <button id="tbarHide" title="書式ツールバーをしまう">&#171;</button>
       <div id="tbarIcons"></div>
+      <!-- 左下：ドキュメント設定・ページ一覧。触る機会が少ないので、ふだんは引き出しにしまっておく -->
+      <div id="tbarSub">
+        <button class="ic" data-s="doc" aria-label="ドキュメント設定" data-tip-html="ドキュメント設定<small>段組・背景・シナリオ名・余白・ページ番号・変数・文字・フォント</small>"><svg class="tic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h6l2 2h8v11H4z"/><path d="M8 12h8M8 15h5"/></svg></button>
+        <button class="ic" data-s="list" aria-label="ページ一覧" data-tip-html="ページ一覧<small>Ctrl+Shift+P</small>"><svg class="tic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="7" height="8"/><rect x="13" y="3" width="7" height="8"/><rect x="4" y="13" width="7" height="8"/><rect x="13" y="13" width="7" height="8"/></svg></button>
+      </div>
       <button id="tbarShow" title="書式ツールバーを出す">&#8250;<span>書式</span></button>
     </nav>
     <div id="tbFly" role="menu"></div>
+    <!-- 左の引き出し：ドキュメント設定・ページ一覧。ツールバー左下のアイコンで開き、原稿欄を押しのけて出る -->
+    <aside id="drawer" class="hide" aria-label="ドキュメント設定・ページ一覧">
+      <div id="drawerHead"><b id="drawerTtl"></b><button id="drawerClose" title="閉じる（Esc）">&#215;</button></div>
+      <div id="subBody">
+        <!-- ドキュメント設定。もとの「ページ」と「文書」を一つにまとめた -->
+        <section class="pane" data-p="doc">
+          <h5 class="dsh">ページ</h5>
+          <label class="f">選んだ段落のページの段組</label>
+          <div class="row">
+            <button id="pcol1" title="選んだ段落が載っているページを1段にします">このページを1段</button>
+            <button id="pcol2" title="選んだ段落が載っているページを2段にします">2段</button>
+          </div>
+          <div class="hint" id="pcolNote">段組はページ単位で決まります。</div>
+          <hr>
+          <label class="f">対象のページ</label>
+          <div class="plist" id="bgPages"></div>
+          <div class="row" style="margin-top:6px">
+            <button id="bgAll">全ページを選ぶ</button>
+            <button id="bgNone">選択を外す</button>
+          </div>
+          <div class="row" style="margin-top:6px">
+            <button id="pgDel" class="danger">選んだページを削除</button>
+          </div>
+          <div class="hint">そのページに載っている段落ごと消えます。</div>
+          <label class="f">背景</label>
+          <div class="grid3" id="bgPresets"></div>
+          <div class="row" style="margin-top:10px">
+            <button id="bgApply" class="on">選択ページに適用</button>
+            <button id="bgClear" class="danger">背景を外す</button>
+          </div>
+          <h5 class="dsh">文書</h5>
+          <label class="f">シナリオ名（書き出しの題名）</label>
+          <input type="text" id="docTitle">
+          <label class="f">紙面の余白（mm）</label>
+          <div class="grid2">
+            <div><span class="hint">上下</span><input type="number" id="padV" min="5" max="40" value="18"></div>
+            <div><span class="hint">左右</span><input type="number" id="padH" min="5" max="40" value="16"></div>
+          </div>
+          <label class="f">ページ番号（紙面の下）</label>
+          <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text);margin:0 0 6px">
+            <input type="checkbox" id="footNum" checked> ページ番号を出す</label>
+          <input type="text" id="footText" placeholder="いつも出す文字（例：{title}）">
+          <div class="grid2" style="margin-top:6px">
+            <div><span class="hint">最初のページの番号</span><input type="number" id="footFrom" min="0" value="1"></div>
+            <div><span class="hint">使える記号</span><div class="hint" style="line-height:1.5">{title} 題名<br>{page} 番号<br>{total} 総数</div></div>
+          </div>
+          <hr>
+          <label class="f">変数（出力したHTMLで名前などを入れられる）</label>
+          <div id="varList"></div>
+          <div class="row" style="margin-top:6px"><button id="varAdd">変数を足す</button></div>
+          <div id="varFound"></div>
+          <div class="hint">本文などに <b>{名前}</b> と書いた場所が、出力したHTMLで入れた値に置き換わります。
+            置き換わるのは<b>ここに登録した名前と、HO1・HO2 のような「HO＋数字」だけ</b>です（HO＋数字は登録しなくても使えます）。
+            ココフォリアの <code>{SAN}</code> のような書き方は登録しなければそのまま残ります。</div>
+          <hr>
+          <label class="f">本文の文字サイズ（pt）</label>
+          <input type="number" id="baseSize" min="7" max="14" step="0.5" value="10">
+          <hr>
+          <label class="f">フォント</label>
+          <div class="row"><button id="fontPick">PCのフォントから選ぶ</button></div>
+          <div class="row" style="margin-top:6px"><button id="fontAdd">ファイルから追加</button></div>
+          <input type="file" id="fontFile" accept=".ttf,.otf,.ttc,.otc,.woff,.woff2" hidden>
+          <div class="hint">Windowsの日本語フォントは .ttc のことが多く、その場合は中の書体を選べます。</div>
+          <div class="grid2" style="margin-top:6px">
+            <div><span class="hint">本文</span><select id="fontBody"></select></div>
+            <div><span class="hint">見出し</span><select id="fontHead"></select></div>
+          </div>
+          <div id="fontList" class="hint" style="margin-top:6px"></div>
+          <div class="hint">書き出した閲覧HTMLにも埋め込まれます。</div>
+          <hr>
+          <input type="file" id="jsonFile" accept=".json" hidden>
+          <input type="file" id="npcArtFile" accept="image/*" hidden>
+          <input type="file" id="imgFile" accept="image/*" hidden>
+          <div class="hint">自動保存とは別に、上の「保存」で大切な原稿はファイルにも残してください。ほかの作品へは上の「作品」から移れます。</div>
+          <div class="row" style="margin-top:10px"><button id="btnReset" class="danger" title="この作品の中身を消します（ほかの作品はそのまま）">全部消して最初から</button></div>
+        </section>
+
+          <div class="pane" data-p="list" id="pagesPane" tabindex="-1">
+            <div id="pagesHead">
+              <span class="seggrp" id="pagesSw">
+                <button id="pgvPage" class="on" title="1ページずつ見ます">ページ</button>
+                <button id="pgvToc" title="タイトルと見出しから目次を作ります">見出し</button>
+              </span>
+              <span id="pagesNote"></span>
+            </div>
+            <div id="pgWrap">
+              <button class="pgStep" id="pgUp" title="前のページ（↑）"></button>
+              <div id="pgMid"><div id="pagesBody"></div><div id="pgHeads"></div></div>
+              <button class="pgStep" id="pgDn" title="次のページ（↓）"></button>
+            </div>
+      <div id="tocPane" style="display:none">
+        <div class="row" style="margin:8px 10px 0"><button id="tocMake">この位置に目次ブロックを作る</button></div>
+        <div id="tocList" style="padding:8px 10px 16px"></div>
+      </div>
+          </div>
+      </div>
+    </aside>
     <div id="srcPane">
       <div id="srcHead">
         <span class="seggrp" id="srcViewSw">
@@ -627,12 +738,13 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
     <div id="canvasWrap"><div id="stageBox"><div id="stage"></div><div id="printAppendix"></div></div>
       <div id="cmtRail"></div></div>
     <div id="charCount" title="書式の記号・ルビの記号・注を除いた、本文の文字数です">0字</div>
-    <div class="splitter" id="splitDock" title="ドラッグで幅を変えられます"></div>
-    <aside id="dock">
+    <div class="splitter hide" id="splitDock" title="ドラッグで幅を変えられます"></div>
+    <!-- 右：段落の設定。段落を選んでいるときだけ出る -->
+    <aside id="dock" class="hide">
       <!-- 上：いま選んでいる段落の設定。段落を選べば、ここがまるごとその段落のものになる -->
       <div id="propPane">
         <div id="propHead">
-          <div id="ppTtl"><b id="propTtlR">段落</b><span id="selInfo"></span></div>
+          <div id="ppTtl"><b id="propTtlR">段落</b><span id="selInfo"></span><button id="dockClose" title="閉じる（選択を外す・Esc）">&#215;</button></div>
           <div id="ppActs">
             <button id="mvUp" data-tip="上へ"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
             <button id="mvDn" data-tip="下へ"><svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
@@ -693,120 +805,6 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 
         </div>
       </div>
-      </div>
-      <!-- 下：ページ・文書・ページ一覧。触る機会が少ないので、ふだんは見出しだけにたたんでおく -->
-      <div id="sub">
-        <div id="subTabs">
-          <button data-s="pg">ページ</button>
-          <button data-s="doc">文書</button>
-          <button data-s="list">ページ一覧</button>
-          <button id="subFold" title="開く／たたむ">&#9652;</button>
-        </div>
-        <div id="subBody">
-        <section class="pane" data-p="pg">
-          <label class="f">選んだ段落のページの段組</label>
-          <div class="row">
-            <button id="pcol1" title="選んだ段落が載っているページを1段にします">このページを1段</button>
-            <button id="pcol2" title="選んだ段落が載っているページを2段にします">2段</button>
-          </div>
-          <div class="hint" id="pcolNote">段組はページ単位で決まります。</div>
-          <hr>
-          <label class="f">本のかたち</label>
-          <div class="grid2">
-            <button id="mkCover">表紙ページを作る</button>
-            <button id="mkColophon">奥付ページを作る</button>
-          </div>
-          <hr>
-          <label class="f">対象のページ</label>
-          <div class="plist" id="bgPages"></div>
-          <div class="row" style="margin-top:6px">
-            <button id="bgAll">全ページを選ぶ</button>
-            <button id="bgNone">選択を外す</button>
-          </div>
-          <div class="row" style="margin-top:6px">
-            <button id="pgDel" class="danger">選んだページを削除</button>
-          </div>
-          <div class="hint">そのページに載っている段落ごと消えます。</div>
-          <label class="f">柄</label>
-          <div class="grid3" id="bgPresets"></div>
-          <label class="f">画像を敷く</label>
-          <input type="file" id="bgFile" accept="image/*" style="padding:5px">
-          <div class="grid2" style="margin-top:6px">
-            <div><span class="hint">大きさ</span>
-              <select id="bgFit"><option value="cover">全面を覆う</option><option value="contain">全体を入れる</option><option value="repeat">敷き詰める</option></select>
-            </div>
-            <div><span class="hint">濃さ</span><input type="range" id="bgOpa" min="5" max="100" value="35"></div>
-          </div>
-          <div class="row" style="margin-top:10px">
-            <button id="bgApply" class="on">選択ページに適用</button>
-            <button id="bgClear" class="danger">背景を外す</button>
-          </div>
-        </section>
-
-        <section class="pane" data-p="doc">
-          <label class="f">シナリオ名（書き出しの題名）</label>
-          <input type="text" id="docTitle">
-          <label class="f">紙面の余白（mm）</label>
-          <div class="grid2">
-            <div><span class="hint">上下</span><input type="number" id="padV" min="5" max="40" value="18"></div>
-            <div><span class="hint">左右</span><input type="number" id="padH" min="5" max="40" value="16"></div>
-          </div>
-          <label class="f">紙面の下（フッター）</label>
-          <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text);margin:0 0 6px">
-            <input type="checkbox" id="footNum" checked> ページ番号を出す</label>
-          <input type="text" id="footText" placeholder="いつも出す文字（例：{title}）">
-          <div class="grid2" style="margin-top:6px">
-            <div><span class="hint">最初のページの番号</span><input type="number" id="footFrom" min="0" value="1"></div>
-            <div><span class="hint">使える記号</span><div class="hint" style="line-height:1.5">{title} 題名<br>{page} 番号<br>{total} 総数</div></div>
-          </div>
-          <label class="f">変数（出力したHTMLで名前などを入れられる）</label>
-          <div id="varList"></div>
-          <div class="row" style="margin-top:6px"><button id="varAdd">変数を足す</button></div>
-          <div id="varFound"></div>
-          <div class="hint">本文などに <b>{名前}</b> と書いた場所が、出力したHTMLで入れた値に置き換わります。
-            置き換わるのは<b>ここに登録した名前と、HO1・HO2 のような「HO＋数字」だけ</b>です（HO＋数字は登録しなくても使えます）。
-            ココフォリアの <code>{SAN}</code> のような書き方は登録しなければそのまま残ります。</div>
-          <label class="f">本文の文字サイズ（pt）</label>
-          <input type="number" id="baseSize" min="7" max="14" step="0.5" value="10">
-          <hr>
-          <label class="f">フォント</label>
-          <div class="row"><button id="fontPick">PCのフォントから選ぶ</button></div>
-          <div class="row" style="margin-top:6px"><button id="fontAdd">ファイルから追加</button></div>
-          <input type="file" id="fontFile" accept=".ttf,.otf,.ttc,.otc,.woff,.woff2" hidden>
-          <div class="hint">Windowsの日本語フォントは .ttc のことが多く、その場合は中の書体を選べます。</div>
-          <div class="grid2" style="margin-top:6px">
-            <div><span class="hint">本文</span><select id="fontBody"></select></div>
-            <div><span class="hint">見出し</span><select id="fontHead"></select></div>
-          </div>
-          <div id="fontList" class="hint" style="margin-top:6px"></div>
-          <div class="hint">書き出した閲覧HTMLにも埋め込まれます。</div>
-          <hr>
-          <input type="file" id="jsonFile" accept=".json" hidden>
-          <input type="file" id="npcArtFile" accept="image/*" hidden>
-          <input type="file" id="imgFile" accept="image/*" hidden>
-          <div class="hint">自動保存とは別に、上の「保存」で大切な原稿はファイルにも残してください。ほかの作品へは上の「作品」から移れます。</div>
-          <div class="row" style="margin-top:10px"><button id="btnReset" class="danger" title="この作品の中身を消します（ほかの作品はそのまま）">全部消して最初から</button></div>
-        </section>
-
-          <div class="pane" data-p="list" id="pagesPane" tabindex="-1">
-            <div id="pagesHead">
-              <span class="seggrp" id="pagesSw">
-                <button id="pgvPage" class="on" title="1ページずつ見ます">ページ</button>
-                <button id="pgvToc" title="タイトルと見出しから目次を作ります">見出し</button>
-              </span>
-              <span id="pagesNote"></span>
-            </div>
-            <div id="pgWrap">
-              <button class="pgStep" id="pgUp" title="前のページ（↑）"></button>
-              <div id="pgMid"><div id="pagesBody"></div><div id="pgHeads"></div></div>
-              <button class="pgStep" id="pgDn" title="次のページ（↓）"></button>
-            </div>
-      <div id="tocPane" style="display:none">
-        <div class="row" style="margin:8px 10px 0"><button id="tocMake">この位置に目次ブロックを作る</button></div>
-        <div id="tocList" style="padding:8px 10px 16px"></div>
-      </div>
-          </div>
-        </div>
       </div>
     </aside>
   </div>
@@ -931,7 +929,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 
 <div id="flowDlg" class="floatwin" style="display:none">
   <div class="fw-bar" id="flowBar">
-    <span style="color:var(--brass);font-size:11px;letter-spacing:.08em;flex:0 0 auto">流れ図</span>
+    <span style="color:var(--brass);font-size:11px;letter-spacing:.08em;flex:0 0 auto">フローチャート</span>
     <button data-fadd="box" title="四角い箱を足します">＋箱</button>
     <button data-fadd="round" title="角の丸い箱を足します">＋角丸</button>
     <button data-fadd="diamond" title="ひし形（判断）を足します">＋ひし形</button>
@@ -1124,7 +1122,7 @@ const DOC_CSS = `
 .t-dialog .sp{display:block;font-size:.78em;font-weight:700;letter-spacing:.12em;
   color:#5c4a33;margin:0 0 .1em;line-height:1.3}
 .t-note{font-size:.86em;line-height:1.75;color:#5f5849;background:rgba(35,32,28,.05);border-left:2px solid rgba(35,32,28,.35);padding:2mm 3mm;margin:0 0}
-/* 処理系（技能判定・特殊ルールを1つにまとめた囲み）。
+/* 処理（技能判定・特殊ルールを1つにまとめた囲み）。
    枠線の形・左の太罫・地色・文字の大きさ・色を、それぞれ選べる。
    色は --bxc（線と見出し）と --bxf（地色）に入れて、まとめて効かせる。 */
 .t-proc{line-height:1.8;padding:2.5mm 3.5mm;margin:0 0}
@@ -1209,7 +1207,7 @@ ul.ls-box .mk{color:#23201c}
 .t-proc .bx-tbl th{background:var(--bxf,rgba(35,32,28,.07))}
 ul.ls .tx{flex:1;min-width:0;white-space:pre-wrap}
 .fw-empty{color:#8a7d63;font-size:.85em}
-/* 流れ図：箱を自由な場所に置き、線でつなぐ。
+/* フローチャート：箱を自由な場所に置き、線でつなぐ。
    形と線はSVG、文字はその上に重ねたHTML。入れ物の実寸と viewBox を同じ比にしてあるので、
    拡大・縮小しても線の太さと文字の位置がずれない。 */
 .t-flow{white-space:normal;break-inside:avoid}
@@ -1522,7 +1520,7 @@ input.npc-artw{width:3.4em;font-family:inherit;font-size:1em;background:#fff !im
 .pcells textarea.cur{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass)}
 .pradio{display:inline-flex;gap:4px;align-items:center;font-size:11px;color:var(--text);flex:1;cursor:pointer}
 #propBody textarea{width:100%;box-sizing:border-box;font:inherit;font-size:12px;line-height:1.6;resize:vertical}
-/* 処理系の色見本。四角の色見本と名前を並べて押せるようにする */
+/* 処理の色見本。四角の色見本と名前を並べて押せるようにする */
 #propBody .bxcols{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
 /* 自分で作ったテンプレの並び。名前のボタンの右に、上書き・改名・削除を小さく置く */
 #propBody .tpllist{display:flex;flex-direction:column;gap:4px;margin-top:6px}
@@ -1648,7 +1646,7 @@ function newTable(){
            name:'', dice:'', rows:4, ncol:2, cb:{},
            seed:[['項目','内容'],['',''],['',''],['','']] };
 }
-/* その升目の段落の並び（無ければ空の描写文を1つ作る） */
+/* その升目の段落の並び（無ければ空の描写を1つ作る） */
 function cellBlocks(t, ri, ci, make){
   if(!t.cb || typeof t.cb!=='object' || Array.isArray(t.cb)) t.cb = {};
   const k = ri+','+ci;
@@ -1777,16 +1775,16 @@ function popInnerViewHTML(pop){
 /* ================= 書式の定義 ================= */
 const TYPES = [
   /* g = 別窓のパネルでの区分。よく使うものから順に並べている（本窓のまとめ方は TOOL_GROUPS） */
-  {k:'desc',     n:'描写文',    s:'0', g:'本文'},
-  {k:'dialog',   n:'会話文',    s:'4', g:'本文'},
+  {k:'desc',     n:'描写',    s:'0', g:'本文'},
+  {k:'dialog',   n:'会話',    s:'4', g:'本文'},
   {k:'note',     n:'注釈',      s:'5', g:'本文'},
-  {k:'proc',     n:'処理系',    s:'6', g:'本文'},
-  {k:'flow',     n:'流れ図',    s:'F', g:'差し込み'},
+  {k:'proc',     n:'処理',    s:'6', g:'本文'},
+  {k:'flow',     n:'フローチャート',    s:'F', g:'差し込み'},
   {k:'h1',       n:'見出し1',   s:'1', g:'見出し'},
   {k:'h2',       n:'見出し2',   s:'2', g:'見出し'},
   {k:'h3',       n:'見出し3',   s:'3', g:'見出し'},
   {k:'title',    n:'タイトル',  s:'T', g:'見出し'},
-  {k:'subtitle', n:'サブ',      s:'S', g:'見出し'},
+  {k:'subtitle', n:'サブタイトル',s:'S', g:'見出し'},
   {k:'scene',    n:'シーン移行',s:'8', g:'見出し'},
   {k:'hr',       n:'罫線',      s:'H', g:'区切り'},
   {k:'vr',       n:'縦線',      s:'V', g:'区切り'},
@@ -1914,7 +1912,7 @@ const LABEL_PICKS = ['技能判定','共鳴判定','行動判定','行為判定'
 function blockLabel(b){
   return b.lb!=null ? String(b.lb) : (LABEL_DEF[b.type]||'');
 }
-/* ---- 処理系（囲み）の見た目 ----
+/* ---- 処理（囲み）の見た目 ----
    技能判定と特殊ルールは中身の作りが同じだったので1つの書式にまとめ、
    見た目だけを選べるようにした。
    ln  枠線の形（実線・破線・なし）
@@ -2028,7 +2026,7 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 const RUBY_RE = /[｜|]([^｜|《》\n]+)《([^《》\n]+)》/g;
 /* ルビが使われているかを見るだけの形。RUBY_RE は置き換えのために /g が付いていて、
    test() を使うと lastIndex が残り、次の判定が false になる。
-   実際これで、見出し・タイトル・会話文・シーン移行のルビが出たり出なかったりしていた。
+   実際これで、見出し・タイトル・会話・シーン移行のルビが出たり出なかったりしていた。
    判定には、状態を持たないこちらを使う。 */
 const RUBY_HAS = /[｜|][^｜|《》\n]+《[^《》\n]+》/;
 function hasRuby(t){ return RUBY_HAS.test(String(t==null?'':t)); }
@@ -4147,7 +4145,7 @@ function fixBlock(nb){
   nb.ind = Math.max(0, Math.min(4, parseInt(nb.ind,10)||0));
   if(Array.isArray(nb.mk)) nb.mk = tidyMarks(nb.mk); else if(nb.mk!=null) delete nb.mk;
   if(nb.type==='flow') nb.cols=1;
-  /* 旧データ: 箇条書きは書式ではなくなったので、描写文にして行の頭に印を付ける */
+  /* 旧データ: 箇条書きは書式ではなくなったので、描写にして行の頭に印を付ける */
   if(nb.type==='list'){
     const mk = ['disc','num','box'].includes(nb.mark) ? nb.mark : 'disc';
     let n=0;
@@ -4177,7 +4175,7 @@ function fixBlock(nb){
    行の頭の印を markdown と同じ書き方にそろえた。
      ・ → -        （箇条書き）
      □ → - [ ]     （選択肢）
-     ＞ → >        （処理系の入れ子）
+     ＞ → >        （処理の入れ子）
    古い印もそのまま読めるようにしてあるが、原稿の側も一度だけ書き換えておく。
    そうしないと、ボタンで付け外しするときに古い印と新しい印が混ざる。
    注やルビの位置は「何文字目から」で持っているので、
@@ -4243,7 +4241,7 @@ function normalize(d){
   }
   if(!out.pages.length) out.pages.push(newPage(out.defCols));
   if(!out.blocks.length) out.blocks = blank().blocks;
-  /* 旧データ: 技能判定・特殊ルールは「処理系」1つに統合された。
+  /* 旧データ: 技能判定・特殊ルールは「処理」1つに統合された。
      見た目と見出し語は、それぞれのテンプレで元どおりに写す。 */
   /* 別窓の中のブロックも、紙面のブロックと同じ整え方を通す */
   const fixList = list => list.forEach(b=>{
@@ -4884,7 +4882,7 @@ const TOC_PICKS = [
   ['h2',       '見出し2',  2],
   ['h3',       '見出し3',  3],
   ['scene',    'シーン移行', 3],
-  ['subtitle', 'サブ',     2]
+  ['subtitle', 'サブタイトル', 2]
 ];
 function newToc(){ return {lb:'目　次', pick:['h1','h2','h3'], pn:true, dots:true, scope:'all'}; }
 function ensureToc(b){
@@ -5021,7 +5019,7 @@ function blockEl(b, pageCols, prevType){
     el.innerHTML = (lb?'<div class="t-lb">'+esc(lb)+'</div>':'') + richBlockHTML(b);
   }
   else if(b.type==='handout'){ el.innerHTML = hoHeadHTML(b) + richBlockHTML(b); }
-  /* 描写文・注釈も、入れ子の記号が使われていればその組み立てを通す。
+  /* 描写・注釈も、入れ子の記号が使われていればその組み立てを通す。
      使われていなければ今までとまったく同じ描き方にする */
   else if((b.type==='desc'||b.type==='note') && hasRich(b.text)){
     el.classList.add('hasrich'); el.innerHTML = richBlockHTML(b); }
@@ -5302,11 +5300,11 @@ function popupInnerHTML(b){
 /* ================= 入れ子の書式 =================
    本文の中に、行の頭の記号で別の書式を入れられるようにする。
      ■…        小見出し
-     ＞技能：…  入れ子の処理系枠
+     ＞技能：…  入れ子の処理枠
      ・…        箇条書き（中黒）
      1. …       箇条書き（番号）
      □…        箇条書き（選択肢）
-     「…」      会話文（行が丸ごとかぎ括弧で閉じているときだけ。
+     「…」      会話（行が丸ごとかぎ括弧で閉じているときだけ。
                  名前「…」と書けば話者になる）
      |項目|内容| 表
    箇条書きの段下げは、行の頭の空白2つ（全角1つ）で1段。
@@ -5314,7 +5312,7 @@ function popupInnerHTML(b){
 const RICH_MARK = /^[ 　\t]*(?:[■◆]|[◇]|[※＊]|[＞>]|[・･]|[-*+][ \t]|\d+[.．)）]|[□☐]|[＠@]|[|｜])/;
 const RICH_TALK = /^\s*(?:([^「『、。！？\s]{1,10})\s*)?[「『][\s\S]*[」』]\s*$/;
 /* 入れ子の書式が使える書式 */
-/* 入れ子の書式を通す書式。会話文はそれ自体が入れ子の書式なので入れない
+/* 入れ子の書式を通す書式。会話はそれ自体が入れ子の書式なので入れない
    （入れると、押しても記号のまま残る食い違いが起きる） */
 const RICH_TYPES = ['desc','note','proc','info','handout'];
 /* 行の頭に入れる印。設定欄（右）のボタンに並べる */
@@ -5326,8 +5324,8 @@ const RICH_MARKS = [
   ['■',          '■見出し','囲みの中の小見出しにします'],
   ['◇',          '◇小見出し','ひとまわり小さい小見出しにします'],
   ['※',          '※注釈',  '注釈（小さめの補足）にします'],
-  ['> 技能：',     '> 判定',  '処理系の中に、もうひとつ判定の枠を入れます'],
-  ['「」',         '「」会話','会話文にします。名前「…」と書けば話し手が付きます'],
+  ['> 技能：',     '> 判定',  '処理の中に、もうひとつ判定の枠を入れます'],
+  ['「」',         '「」会話','会話にします。名前「…」と書けば話し手が付きます'],
   ['|項目|内容|', '｜表',    '表にします。同じ形の行を続けると1つの表になります'],
   ['＠',          '＠別窓',  '＠のうしろに別窓の名前を書くと、その別窓を開くボタンになります']
 ];
@@ -5391,7 +5389,7 @@ function slashFire(el, e){
   if(hit.inside) s.modify('move','backward','character');
   return true;
 }
-/* textarea（表の広い窓・別窓の文章・処理系の中身）でも同じことをする */
+/* textarea（表の広い窓・別窓の文章・処理の中身）でも同じことをする */
 function slashFireTA(ta, e){
   if(!ta || (e && e.isComposing)) return false;
   if(e && e.data!=null && e.data!==' ' && e.data!=='　') return false;
@@ -5424,8 +5422,8 @@ function slashNorm(t){
     .replace(/[ァ-ヶ]/g, c=>String.fromCharCode(c.charCodeAt(0)-0x60));
 }
 let slashMenu = null;     // 出している候補 {el, ta, back, list, i}。出していなければ null
-/* 候補を出してよい欄か。入れ子の書式が効く段落（描写文・注釈・処理系、表の升目）と、
-   その中身を書く入力欄（別窓の文章・表の広い窓の升目・設定欄の升目と処理系の中身）に限る */
+/* 候補を出してよい欄か。入れ子の書式が効く段落（描写・注釈・処理、表の升目）と、
+   その中身を書く入力欄（別窓の文章・表の広い窓の升目・設定欄の升目と処理の中身）に限る */
 function slashField(t){
   if(!t || !t.closest) return null;
   if(t.tagName==='TEXTAREA'){
@@ -5633,7 +5631,7 @@ function richApply(text, a, z, mark){
     const c = a + ins.length - (mark==='「」' ? 1 : 0);
     return {text: t.slice(0,a)+ins+t.slice(z), a:c, z:c};
   }
-  /* 会話文は、選んだところを丸ごと囲む。すでに囲んであれば外す */
+  /* 会話は、選んだところを丸ごと囲む。すでに囲んであれば外す */
   if(mark==='「」'){
     const raw = t.slice(a,z), sv = raw.trim();
     const on = /^[「『][\s\S]*[」』]$/.test(sv);
@@ -5832,9 +5830,9 @@ function richTextHTML(text, opt){
   const t = String(text||'');
   return richBodyHTML(t, (a,z)=>rubyHTML(t.slice(a,z)), opt);
 }
-/* 旧名。処理系の中身はいつもこの組み立てを通る */
-/* 流れ図。1行がひと箱、行頭に ・ か - があると枝分かれとして横に並ぶ */
-/* ================= 流れ図（自由配置） =================
+/* 旧名。処理の中身はいつもこの組み立てを通る */
+/* フローチャート。1行がひと箱、行頭に ・ か - があると枝分かれとして横に並ぶ */
+/* ================= フローチャート（自由配置） =================
    箱を好きな場所に置き、箱から箱へ線を引く。分かれ道の先でまた分かれてもよい。
    形と線はSVGで描き、文字はその上にHTMLで重ねる
    （ひし形でも枠線がきれいに出て、中の文字は本文と同じ組み方にできる）。
@@ -6019,7 +6017,7 @@ function flowEdgeSVG(f, e){
 function flowHTML(b, edit){
   const f = ensureFlow(b);
   if(!f.nodes.length)
-    return '<div class="fw-empty">（流れ図。右の設定欄の「図をひらく」から作れます）</div>';
+    return '<div class="fw-empty">（フローチャート。右の設定欄の「図をひらく」から作れます）</div>';
   const W = f.w, H = f.h;
   const svg = '<svg class="fwsvg" viewBox="0 0 '+fnum(W)+' '+fnum(H)+'" xmlns="http://www.w3.org/2000/svg">'
     + f.edges.map(e=>flowEdgeSVG(f,e)).join('')
@@ -6420,7 +6418,7 @@ function docCharCount(){
   let n = 0;
   const walk = list => list.forEach(b=>{
     if(b.type==='flow'){
-      /* 流れ図は図に置いた箱の文字を数える（b.text は移し替えの元として残っているだけ） */
+      /* フローチャートは図に置いた箱の文字を数える（b.text は移し替えの元として残っているだけ） */
       const ff = b.flow;
       if(ff && Array.isArray(ff.nodes))
         ff.nodes.forEach(x=>{ n += plainCount(x.t) + plainCount(x.t2); });
@@ -6490,9 +6488,6 @@ function renderSrc(force){
   }else{
     srcList.innerHTML = srcRowsHTML(S.blocks);
   }
-  document.getElementById('modeNote').innerHTML = '<button id="modeHelp" title="使い方を見る">?</button>';
-  const mh=document.getElementById('modeHelp');
-  if(mh) mh.onclick=()=>document.getElementById('btnHelp').click();
 }
 function npcLabel(b){
   const np=b.npc||{}; const nm=String(np.name||'').trim();
@@ -6500,7 +6495,7 @@ function npcLabel(b){
   return sys+(nm?'：'+nm:'');
 }
 function render(){ varCacheReset(); showCharCount(); paginate(); renderSrc(true); buildTOC(); buildBgPages(); syncBlockPanel(); renderProps(); renderNpcModal(); renderPopWin(true);
-  /* 流れ図の窓も、元に戻すなどで中身が変わったら描き直す。
+  /* フローチャートの窓も、元に戻すなどで中身が変わったら描き直す。
      動かしている最中は作り直さない（つかんでいるものを見失うため） */
   if(flowId && !flowDrag && !flowMarquee) renderFlowWin();
   /* 箱からあふれた文字があれば、その分だけ高さを伸ばして組み直す */
@@ -6710,15 +6705,17 @@ function restoreEditSpot(){
   const s0 = getSelection(); s0.removeAllRanges(); s0.addRange(r);
   return true;
 }
-['tbar','tbFly','dock','popProp'].forEach(id=>{
+['tbar','tbFly','drawer','dock','popProp'].forEach(id=>{
   const box = document.getElementById(id); if(!box) return;
+  /* 右上の × は選択を外して閉じるボタンなので、打っていた場所へは戻さない */
+  const keep = e => e.target.closest('button') && !e.target.closest('#dockClose');
   box.addEventListener('mousedown', e=>{
-    if(!e.target.closest('button')) return;
+    if(!keep(e)) return;
     noteEditSpot();
     if(editSpot) e.preventDefault();       // 焦点を奪わせない
   }, true);
   box.addEventListener('click', e=>{
-    if(!e.target.closest('button')) return;
+    if(!keep(e)) return;
     if(editSpot) setTimeout(restoreEditSpot, 0);
   });
 });
@@ -6790,7 +6787,7 @@ srcOn('keydown', e=>{
     e.preventDefault();
     const off = caretOffset(t), txt = t.innerText.replace(/\n$/,'');
     f.b.text = txt.slice(0,off);
-    /* 改行で増える段落はいつも描写文にする。見出しや囲みが続いてしまうのを防ぐ */
+    /* 改行で増える段落はいつも描写にする。見出しや囲みが続いてしまうのを防ぐ */
     const nt = 'desc';
     const nb = newBlock(nt, txt.slice(off)); nb.cols = 2;
     f.list.splice(f.i+1,0,nb);
@@ -6842,8 +6839,8 @@ addEventListener('keydown', e=>{
   if(imeBusy(e)) return;
   const a=document.activeElement;
   if(a && (a.isContentEditable || a.tagName==='INPUT' || a.tagName==='TEXTAREA' || a.tagName==='SELECT')) return;
-  /* 流れ図の窓を開いているあいだは、その窓の中のものを消す。
-     紙面の段落（＝流れ図そのもの）には手を出さない。
+  /* フローチャートの窓を開いているあいだは、その窓の中のものを消す。
+     紙面の段落（＝フローチャートそのもの）には手を出さない。
      窓を触っているつもりで紙面の段落が消えてしまうため */
   if(flowId && document.getElementById('flowDlg').style.display==='flex'){
     e.preventDefault(); flowDeleteSel(); return;
@@ -7275,8 +7272,9 @@ function doJumpPreview(id){
     const want = Math.min(wrap.clientHeight*0.3, Math.max(0, (wrap.clientHeight - r.height)/2));
     wrap.scrollTop += (r.top - wr.top) - want;
   }
-  /* 拡大していて横にはみ出しているときは、横も寄せる */
-  if(r.left < wr.left+4) wrap.scrollLeft += (r.left - wr.left) - 12;
+  /* 拡大していて横にはみ出しているときは、横も寄せる。
+     段落が見える幅より広いときは、文字の始まる左端を見せる */
+  if(r.left < wr.left+4 || r.width > wr.width-16) wrap.scrollLeft += (r.left - wr.left) - 12;
   else if(r.right > wr.right-4) wrap.scrollLeft += (r.right - wr.right) + 12;
   el.classList.add('jumped');
   setTimeout(()=>el.classList.remove('jumped'), 700);
@@ -7915,11 +7913,11 @@ document.getElementById('popBtnProp').onclick = ()=>{
   }
   syncPopBar();
 };
-/* ================= 流れ図の編集窓 =================
+/* ================= フローチャートの編集窓 =================
    図そのものは紙面とまったく同じ組み方（flowHTML）を拡大して見せ、
    その上に「つかむところ」だけを重ねる。だから編集中の見え方と紙面が食い違わない。 */
 const FLOW_MM = 96/25.4;                 // 1mm が何px か
-let flowId = null;                       // いま開いている流れ図のブロックid
+let flowId = null;                       // いま開いているフローチャートのブロックid
 let flowSelSet = new Set();              // 選んでいる箱（複数）
 let flowSel = null;                      // そのうち最後に押したもの（設定欄はこれを出す）
 let flowSelEdge = null;                  // 選んでいる線
@@ -7937,7 +7935,7 @@ function flowPick(id, add){
   flowSel = id;
 }
 function flowSelNodes(fl){ return [...flowSelSet].map(id=>flowNode(fl,id)).filter(Boolean); }
-/* 流れ図の窓での Backspace / Delete。選んでいる箱か線だけを消す */
+/* フローチャートの窓での Backspace / Delete。選んでいる箱か線だけを消す */
 function flowDeleteSel(){
   const b = flowBlk(); if(!b) return;
   const fl = ensureFlow(b);
@@ -7995,7 +7993,7 @@ function flowCanvasSVG(fl){
 }
 function renderFlowWin(force){
   const b = flowBlk();
-  /* 編集していた流れ図が消えた（削除・読み込み直し）ときは窓も閉じる */
+  /* 編集していたフローチャートが消えた（削除・読み込み直し）ときは窓も閉じる */
   if(!b){ if(flowId) closeFlowWin(); return; }
   /* 消えた箱が選ばれたままにならないようにする */
   const alive = new Set((b.flow&&b.flow.nodes||[]).map(n=>n.id));
@@ -8881,18 +8879,16 @@ function typeBtnsHTML(skip){
    書式が 1 つだけのアイコンは、押せばすぐその書式になる。
    アイコンの顔は最後に使った書式にし、選んでいる段落の書式を含むアイコンは金色にする。 */
 const TOOL_GROUPS = [
-  {n:'本文',     ks:['desc','dialog','note','proc']},
-  {n:'見出し',   ks:['h1','h2','h3','scene']},
-  {n:'表題',     ks:['title','subtitle']},
-  {n:'線',       ks:['hr','vr']},
-  {n:'改め',     ks:['break','colbr']},
-  {n:'図表',     ks:['table','flow','image']},
-  {n:'NPCシート',ks:['npc']},
-  {n:'別窓',     ks:['popup']},
-  {n:'本の部品', ks:['cover','toc','colophon']},
-  {n:'情報',     ks:['info','handout']}
+  {n:'本文ブロック',         ks:['desc','dialog','note','proc','info']},
+  {n:'見出しブロック',       ks:['h1','h2','h3','scene']},
+  {n:'区切りブロック',       ks:['hr','vr','break','colbr']},
+  {n:'図表ブロック',         ks:['image','table','flow']},
+  {n:'シートブロック',       ks:['npc','handout']},
+  {n:'新規ウィンドウの追加', ks:['popup']},
+  {n:'装丁ブロック',         ks:['cover','toc','colophon']},
+  {n:'表題ブロック',         ks:['title','subtitle']}
 ];
-const TOOL_SEP = {1:1, 4:1, 7:1, 8:1};          // この番号のアイコンのあとに区切り線を引く
+const TOOL_SEP = {2:1, 5:1};          // この番号のアイコンのあとに区切り線を引く          // この番号のアイコンのあとに区切り線を引く
 /* アイコンは 24×24 の線画。仮のもので、あとから描き直してよい */
 const TOOL_ICON = {
   desc:    '<path d="M5 7h14M5 11h14M5 15h14M5 19h9"/>',
@@ -8927,7 +8923,7 @@ let toolOpen = -1;                          // 中身を開いているアイコ
 function toolTip(i){
   const g = TOOL_GROUPS[i];
   if(g.ks.length>1) return g.n+'<small>'+g.ks.map(k=>toolType(k).n).join('・')+'</small>';
-  return g.n+'<small>Ctrl+Shift+'+toolType(g.ks[0]).s+'</small>';
+  return g.n+'<small>'+toolType(g.ks[0]).n+'　Ctrl+Shift+'+toolType(g.ks[0]).s+'</small>';
 }
 function closeToolFly(){
   toolOpen = -1;
@@ -9009,7 +9005,7 @@ function hideUiTip(){ const t=document.getElementById('uiTip'); if(t) t.style.di
 (function initUiTip(){
   const tip = document.createElement('div'); tip.id='uiTip'; document.body.appendChild(tip);
   document.addEventListener('mouseover', e=>{
-    const b = e.target.closest && e.target.closest('#tbarIcons .ic, #ppActs button');
+    const b = e.target.closest && e.target.closest('#tbarIcons .ic, #tbarSub .ic, #ppActs button');
     if(!b || toolOpen>=0){ tip.style.display='none'; return; }
     if(b.dataset.tipHtml) tip.innerHTML = b.dataset.tipHtml; else tip.textContent = b.dataset.tip || '';
     tip.style.display='block';
@@ -9020,7 +9016,7 @@ function hideUiTip(){ const t=document.getElementById('uiTip'); if(t) t.style.di
       tip.style.top  = (r.bottom+6)+'px';
     }
   });
-  document.addEventListener('mouseout', e=>{ if(e.target.closest && e.target.closest('#tbarIcons .ic, #ppActs button')) tip.style.display='none'; });
+  document.addEventListener('mouseout', e=>{ if(e.target.closest && e.target.closest('#tbarIcons .ic, #tbarSub .ic, #ppActs button')) tip.style.display='none'; });
 })();
 /* 別窓じぶんのパネル。書式は本窓と同じ setType を呼び、
    段落の操作は本窓の同じボタンを押しに行くだけにしてある。
@@ -9045,7 +9041,7 @@ function syncPopSideBtns(){
    画像だけは中身がないと意味がないので、ファイルの選択を開く。 */
 /* 升目の中に段落を作る。作ったものを選んで、そこへ寄せる */
 /* 升目の中の段落に、その場（紙面や別窓の窓）でカーソルを置く。
-   置けたら true。置けない書式（処理系や表など、紙面で直に打てないもの）は false */
+   置けたら true。置けない書式（処理や表など、紙面で直に打てないもの）は false */
 function focusCellBlock(id, root){
   if(!root) return false;
   const el = root.querySelector('[data-btext="'+id+'"]');
@@ -9102,7 +9098,7 @@ function setType(k){
     if(k==='proc'){ if(!f.b.bx) applyBxTpl(f.b,'skill'); else ensureProc(f.b); }
     if(k==='break'||k==='toc'||k==='image'){ f.b.cols=1; }
     if(k==='colbr'){ f.b.cols=2; f.b.text=''; }   // 段の流れの中に置かないと段を送れない
-    if(k==='flow'){ f.b.cols=1; }                 // 流れ図は縦長なので全幅にする
+    if(k==='flow'){ f.b.cols=1; }                 // フローチャートは縦長なので全幅にする
     if(k==='break'){
       const L=f.list, i=L.indexOf(f.b);
       const nx=L[i+1];
@@ -9214,7 +9210,7 @@ function setCols(n){
     f.b.cols=n;
   });
   render(); save();
-  if(forced && n===2) setStatus('NPCシートと流れ図は全幅のみです','#ff9b83');
+  if(forced && n===2) setStatus('NPCシートとフローチャートは全幅のみです','#ff9b83');
 }
 /* 表・キャラシ・別窓は、中身の作りが込み入っているので左でいじる。
    紙面には出来上がりだけを出し、操作の欄はここに集める。 */
@@ -9244,6 +9240,8 @@ function renderProps(){
   const b = first ? first.b : null;
   const common = document.getElementById('blkCommon');
   const inPop = placeProps(b);
+  /* 右の欄は段落を選んでいるときだけ出す。別窓の中の段落は、その窓の右に設定が出るので出さない */
+  autoDock(sel.size>0 && !(b && inPop));
   /* 段落をひとつも選んでいなければ、案内だけを出す */
   if(!b && !sel.size){
     propId=null; box.style.display='none'; body.innerHTML='';
@@ -9269,7 +9267,7 @@ function renderProps(){
   propId = b.id;
   const ttl = b.type==='table' ? '表の設定' : b.type==='npc' ? 'キャラクターシート'
             : b.type==='popup' ? '別窓の設定' : b.type==='image' ? '画像の設定'
-            : b.type==='proc' ? '処理系の設定' : TYPE_NAME(b.type)+'の設定';
+            : b.type==='proc' ? '処理の設定' : TYPE_NAME(b.type)+'の設定';
   document.getElementById('propTtl').textContent = ttl;
   document.getElementById('popPropHead').textContent = ttl;
   const h = propsHTML(b);
@@ -9441,7 +9439,7 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
   body.addEventListener('input', e=>{
     const b = propBlk(); if(!b) return;
     const el = e.target.closest('[data-p],[data-cell]'); if(!el) return;
-    /* 升目の欄と、処理系の「中身」でも合図を印に化けさせる */
+    /* 升目の欄と、処理の「中身」でも合図を印に化けさせる */
     if(el.tagName==='TEXTAREA' && (el.dataset.cell!=null || el.dataset.p==='btext'))
       slashFireTA(el, e);
     const t  = b.type==='table' ? ensureTable(b) : null;
@@ -9562,7 +9560,7 @@ function propsRich(b){
 }
 /* 書式ごとの欄。ここが空の書式でも、共通の設定（下の #blkCommon）は出る */
 function propsHTML(b){
-  /* 描写文・注釈は入れ子の書式のボタンだけ。処理系・情報・ハンドアウトは自分の欄のあとに出す */
+  /* 描写・注釈は入れ子の書式のボタンだけ。処理・情報・ハンドアウトは自分の欄のあとに出す */
   const h = (b.type==='desc' || b.type==='note') ? propsRich(b)
     : b.type==='dialog' ? pRow('話し手',
         '<input type="text" data-p="dsp" value="'+esc(b.sp||'')+'" placeholder="なくても構いません">')
@@ -9628,7 +9626,7 @@ function propsTocItem(b){
       + '</div>',
       '目次での見た目の段だけを変えます。紙面の見出しの大きさは変わりません。');
 }
-/* 流れ図。1行がひと箱、行の頭に - か ・ を付けた行は、続けて書くと横に並ぶ枝になる。
+/* フローチャート。1行がひと箱、行の頭に - か ・ を付けた行は、続けて書くと横に並ぶ枝になる。
    書き方がどこにも出ていなかったので、ここに欄と手引きを置く */
 function propsFlow(b){
   const fl = ensureFlow(b);
@@ -10007,14 +10005,11 @@ const bgWrap=document.getElementById('bgPresets');
 bgWrap.innerHTML=BGS.map(b=>'<button class="swatch" data-bg="'+b.k+'"><div class="page '+(b.k==='none'?'':b.k)
   +'" style="width:100%;height:100%;position:absolute;inset:0"><div class="page-bg '+(b.k==='none'?'':b.k)
   +'" style="position:absolute;inset:0"></div></div><span>'+b.n+'</span></button>').join('');
-let bgPick='none', bgImg=null;
+/* 画像を挿入するのは書式ツールバーの「画像」なので、ここでは柄だけを選ぶ。
+   前の版で敷いた画像は、そのまま出す（「背景を外す」で外せる） */
+let bgPick='none';
 bgWrap.onclick=e=>{const b=e.target.closest('[data-bg]');if(!b)return;bgPick=b.dataset.bg;
   bgWrap.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('on',x===b));};
-document.getElementById('bgFile').onchange=e=>{
-  const f=e.target.files[0]; if(!f) return;
-  if(f.size>2.5*1024*1024 && !confirm('2.5MBを超える画像です。保存できない場合があります。続けますか？')) return;
-  const r=new FileReader(); r.onload=()=>{bgImg=r.result; setStatus('画像を読み込みました','var(--ok)');}; r.readAsDataURL(f);
-};
 function buildBgPages(){
   const box=document.getElementById('bgPages');
   box.innerHTML=S.pages.map((p,i)=>'<label><input type="checkbox" class="bgpg" value="'+i+'"'+(pgSel.has(p.id)?' checked':'')
@@ -10039,7 +10034,7 @@ function targetPages(){
 document.getElementById('pcol1').onclick=()=>setPageCols(1);
 document.getElementById('pcol2').onclick=()=>setPageCols(2);
 /* 段組はページ単位。選んだ段落が載っているページに効く。
-   「ページ」タブでページを選んでいれば、そちらが優先される。 */
+   ドキュメント設定の「対象のページ」でページを選んでいれば、そちらが優先される。 */
 function selPageIdx(){
   const chosen = targetPages();
   if(chosen) return chosen;
@@ -10087,9 +10082,6 @@ document.getElementById('bgApply').onclick=()=>{
   const idx=targetPages(); if(!idx) return alert('適用するページを選んでください。');
   idx.forEach(i=>{
     S.pages[i].bg.preset=bgPick;
-    if(bgImg) S.pages[i].bg.img=bgImg;
-    S.pages[i].bg.fit=document.getElementById('bgFit').value;
-    S.pages[i].bg.opa=+document.getElementById('bgOpa').value;
   });
   render(); save(); setStatus(idx.length+'ページに適用しました','var(--ok)');
 };
@@ -10225,6 +10217,7 @@ function deselectAll(quiet){
   if(!quiet) setStatus('選択を外しました');
 }
 document.getElementById('btnDesel').onclick=()=>deselectAll();
+document.getElementById('dockClose').onclick=()=>deselectAll();
 /* ブロックそのものの控え。表もNPCシートも中身ごと写す */
 let blkClip = null;
 function blkCopyDo(quiet){
@@ -11298,14 +11291,12 @@ const HELP = [
 <tr><th>左・書式ツールバー</th><td>書式を選ぶ（＝段落を足す／変える）。関連の近い書式を1つのアイコンにまとめてあり、
 押すと中身が横に開きます（もう一度押すと閉じます）。右下に三角のあるアイコンは中に複数入っています。
 アイコンに指を乗せると名前が出ます。左上の <b>&#171;</b> で細い帯にしまい、<b>&#8250;</b> で戻します。</td></tr>
-<tr><th>右上・段落の設定</th><td>いま選んでいる段落の中身と見た目。いちばん上の列は段落の操作
+<tr><th>左下・ドキュメント設定／ページ一覧</th><td>ツールバーのいちばん下の2つのアイコンです。押すとツールバーの右に引き出しが開き、原稿欄はそのぶん狭くなります（重ならないので、開いたまま段落を選べます）。もう一度押すか、右上の <b>&#215;</b>、引き出しの中で <code>Esc</code> を押すと閉じます。<br>
+<b>ドキュメント設定</b>：段組・対象のページ・背景（ここまでページごと）と、シナリオ名・余白・ページ番号・変数・文字サイズ・フォント・全部消して最初から（文書全体）。<b>ページ一覧</b>：1ページずつ見て、そのページの見出しへ飛べます（「段組とページ」を参照）。</td></tr>
+<tr><th>右・段落の設定</th><td><b>段落を選んでいるときだけ</b>紙面の右に出ます。右上の <b>&#215;</b> か <code>Esc</code> で閉じます（選択が外れ、紙面が広くなります）。いちばん上の列は段落の操作
 （上へ・下へ・複製・下に追加・結合・ブロックをコピー・貼り付け・文章をコピー・選択を外す・削除）。
-その下に、書式ごとの欄（表・キャラシ・画像・処理系など）と、どの段落にも共通の欄（入れ子の書式、ルビ、2段のときの置き方、コメント、文字の色、字下げ、この段落だけの余白）が出ます。</td></tr>
-<tr><th>右下・ページ</th><td>選んだ段落のページの段組、表紙・奥付づくり、背景。</td></tr>
-<tr><th>右下・文書</th><td>シナリオ名、紙面の余白、文字サイズ、フォントなど、文書全体の設定。</td></tr>
-<tr><th>右下・ページ一覧</th><td>1ページずつ見て、そのページの見出しへ飛べます（「段組とページ」を参照）。</td></tr>
+その下に、書式ごとの欄（表・キャラシ・画像・処理など）と、どの段落にも共通の欄（入れ子の書式、ルビ、2段のときの置き方、コメント、文字の色、字下げ、この段落だけの余白）が出ます。</td></tr>
 </table>
-<p>右下の<b>ページ・文書・ページ一覧</b>は、ふだんは見出しだけに格納してあります。押すと開き、もう一度押すと格納します。</p>
 <h4>本文の表示</h4>
 <table>
 <tr><th>全体</th><td>本文を続けて表示します。通して読み書きするとき。</td></tr>
@@ -11358,7 +11349,7 @@ const HELP = [
 <ul>
 <li>境目をつかんで動かすと、本文・紙面・右のプロパティ等の幅を変えられます。</li>
 <li>境目を<b>ダブルクリック</b>すると既定の幅に戻ります。</li>
-<li>幅、ツールバーをしまったか、右下でどのタブを開いているかは、このブラウザに覚えさせます。窓を狭くすると、本文・紙面・道具欄が上下に並びます。</li>
+<li>幅、ツールバーをしまったか、左下の引き出しで何を開いているかは、このブラウザに覚えさせます。窓を狭くすると、本文・紙面・道具欄が上下に並びます。</li>
 </ul>
 <h4>保存</h4>
 <ul>
@@ -11396,11 +11387,11 @@ const HELP = [
 <tr><th><code>Tab</code> / <code>Shift</code>+<code>Tab</code></th><td>字下げを1段ずつ増減します（<code>Ctrl</code>+<code>Shift</code>+<code>]</code> / <code>[</code>も同じ）。打っている途中でも使えます。</td></tr>
 <tr><th><code>Ctrl</code>+<code>0</code> / <code>+</code> / <code>-</code></th><td>ページの表示倍率。<code>0</code>で幅に合わせます。<code>Ctrl</code>+<code>Shift</code>+<code>↑</code> / <code>↓</code> でも拡大縮小できます。</td></tr>
 <tr><th>書式のショートカット</th><td>すべて <code>Ctrl</code>+<code>Shift</code>+キー です（<code>Ctrl</code>+<code>Alt</code>+キー も今までどおり使えます。ブラウザに取られる組み合わせがあったときの逃げ道です）。<br>
-<code>0</code>描写文、<code>1</code>〜<code>3</code>見出し1〜3、<code>4</code>会話文、<code>5</code>注釈、<code>6</code>処理系、<code>8</code>シーン移行、<code>9</code>NPCシート、<br>
-<code>C</code>表紙、<code>T</code>タイトル、<code>S</code>サブ、<code>K</code>奥付、<code>G</code>画像、<code>M</code>目次、<code>H</code>罫線、<code>V</code>縦線、<code>B</code>改ページ、<code>D</code>改段、<code>X</code>表、<code>W</code>別窓、<code>F</code>流れ図<br>
+<code>0</code>描写、<code>1</code>〜<code>3</code>見出し1〜3、<code>4</code>会話、<code>5</code>注釈、<code>6</code>処理、<code>8</code>シーン移行、<code>9</code>NPCシート、<br>
+<code>C</code>表紙、<code>T</code>タイトル、<code>S</code>サブタイトル、<code>K</code>奥付、<code>G</code>画像、<code>M</code>目次、<code>H</code>罫線、<code>V</code>縦線、<code>B</code>改ページ、<code>D</code>改段、<code>X</code>表、<code>W</code>別窓、<code>F</code>フローチャート<br>
 段落を<b>選んでいれば</b>その書式に変わり、<b>選んでいなければ</b>いちばん後ろに新しく足されます。<br>
 ブラウザで開いているときは、<code>Ctrl</code>+<code>Shift</code>+<code>T</code>（タブを開き直す）などブラウザ側が先に取る組み合わせがあります。その場合は <code>Ctrl</code>+<code>Alt</code>+キー を使ってください。exe版ではどちらも使えます。</td></tr>
-<tr><th><code>Ctrl</code>+<code>Shift</code>+<code>P</code></th><td>右下のページ一覧を出したり隠したりします。</td></tr>
+<tr><th><code>Ctrl</code>+<code>Shift</code>+<code>P</code></th><td>左下のページ一覧を出したり隠したりします。</td></tr>
 <tr><th><code>Ctrl</code>+<code>C</code> / <code>V</code></th><td>段落まるごとを控える／貼り付けます。表やNPCシートも、升目に入れた段落まで中身をそのまま写します。<br>
 <b>文字を選んでいるとき</b>と<b>文字を打つ欄にいるとき</b>は、いつもどおり文字のコピー・貼り付けになります。段落を選んで、文字にカーソルが入っていないときだけ段落まるごとになります。<br>
 控えた段落は、このツールを開いているあいだ覚えています（別のアプリへは貼れません）。</td></tr>
@@ -11419,7 +11410,7 @@ const HELP = [
 <h3>段組とページ</h3>
 <p>改ページは自動です。区切りたい位置には書式ツールバーの<b>改め → 改ページ</b>で区切りを置けます。</p>
 <h4>ページの段組</h4>
-<p>段組は<b>ページ単位</b>で決まります。右下の「ページ」の<b>選んだ段落のページの段組</b>で、選んでいる段落が載っているページを切り替えます（同じ欄の「対象のページ」でページを選んでいれば、そちらが対象になります）。2段組にすると<b>半分の幅の縦長の段</b>になり、文章は左の段を最後まで埋めてから右の段へ流れます。ページ見出しの「段組を切替」でも変えられます。</p>
+<p>段組は<b>ページ単位</b>で決まります。左下の「ドキュメント設定」の<b>選んだ段落のページの段組</b>で、選んでいる段落が載っているページを切り替えます（同じ欄の「対象のページ」でページを選んでいれば、そちらが対象になります）。2段組にすると<b>半分の幅の縦長の段</b>になり、文章は左の段を最後まで埋めてから右の段へ流れます。ページ見出しの「段組を切替」でも変えられます。</p>
 <h4>ブロックの置き方</h4>
 <table>
 <tr><th>全幅</th><td>2段組のページで、段をまたいで横いっぱいに置きます。タイトルや見出し、NPCシート、画像に向きます。</td></tr>
@@ -11429,7 +11420,7 @@ const HELP = [
 
  ['blocks','書式と段落', `
 <h3>書式と段落</h3>
-<p>書式は左の<b>書式ツールバー</b>で選びます。関連の近いものを10のアイコンにまとめてあります：<b>本文</b>（描写文・会話文・注釈・処理系）、<b>見出し</b>（見出し1〜3・シーン移行）、<b>表題</b>（タイトル・サブ）、<b>線</b>（罫線・縦線）、<b>改め</b>（改ページ・改段）、<b>図表</b>（表・流れ図・画像）、<b>NPCシート</b>、<b>別窓</b>、<b>本の部品</b>（表紙・目次・奥付）、<b>情報</b>（情報・ハンドアウト）。アイコンを押すと中身が開き、選ぶとその書式になります。段落を<b>選んでいれば</b>その書式に変わり、<b>何も選んでいなければ</b>いちばん後ろに新しく足されます。いま選んでいる段落の書式を含むアイコンは金色になります。</p>
+<p>書式は左の<b>書式ツールバー</b>で選びます。関連の近いものを8つのアイコンにまとめてあります：<b>本文ブロック</b>（描写・会話・注釈・処理・情報）、<b>見出しブロック</b>（見出し1〜3・シーン移行）、<b>区切りブロック</b>（罫線・縦線・改ページ・改段）、<b>図表ブロック</b>（画像・表・フローチャート）、<b>シートブロック</b>（NPCシート・ハンドアウト）、<b>新規ウィンドウの追加</b>（別窓）、<b>装丁ブロック</b>（表紙・目次・奥付）、<b>表題ブロック</b>（タイトル・サブタイトル）。アイコンを押すと中身が開き、選ぶとその書式になります。段落を<b>選んでいれば</b>その書式に変わり、<b>何も選んでいなければ</b>いちばん後ろに新しく足されます。いま選んでいる段落の書式を含むアイコンは金色になります。</p>
 <h4>情報ブロック</h4>
 <p>プレイヤーに渡す情報をまとめる枠です（<code>Ctrl</code>+<code>Alt</code>+<code>L</code>）。見出し語（例：「情報：古い日記」）と本文を持ち、本文には入れ子の書式も使えます。出力したHTMLでは、枠にカーソルを合わせると縁が光り、<b>クリックするだけで本文だけ</b>をクリップボードに写せます（「本文をコピーしました」と出ます）。セッション中にチャットへそのまま貼れます。文字をドラッグで選んだときは、ふつうの文字選択になります。編集画面ではクリックは段落を選ぶ操作なので、写したいときは<b>文章をコピー</b>を使ってください。</p>
 <h4>ハンドアウト</h4>
@@ -11437,23 +11428,23 @@ const HELP = [
 <h4>変数（{HO1} など）</h4>
 <p>本文・見出し・表・別窓など、どこにでも <code>{名前}</code> と書いておくと、<b>出力したHTMLで入れた値に置き換わります</b>。たとえば <code>{HO1}は机の上の日記に目を留める。</code> と書いておけば、HTMLを開いた人が HO1 の欄に「佐藤 千景」と入れた時点で、文中の <code>{HO1}</code> がすべて「佐藤 千景」になります。</p>
 <ul>
-<li>置き換わるのは、<b>HO1・HO2 のような「HO＋数字」</b>（ハンドアウトの枠がなくても、書くだけで使えます）と、右下の「文書」の<b>変数</b>の欄で<b>登録した名前</b>（例：<code>{KP}</code>）だけです。ココフォリアの <code>{SAN}</code> のような書き方は、登録しなければそのまま残ります。</li>
-<li>「文書」の変数の欄には、本文で見つかったまだ登録していない名前が並ぶので、押せば登録できます。既定値（値を入れていないときに出す文字）と説明も付けられます。</li>
+<li>置き換わるのは、<b>HO1・HO2 のような「HO＋数字」</b>（ハンドアウトの枠がなくても、書くだけで使えます）と、左下の「ドキュメント設定」の<b>変数</b>の欄で<b>登録した名前</b>（例：<code>{KP}</code>）だけです。ココフォリアの <code>{SAN}</code> のような書き方は、登録しなければそのまま残ります。</li>
+<li>変数の欄には、本文で見つかったまだ登録していない名前が並ぶので、押せば登録できます。既定値（値を入れていないときに出す文字）と説明も付けられます。</li>
 <li>出力したHTMLでは、左の目次の上に<b>登場人物（変数）</b>の欄が出ます。入れた値はそのブラウザに覚えさせるので、開き直しても残ります。値を入れるまでは既定値（なければ名前）を淡く出します。コピーで写す文にも、入れた値が入ります。</li>
 <li>編集画面の紙面は、出力したHTMLを開いた直後と同じく<b>既定値（なければ名前）</b>で表示します（<code>{HO1}</code> は「HO1」）。変数を含む段落は紙面の上では直接書き換えられないので、左の原稿で直してください（左の原稿には <code>{HO1}</code> のまま出ます）。</li>
 </ul>
-<p>ただし、<b>罫線・縦線・改ページ・改段・目次・画像・流れ図・表・NPCシート・別窓</b>は段落の文字を使わないので、<b>文字の書いてある段落</b>を選んでいるときは、その段落を変えずに<b>すぐ下へ新しく足します</b>（書いた文字が消えないように）。選んでいる段落が空っぽなら、その段落が変わります。罫線・縦線・改ページ・改段なら、足したあとも打っていた段落のまま書き続けられます。同じことが <code>Ctrl</code>+<code>Alt</code>+各キーでもできます。</p>
+<p>ただし、<b>罫線・縦線・改ページ・改段・目次・画像・フローチャート・表・NPCシート・別窓</b>は段落の文字を使わないので、<b>文字の書いてある段落</b>を選んでいるときは、その段落を変えずに<b>すぐ下へ新しく足します</b>（書いた文字が消えないように）。選んでいる段落が空っぽなら、その段落が変わります。罫線・縦線・改ページ・改段なら、足したあとも打っていた段落のまま書き続けられます。同じことが <code>Ctrl</code>+<code>Alt</code>+各キーでもできます。</p>
 <p>左の一覧では書式名が行の左に出ます（この文字はコピーには含まれません）。</p>
 <h4>表紙ページと奥付</h4>
-<p>「ページ」タブの<b>表紙ページを作る</b>／<b>奥付ページを作る</b>で、まとめて用意できます。表紙は先頭に題字と改ページを、奥付は末尾に改ページと著者・発行の雛形を置きます。すでにある場合はその位置へ移動します。</p>
+<p>書式ツールバーの<b>装丁ブロック</b>から<b>表紙</b>・<b>奥付</b>を選びます。独立したページにしたいときは、前後に<b>改ページ</b>（区切りブロック）を入れてください。</p>
 <table>
 <tr><th>表紙</th><td>ページの中ほどに大きく置く題字。</td></tr>
 <tr><th>奥付</th><td>小さな文字と区切り線。著者や発行日を末尾に。</td></tr>
 </table>
 <p>表紙は <code>Ctrl</code>+<code>Alt</code>+<code>C</code>、奥付は <code>Ctrl</code>+<code>Alt</code>+<code>K</code> でも指定できます。</p>
-<h4>流れ図（<code>Ctrl</code>+<code>Shift</code>+<code>F</code>）</h4>
+<h4>フローチャート（<code>Ctrl</code>+<code>Shift</code>+<code>F</code>）</h4>
 <p>箱を<b>好きな場所に置いて、線でつなぐ</b>図です。分かれ道の先で、さらに分かれ道を作れます。戻る矢印や、離れた箱への合流も引けます。縦に長くなるので<b>いつも全幅</b>です。</p>
-<p>流れ図を選んで<b>右の設定欄の「図をひらいて描く」</b>を押すと、編集の窓がひらきます（テキストの欄で<b>二度押し</b>しても開きます）。</p>
+<p>フローチャートを選んで<b>右の設定欄の「図をひらいて描く」</b>を押すと、編集の窓がひらきます（テキストの欄で<b>二度押し</b>しても開きます）。</p>
 <ul>
 <li><b>箱を足す</b>：窓の上の「＋箱」「＋角丸」「＋ひし形」「＋丸端」。箱を選んでから押すと、その下に置かれて線もつながります。</li>
 <li><b>動かす</b>：箱をつかんで運びます。<code>Alt</code> を押しながらだと、細かく置けます。</li>
@@ -11478,7 +11469,7 @@ const HELP = [
 <p>図ぜんたいの大きさは mm で決めます。「中身に合わせる」を押すと、置いた箱がちょうど収まる大きさになります。版面より広くすると紙面からはみ出すので、そのときは幅を小さくしてください。</p>
 <p>以前の「1行がひと箱、行頭の <code>-</code> で枝分かれ」で書いた原稿は、<b>開いたときに自動で図へ移し替わります</b>。元の文章もそのまま残ります。</p>
 <h4>入れ子の書式（行の頭の印）</h4>
-<p>箇条書きは独立した書式ではなく、<b>本文の中に置く入れ子の書式</b>です。行の頭に印を入れると、その行だけ別の書式になります。<b>描写文・注釈・処理系・別窓の中身・キャラシのメモ／タブ</b>で使えます。<br>
+<p>箇条書きは独立した書式ではなく、<b>本文の中に置く入れ子の書式</b>です。行の頭に印を入れると、その行だけ別の書式になります。<b>描写・注釈・処理・別窓の中身・キャラシのメモ／タブ</b>で使えます。<br>
 段落を選ぶと<b>右の設定欄</b>に「入れ子の書式」のボタンが出ます。押すと、いまカーソルのある行の頭に印を入れます（本文に触れていなければ末尾に新しい行として足します）。</p>
 <p>打ちながら入れるときは、行の頭で <code>/</code> を打ちます。<b>候補の一覧</b>が出るので、<code>↑</code><code>↓</code>で選んで <code>Enter</code> か <code>Tab</code> で入れます（マウスで押しても入ります）。続けて打つと絞り込めます。手がかりは、合図の名前（<code>/ko</code> → 小見出し）、ひらがなの読み（<code>/みだし</code> → 見出し・小見出し）、表示名です。<code>Esc</code> で閉じると、打った文字はそのまま残ります。日本語入力のままなら全角の <code>／</code> でも出ます（日本語キーボードの <code>/</code> キーは、日本語入力がオンだと「・」になるためです）。<code>/komidashi</code> のように最後まで打って空白を押しても、これまでどおり入ります。</p>
 <table>
@@ -11486,15 +11477,15 @@ const HELP = [
 <tr><th><code>1.</code> <code>2.</code> で始まる行</th><td><b>箇条書き（番号）</b>。書いた番号がそのまま出ます。markdown と同じです。</td></tr>
 <tr><th><code>- [ ] </code>で始まる行</th><td><b>箇条書き（選択肢）</b>。選ばせるものを並べるときに。<code>- [x]</code> と書くと済みの印（☑）になります。markdown と同じです。</td></tr>
 <tr><th>印の前の<b>スペース</b></th><td>半角2つ（全角1つ）で<b>1段下がります</b>（3段まで）。<code>  - 鍵がかかっている</code> のように書きます。</td></tr>
-<tr><th><code>「</code>で始まり<code>」</code>で終わる行</th><td><b>会話文</b>。<code>灰島「よく来たね」</code> のように前に名前を書くと、話し手として出ます。行の途中で<code>」</code>が閉じたあとに文が続く場合は、ふつうの文のままです。</td></tr>
+<tr><th><code>「</code>で始まり<code>」</code>で終わる行</th><td><b>会話</b>。<code>灰島「よく来たね」</code> のように前に名前を書くと、話し手として出ます。行の途中で<code>」</code>が閉じたあとに文が続く場合は、ふつうの文のままです。</td></tr>
 <tr><th><code>|項目|内容|</code> の行</th><td><b>表</b>。同じ形の行を続けると1つの表になり、<b>1行目が見出し</b>です。<code>|---|---|</code> の区切り行は書いても無視されます。</td></tr>
 <tr><th><code>■</code>で始まる行</th><td>小見出しになります。「■成功した場合」「■失敗した場合」のように結果を分けて書けます。</td></tr>
 <tr><th><code>&gt; </code>で始まる行</th><td>枠の中にもうひとつ<b>入れ子の枠</b>が入ります。<code>&gt; 目星：机の裏の封筒に気づく</code> のように、コロンの前が見出しになります。</td></tr>
 </table>
 <p><b>印は markdown と同じ書き方にそろえてあります。</b>これまでの <code>・</code> <code>□</code> <code>＞</code> もそのまま読めます。古い原稿は、開いたときに一度だけ新しい印へ書き換えます（見た目と注の位置は変わりません）。</p>
-<p>もとの「箇条書き」の書式で書いた原稿は、開いたときに<b>描写文に直し、各行の頭に印を付け直します</b>。見た目はそのままです。</p>
-<h4>処理系（囲み）</h4>
-<p><b>処理系</b>は、もとの「技能判定」と「特殊ルール」を1つにまとめた書式です。中身の書き方は同じで、<b>見た目だけを設定欄で選びます</b>。「技能判定」「特殊ルール」のテンプレを押せば元どおりの見た目になり、そのうえで枠線の形（実線・破線・なし）、左の太い罫、地色、字の大きさ、色（朱・墨・藍・苔・金茶・灰）を個別に変えられます。古い原稿を開いたときは、自動でこの書式に読み替えます。</p>
+<p>もとの「箇条書き」の書式で書いた原稿は、開いたときに<b>描写に直し、各行の頭に印を付け直します</b>。見た目はそのままです。</p>
+<h4>処理（囲み）</h4>
+<p><b>処理</b>は、もとの「技能判定」と「特殊ルール」を1つにまとめた書式です。中身の書き方は同じで、<b>見た目だけを設定欄で選びます</b>。「技能判定」「特殊ルール」のテンプレを押せば元どおりの見た目になり、そのうえで枠線の形（実線・破線・なし）、左の太い罫、地色、字の大きさ、色（朱・墨・藍・苔・金茶・灰）を個別に変えられます。古い原稿を開いたときは、自動でこの書式に読み替えます。</p>
 <h4>コメント</h4>
 <p>左の本文で文字を選び、右の設定の<b>コメントを付ける</b>を押すと、その文字に注がぶら下がります。紙面では<b>薄い点線と小さな番号</b>だけが付き、押すと<b>紙面の外、右側</b>に注が出ます。書き出したHTMLでも同じように右の欄外に出ます。</p>
 <ul>
@@ -11507,11 +11498,11 @@ const HELP = [
 <tr><th>罫線</th><td>横に一本線を引きます。文字を入れると、線の中ほどに小さな見出しとして入ります。</td></tr>
 <tr><th>縦線</th><td>左端に縦の線を立て、その右に文章を置きます。囲み記事や補足に。</td></tr>
 <tr><th>シーン移行</th><td>右に寄せ、本文より少し小さく、太字と下線がつきます。場面の切り替わりを示すのに使います。</td></tr>
-<tr><th>改ページ</th><td>そこでページを区切ります。<code>Ctrl</code>+<code>Alt</code>+<code>B</code>でも入ります。改ページを入れると、次のページに書き始められるよう<b>空の描写文がひとつ添えられます</b>。</td></tr>
+<tr><th>改ページ</th><td>そこでページを区切ります。<code>Ctrl</code>+<code>Alt</code>+<code>B</code>でも入ります。改ページを入れると、次のページに書き始められるよう<b>空の描写がひとつ添えられます</b>。</td></tr>
 <tr><th>改段</th><td>2段組のページで、そこから<b>次の段へ送ります</b>。左の段を途中で切り上げて右の段へ移りたいときに使います。1段組のページでは何も起こりません。<code>Ctrl</code>+<code>Alt</code>+<code>D</code>。</td></tr>
 </table>
 <h4>ページ一覧</h4>
-<p>上の<b>ページ一覧</b>（<code>Ctrl</code>+<code>Alt</code>+<code>P</code>）か、右下の<b>ページ一覧</b>を押すと、右下に1ページずつの一覧が出ます。縮小したページの右に、<b>そのページに載っている見出し</b>が階層つきで並びます。</p>
+<p>左下の<b>ページ一覧</b>のアイコン（<code>Ctrl</code>+<code>Shift</code>+<code>P</code>）を押すと、左の引き出しに1ページずつの一覧が出ます。縮小したページの右に、<b>そのページに載っている見出し</b>が階層つきで並びます。</p>
 <ul>
 <li><b>&#9650;</b>・<b>&#9660;</b>（一覧の中で <code>↑</code>・<code>↓</code>、<code>PageUp</code>・<code>PageDown</code>）で前後のページに切り替わります。ボタンには行き先のページの見出しが添えてあります。</li>
 <li>切り替えると紙面もそのページへ移ります。逆に紙面をスクロールすると、一覧も見ているページに合わせて変わります。</li>
@@ -11538,13 +11529,13 @@ const HELP = [
 </ul>
 <div class="note">段落をまたいだドラッグでの文字選択は、ブラウザの仕組み上できません（段落ごとに別々の編集領域になっているためです）。複数の段落をコピーしたいときは、上のやり方をお使いください。</div>
 <h4>貼り付け</h4>
-<p>空行で区切った文章を貼ると、段落ごとのブロックに分かれて取り込まれます。行頭の <code>#</code> <code>##</code> <code>###</code> は見出しに、<code>「</code>で始まる行は会話文に、<code>※</code>で始まる行は注釈に、「シーン」で始まる行や「〜へ移行」で終わる行はシーン移行に、自動で振り分けます。段落の中の単独の改行はそのまま残ります。</p>
+<p>空行で区切った文章を貼ると、段落ごとのブロックに分かれて取り込まれます。行頭の <code>#</code> <code>##</code> <code>###</code> は見出しに、<code>「</code>で始まる行は会話に、<code>※</code>で始まる行は注釈に、「シーン」で始まる行や「〜へ移行」で終わる行はシーン移行に、自動で振り分けます。段落の中の単独の改行はそのまま残ります。</p>
 <h4>目次</h4>
 <p>目次を選ぶと、右の設定欄で中身を決められます。</p>
 <ul>
-<li><b>載せる範囲</b>：<b>全体</b>は文書全体の見出しを、<b>この章だけ</b>はすぐ上の見出し1から次の見出し1の手前までの見出しを載せます。章ごとの細かい目次を、いくつでも置けます。見出し1を選んで書式ツールバーの「本の部品 → 目次」を押すと、その章の頭に「この章だけ」の目次が入ります（うしろに改ページは入りません）。</li>
+<li><b>載せる範囲</b>：<b>全体</b>は文書全体の見出しを、<b>この章だけ</b>はすぐ上の見出し1から次の見出し1の手前までの見出しを載せます。章ごとの細かい目次を、いくつでも置けます。見出し1を選んで書式ツールバーの「装丁ブロック → 目次」を押すと、その章の頭に「この章だけ」の目次が入ります（うしろに改ページは入りません）。</li>
 <li><b>見出し語</b>：「目　次」の文字を変えられます。空にすると見出しそのものを出しません。</li>
-<li><b>何を載せるか</b>：タイトル・見出し1〜3・サブ・シーン移行から選びます。押すたびに載せる／載せないが切り替わります（既定は見出し1〜3）。</li>
+<li><b>何を載せるか</b>：タイトル・見出し1〜3・サブタイトル・シーン移行から選びます。押すたびに載せる／載せないが切り替わります（既定は見出し1〜3）。</li>
 <li><b>体裁</b>：ページ番号と、項目とページ番号をつなぐ点線を、それぞれ出し入れできます。</li>
 </ul>
 <p>ここまでは<b>書式ごと</b>（見出し1、見出し2…）の決めです。<b>見出し1つずつ</b>の決めは、その見出しを選ぶと右の設定欄に出ます。</p>
@@ -11553,7 +11544,7 @@ const HELP = [
 <li><b>目次に載せるか</b>：<b>目次の設定どおり</b>／<b>かならず載せる</b>／<b>載せない</b>の3つから選びます。「かならず載せる」を使うと、目次の側で外してある書式でも、その見出しだけ載せられます。逆に「載せない」で、同じ書式の中からその1つだけ外せます。</li>
 <li><b>目次での段さげ</b>：目次での見た目の段を、見出しごとに変えられます（例：見出し2だが目次では1段目に出す）。紙面の見出しの大きさは変わりません。</li>
 </ul>
-<p>書式ツールバーの<b>本の部品 → 目次</b>で作れます。タイトルと見出し1〜3から組み立てられ、書き出したHTMLでは目次からその位置へ飛べます。<b>ページ一覧</b>の欄を「見出し」に切り替えると、いまの見出しが一覧で出て、押すとその位置へ飛べます。</p>`],
+<p>書式ツールバーの<b>装丁ブロック → 目次</b>で作れます。タイトルと見出し1〜3から組み立てられ、書き出したHTMLでは目次からその位置へ飛べます。<b>ページ一覧</b>の欄を「見出し」に切り替えると、いまの見出しが一覧で出て、押すとその位置へ飛べます。</p>`],
 
  ['ruby','ルビ', `
 <h3>ルビ</h3>
@@ -11626,7 +11617,7 @@ const HELP = [
 <tr><th><code>#</code> <code>##</code> <code>###</code></th><td><b>見出し1・2・3</b>。別窓の中だけの記法です（本文の段落では <code>#</code> はそのままの文字になります）。</td></tr>
 <tr><th><code>- </code> <code>1.</code> <code>- [ ] </code></th><td>箇条書き。印の前のスペース2つで1段下がります。</td></tr>
 <tr><th><code>|項目|内容|</code></th><td>表。同じ形の行を続けると1つの表になり、1行目が見出しです。</td></tr>
-<tr><th><code>「…」</code></th><td>会話文。前に名前を書くと話し手になります。</td></tr>
+<tr><th><code>「…」</code></th><td>会話。前に名前を書くと話し手になります。</td></tr>
 <tr><th><code>■</code> <code>＞</code></th><td>小見出しと、入れ子の判定枠。</td></tr>
 </table>
 <p>入れられないのは<b>画像とNPCシート</b>です。どちらも文字だけでは書けないためで、これらは本文の段落として置いてください。</p>
@@ -11718,13 +11709,13 @@ addEventListener('keydown', e=>{ if(e.key==='Escape' && document.getElementById(
 
 /* ================= 欄の幅と出し入れ =================
    原稿と紙面の仕切り、紙面と右の道具欄の仕切りをつかむと幅が変わる。
-   幅・道具欄の出し入れ・ツールバーをしまったか・下の控えでどのタブを開いているかは、
+   幅・ツールバーをしまったか・左の引き出しで何を開いているかは、
    このブラウザに覚えさせる（原稿の中身ではないのでJSONには入れない）。
    v1（左に道具パネルがあったころ）の記録は形が違うので読まない。 */
 const PANE_KEY='trpg-panes-v2';
 const DOCK_W = 300;                 // 右の道具欄の既定の幅
-let subCur = null;                  // 下の控えで開いているタブ（'pg'／'doc'／'list'、たたんでいれば null）
-let subLast = 'pg';                 // たたむ前に開いていたタブ。▴ で開き直すときに使う
+let subCur = null;                  // 左の引き出しで開いているもの（'doc'／'list'、閉じていれば null）
+const SUB_NAME = {doc:'ドキュメント設定', list:'ページ一覧'};
 function loadPanes(){
   try{ const v=localStorage.getItem(PANE_KEY); if(v) return JSON.parse(v); }catch(e){}
   return null;
@@ -11734,7 +11725,6 @@ function savePanes(){
   try{ localStorage.setItem(PANE_KEY, JSON.stringify({
     src : src.style.flex ? src.offsetWidth : 0,          // 動かしていなければ 0（＝原稿と紙面を半分ずつ）
     dock: dock.offsetWidth || parseInt(dock.style.flexBasis) || DOCK_W,
-    dockOpen: !dock.classList.contains('hide'),
     tbarMini: document.getElementById('tbar').classList.contains('mini'),
     sub: subCur
   })); }catch(e){}
@@ -11742,8 +11732,11 @@ function savePanes(){
 /* 原稿の既定の幅と文字数の位置は、左右の欄の幅から CSS で決めている。その幅を渡す */
 function layoutVars(){
   const m=document.getElementById('main'), dock=document.getElementById('dock');
-  m.style.setProperty('--tbw',   document.getElementById('tbar').offsetWidth+'px');
+  const dr=document.getElementById('drawer');
+  m.style.setProperty('--tbw',   (document.getElementById('tbar').offsetWidth + (dr.classList.contains('hide') ? 0 : dr.offsetWidth))+'px');
   m.style.setProperty('--dockw', (dock.classList.contains('hide') ? 0 : dock.offsetWidth)+'px');
+  /* 原稿の既定の幅は、右の段落欄を出していなくても出しているものとして決める */
+  m.style.setProperty('--dockbase', (parseInt(dock.style.width) || DOCK_W)+'px');
 }
 function setDockW(w){
   const dock=document.getElementById('dock');
@@ -11761,7 +11754,15 @@ function applyPanes(v){
   if(v.sub) setSub(v.sub, true);
 }
 function clampPane(v,min,max){ return Math.max(min, Math.min(max, v)); }
-/* 右の道具欄の出し入れ（上の ☰） */
+/* 右の段落の欄を、段落を選んでいるかどうかに合わせて出し入れする。
+   紙面の幅が変わるので、窓に合わせる拡大のときは合わせ直す */
+function autoDock(show){
+  const dock=document.getElementById('dock');
+  if(dock.classList.contains('hide') === !show) return;
+  toggleDock(show, true);
+  if(zoomMode==='fit') applyZoom();
+}
+/* 右の段落の欄の出し入れ */
 function toggleDock(on, quiet){
   const dock=document.getElementById('dock');
   const show = (on===undefined) ? dock.classList.contains('hide') : on;
@@ -11772,26 +11773,33 @@ function toggleDock(on, quiet){
   if(show && pagesVisible()) buildPages();
   savePanes(); if(zoomMode==='fit') applyZoom();
 }
-/* 下の控え（ページ・文書・ページ一覧）。同じタブをもう一度押すとたたむ */
+/* 左の引き出し（ドキュメント設定・ページ一覧）。同じアイコンをもう一度押すと閉じる */
 function setSub(v, quiet){
-  subCur = v || null;
-  if(subCur) subLast = subCur;
-  const sub=document.getElementById('sub');
-  sub.classList.toggle('open', !!subCur);
-  sub.classList.toggle('big', subCur==='list');    // ページ一覧は 1 ページを大きく見せたいので高めに開く
-  sub.querySelectorAll('#subTabs button[data-s]').forEach(b=>b.classList.toggle('on', b.dataset.s===subCur));
-  sub.querySelectorAll('#subBody > .pane').forEach(p=>p.classList.toggle('on', p.dataset.p===subCur));
-  document.getElementById('subFold').innerHTML = subCur ? '&#9662;' : '&#9652;';
-  document.getElementById('btnPages').classList.toggle('on', subCur==='list');
+  if(v==='pg') v='doc';               // もとの「ページ」は「ドキュメント設定」にまとめた
+  subCur = SUB_NAME[v] ? v : null;
+  const dr=document.getElementById('drawer');
+  dr.classList.toggle('hide', !subCur);
+  document.getElementById('drawerTtl').textContent = SUB_NAME[subCur] || '';
+  dr.querySelectorAll('#subBody > .pane').forEach(p=>p.classList.toggle('on', p.dataset.p===subCur));
+  document.querySelectorAll('#tbarSub .ic').forEach(b=>b.classList.toggle('open', b.dataset.s===subCur));
+  hideUiTip();
+  layoutVars();
   if(subCur==='list') setPagesView(pagesView);
   if(subCur==='doc') buildVarUI();
   if(!quiet) savePanes();
+  if(zoomMode==='fit') applyZoom();
 }
-document.getElementById('subTabs').addEventListener('click', e=>{
-  const b=e.target.closest('button'); if(!b) return;
-  if(b.id==='subFold'){ setSub(subCur ? null : subLast); return; }
+document.getElementById('tbarSub').addEventListener('click', e=>{
+  const b=e.target.closest('.ic'); if(!b) return;
   setSub(subCur===b.dataset.s ? null : b.dataset.s);
 });
+document.getElementById('drawerClose').onclick=()=>setSub(null);
+/* 引き出しの中にいるときの Esc は、引き出しを閉じるだけ。段落の選択は外さない */
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Escape' || !subCur || e.__escHandled) return;
+  if(!document.getElementById('drawer').contains(document.activeElement)) return;
+  e.preventDefault(); e.__escHandled = true; document.activeElement.blur && document.activeElement.blur(); setSub(null);
+}, true);
 
 (function initSplitters(){
   let drag=null;
@@ -11937,13 +11945,13 @@ function pageHeadline(i){
   }
   return ids.length ? '（文字なし）' : '（空のページ）';
 }
-/* ================= ページ一覧（右下の控え） =================
+/* ================= ページ一覧（左の引き出し） =================
    1 ページずつ、▲▼（↑↓キー）で切り替えて見る。全ページを縮小して並べると
    欄が細いぶん小さくなりすぎるので、1 枚を大きく出し、横にそのページの見出しを並べる。
    上下のボタンには行き先のページの見出しを添えて、押す前にどこへ行くかわかるようにする。 */
 let pageCur = 0;                    // 一覧で見ているページ（0 から）
 let pageJumpAt = 0;                 // こちらから紙面を送った時刻。直後のスクロールでは一覧を動かさない
-const PAGE_HEADS = {title:'タイトル', subtitle:'サブ', h1:'見出し1', h2:'見出し2', h3:'見出し3',
+const PAGE_HEADS = {title:'タイトル', subtitle:'サブタイトル', h1:'見出し1', h2:'見出し2', h3:'見出し3',
   scene:'シーン移行', cover:'表紙', toc:'目次', colophon:'奥付'};
 function pageHeads(i){
   return (pageMap[i]||[]).map(id=>findBlock(id)).filter(f=>f && PAGE_HEADS[f.b.type]).map(f=>f.b);
@@ -12009,11 +12017,11 @@ function showPage(i, jump){
   }
 }
 function pagesVisible(){
-  return subCur==='list' && !document.getElementById('dock').classList.contains('hide');
+  return subCur==='list';
 }
 function togglePages(on){
   const show = (on===undefined) ? !pagesVisible() : on;
-  if(show){ toggleDock(true); setSub('list'); }
+  if(show) setSub('list');
   else if(subCur==='list') setSub(null);
 }
 function setPagesView(v){
@@ -12027,7 +12035,6 @@ function setPagesView(v){
 }
 document.getElementById('pgvPage').onclick=()=>setPagesView('page');
 document.getElementById('pgvToc').onclick=()=>setPagesView('toc');
-document.getElementById('btnPages').onclick=()=>togglePages();
 document.getElementById('pgUp').onclick=()=>showPage(pageCur-1, true);
 document.getElementById('pgDn').onclick=()=>showPage(pageCur+1, true);
 document.getElementById('pagesPane').addEventListener('keydown', e=>{
@@ -12076,36 +12083,6 @@ document.getElementById('pgHeads').addEventListener('click', e=>{
   });
 })();
 
-/* ---- 表紙ページと奥付を作る ---- */
-document.getElementById('mkCover').onclick=()=>{
-  const has=S.blocks.find(b=>b.type==='cover');
-  if(has){
-    sel.clear(); sel.add(has.id); paintSel();
-    const row=srcList.querySelector('.src[data-id="'+has.id+'"]');
-    if(row) row.scrollIntoView({behavior:'smooth',block:'center'});
-    setStatus('表紙はすでにあります','#ff9b83'); return;
-  }
-  const c=newBlock('cover', S.title||'無題のシナリオ'); c.cols=1;
-  const br=newBlock('break',''); br.cols=1;
-  S.blocks.unshift(c, br);
-  sel.clear(); sel.add(c.id);
-  render(); save(); setStatus('表紙ページを作りました','var(--ok)');
-};
-document.getElementById('mkColophon').onclick=()=>{
-  const has=S.blocks.find(b=>b.type==='colophon');
-  if(has){
-    sel.clear(); sel.add(has.id); paintSel();
-    const row=srcList.querySelector('.src[data-id="'+has.id+'"]');
-    if(row) row.scrollIntoView({behavior:'smooth',block:'center'});
-    setStatus('奥付はすでにあります','#ff9b83'); return;
-  }
-  const NL=String.fromCharCode(10);
-  const br=newBlock('break',''); br.cols=1;
-  const k=newBlock('colophon', (S.title||'無題のシナリオ')+NL+'著者：'+NL+'発行：'); k.cols=1;
-  S.blocks.push(br, k);
-  sel.clear(); sel.add(k.id);
-  render(); save(); setStatus('奥付ページを作りました','var(--ok)');
-};
 
 /* ================= 作品の切り替え ================= */
 /* 原稿を画面に出し直す。元に戻す履歴は作品ごとに初めから */
