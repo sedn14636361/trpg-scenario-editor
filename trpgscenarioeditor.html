@@ -353,7 +353,11 @@ kbd{background:#0e1219;border:1px solid var(--line);border-radius:3px;padding:0 
 .varrow input{min-width:0;padding:4px 6px;font-size:12px}
 .varrow input[data-vk="n"]{flex:0 0 70px}.varrow input[data-vk="def"]{flex:0 0 80px}.varrow input[data-vk="note"]{flex:1}
 .varrow button{flex:0 0 auto;padding:2px 7px}
-.varrow.ho{font-size:12px;color:var(--muted);gap:8px}.varrow.ho code{color:var(--brass)}
+.varrow .vname{flex:0 0 70px;color:var(--brass);font-size:12px;overflow:hidden;text-overflow:ellipsis}
+.varrow .vdel-sp{flex:0 0 27px}
+.varrow.ho input,.varrow.auto input{border-left:2px solid var(--brass)}
+.varrow.bad input[data-vk="n"]{border-color:var(--vermilion)}
+.varcap{margin:-2px 0 6px;font-size:10px;color:var(--muted)}
 #propSlot #propBox{display:block !important}
 #propSlot #propTtl,#propSlot #propHr{display:none}
 #blkCommon{border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
@@ -588,7 +592,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.10.1</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.10.2</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -1826,15 +1830,17 @@ function cleanVars(a){
     .filter(v=>{ if(!v.n || seen.has(v.n)) return false; seen.add(v.n); return true; });   // 名前が空・重なりは除く
 }
 /* 置き換える変数の一覧。ハンドアウトの番号（PC名）を先に、文書で登録したものをあとに並べる */
+/* ハンドアウトの変数の説明を書いていないときに出す文 */
+function hoNoteDef(h){ return h.ttl.trim() ? h.ttl+'のPC' : 'ハンドアウトのPC'; }
 function varList(){
   const out = [], seen = new Set();
   allBlocks().filter(b=>b.type==='handout').forEach(b=>{
     const h = ensureHo(b); if(seen.has(h.no)) return; seen.add(h.no);
-    out.push({n:h.no, def:h.def, note:(h.ttl.trim()?h.ttl+'のPC':'ハンドアウトのPC'), ho:true});
+    out.push({n:h.no, def:h.def, note:(h.note.trim() || hoNoteDef(h)), ho:true, id:b.id});
   });
-  (S.vars||[]).forEach(v=>{
+  (S.vars||[]).forEach((v,i)=>{
     if(!VAR_NAME_RE.test(v.n) || VAR_RESERVED.includes(v.n) || seen.has(v.n)) return;
-    seen.add(v.n); out.push({n:v.n, def:v.def, note:v.note});
+    seen.add(v.n); out.push({n:v.n, def:v.def, note:v.note, vi:i});
   });
   /* {HO1} のような「HO＋数字」は、ハンドアウトの枠がなくても登録なしで変数にする */
   const all = JSON.stringify(S.blocks, (k,v)=> (k==='img'||k==='data') ? undefined : v);
@@ -1888,7 +1894,7 @@ function varCandidates(){
 function ensureHo(b){
   const h = (b.ho && typeof b.ho==='object') ? b.ho : (b.ho = {});
   h.no  = String(h.no==null?'':h.no).trim();
-  h.ttl = String(h.ttl||''); h.rec = String(h.rec||''); h.def = String(h.def||'');
+  h.ttl = String(h.ttl||''); h.rec = String(h.rec||''); h.def = String(h.def||''); h.note = String(h.note||'');
   if(!VAR_NAME_RE.test(h.no) || VAR_RESERVED.includes(h.no)){
     /* 番号がなければ、まだ使っていない HO1, HO2 … を振る */
     const used = new Set((typeof S!=='undefined' && S ? allBlocks() : []).filter(x=>x!==b && x.type==='handout' && x.ho).map(x=>x.ho.no));
@@ -6500,7 +6506,21 @@ function render(){ varCacheReset(); showCharCount(); paginate(); renderSrc(true)
   if(flowId && !flowDrag && !flowMarquee) renderFlowWin();
   /* 箱からあふれた文字があれば、その分だけ高さを伸ばして組み直す */
   if(flowGrowAll()) repaginateSoon();
-  if(pagesVisible()) buildPages(); }
+  if(pagesVisible()) buildPages();
+  followNewBlocks(); }
+/* 段落を足したら、紙面をその段落へ動かす。描き直しのたびに、前に見たことのない段落を探す。
+   選ばれている新しい段落があればそこへ、なければ数個だけ足されたときの先頭へ。
+   作品を開いたときのように一度にたくさん増えたときは動かさない。見えていれば jumpPreview は動かさない */
+let knownIds = null;
+function followNewBlocks(){
+  const ids = S.blocks.map(b=>b.id);
+  if(!knownIds){ knownIds = new Set(ids); return; }
+  const fresh = ids.filter(id=>!knownIds.has(id));
+  ids.forEach(id=>knownIds.add(id));
+  if(!fresh.length) return;
+  const t = fresh.find(id=>sel.has(id)) || (fresh.length<=5 ? fresh[0] : null);
+  if(t) jumpPreview(t);
+}
 /* 文字を打っている間はページ側だけを組み直す（左は打った内容がそのまま残っている） */
 let repagTimer=null, repagPending=false;
 function doRepaginate(){
@@ -6705,7 +6725,7 @@ function restoreEditSpot(){
   const s0 = getSelection(); s0.removeAllRanges(); s0.addRange(r);
   return true;
 }
-['tbar','tbFly','drawer','dock','popProp'].forEach(id=>{
+['tbar','tbFly','dock','popProp'].forEach(id=>{
   const box = document.getElementById(id); if(!box) return;
   /* 右上の × は選択を外して閉じるボタンなので、打っていた場所へは戻さない */
   const keep = e => e.target.closest('button') && !e.target.closest('#dockClose');
@@ -9472,12 +9492,14 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
     if(np && (k==='name'||k==='kana'||k==='role')){ np[k]=v; soft(); return; }
     if(k==='toclb'){  ensureToc(b).lb = v; soft(); return; }
     if(k==='infolb'){ b.lb = v; soft(); return; }
-    if(k==='hottl'){ ensureHo(b).ttl = v; soft(); return; }
+    if(k==='hottl'){ ensureHo(b).ttl = v; soft(); varUiSoon(); return; }
+    if(k==='hodef'){ ensureHo(b).def = v; soft(); varUiSoon(); return; }
+    if(k==='honote'){ ensureHo(b).note = v; soft(); varUiSoon(); return; }
     if(k==='hono'){
       /* 番号は変数の名前になるので、使える文字だけのときに受け取る（ほかのハンドアウトと重ねない） */
       const nv = String(v||'').trim();
       const dup = allBlocks().some(x=>x!==b && x.type==='handout' && x.ho && x.ho.no===nv);
-      if(VAR_NAME_RE.test(nv) && !VAR_RESERVED.includes(nv) && !dup){ ensureHo(b).no = nv; soft(); }
+      if(VAR_NAME_RE.test(nv) && !VAR_RESERVED.includes(nv) && !dup){ ensureHo(b).no = nv; soft(); varUiSoon(); }
       else setStatus(dup ? 'その番号はほかのハンドアウトで使っています' : '番号は英数字・かな・漢字の16字までです','#ff9b83');
       return;
     }
@@ -9669,7 +9691,11 @@ function propsHandout(b){
   const h = ensureHo(b);
   return pRow('番号', '<input type="text" data-p="hono" value="'+esc(h.no)+'" placeholder="HO1">',
       'この番号がそのまま変数 <b>{'+esc(h.no)+'}</b>（このハンドアウトのPC名）になります。出力したHTMLで名前を入れると、文中の {'+esc(h.no)+'} がすべてその名前に変わります。')
-    + pRow('題', '<input type="text" data-p="hottl" value="'+esc(h.ttl)+'" placeholder="例：古書店の常連">');
+    + pRow('題', '<input type="text" data-p="hottl" value="'+esc(h.ttl)+'" placeholder="例：古書店の常連">')
+    + '<label class="f">変数 {'+esc(h.no)+'}</label><div class="grid2">'
+    + '<div><span class="hint">既定値</span><input type="text" data-p="hodef" value="'+esc(h.def)+'" placeholder="'+esc(h.no)+'"></div>'
+    + '<div><span class="hint">説明</span><input type="text" data-p="honote" value="'+esc(h.note)+'" placeholder="'+esc(hoNoteDef(h))+'"></div></div>'
+    + '<div class="hint">既定値は、出力したHTMLで名前を入れる前に出す文字です（空なら「'+esc(h.no)+'」）。説明は出力したHTMLの入力欄の下に出ます。ドキュメント設定の変数の一覧からも直せます。</div>';
 }
 function pRow(label, inner, hint){
   return '<label class="f">'+esc(label)+'</label>'+inner
@@ -10591,40 +10617,102 @@ function syncSettings(){
     document.getElementById('footText').value = f.text||'';
   document.getElementById('footFrom').value = f.from||1;
 }
-/* 文書タブの変数の欄。ハンドアウトから来たものは名前と説明だけを見せ、直すのはハンドアウトの設定で */
+/* ドキュメント設定の変数の一覧。ハンドアウトの変数・本文に書いた HO＋数字・登録した変数を、すべてここで直せる。
+   行は data-vrow で見分ける（r0＝登録した変数の0番、h＋id＝ハンドアウト、a＋名前＝本文に書いた HO＋数字）。
+   作り直すと欄が新しくなるので、打っていた欄とカーソルの位置を戻す（戻さないと、次に押した欄が消えて打てなかった） */
+function varRowHTML(row, n, def, note, opt){
+  const a = ' data-vrow="'+row+'"';
+  return '<div class="varrow'+(opt.cls?' '+opt.cls:'')+'"'+(opt.tip?' title="'+esc(opt.tip)+'"':'')+'>'
+    + (opt.nameRO ? '<code class="vname">{'+esc(n)+'}</code>'
+                  : '<input type="text"'+a+' data-vk="n" value="'+esc(n)+'" placeholder="名前（例：KP）" title="名前。本文には {名前} と書きます">')
+    + '<input type="text"'+a+' data-vk="def" value="'+esc(def)+'" placeholder="'+esc(opt.defPh||'既定値')+'" title="値を入れていないときに出す文字">'
+    + '<input type="text"'+a+' data-vk="note" value="'+esc(note)+'" placeholder="'+esc(opt.notePh||'説明')+'" title="出力したHTMLで入力欄の下に出す説明">'
+    + (opt.del!=null ? '<button data-vdel="'+opt.del+'" title="この変数を消す">×</button>' : '<span class="vdel-sp"></span>')
+    + '</div>' + (opt.cap ? '<div class="varcap">'+opt.cap+'</div>' : '');
+}
 function buildVarUI(){
   const box = document.getElementById('varList'); if(!box || !S) return;
-  const hos = varList().filter(v=>v.ho || v.auto);
-  box.innerHTML = hos.map(v=>'<div class="varrow ho"><code>{'+esc(v.n)+'}</code><span>'+esc(v.note)
-      + (v.ho ? '（ハンドアウト）' : '（本文に書いた HO＋数字から自動）')+'</span></div>').join('')
-    + (S.vars||[]).map((v,i)=>'<div class="varrow">'
-      + '<input type="text" data-vi="'+i+'" data-vk="n" value="'+esc(v.n)+'" placeholder="名前（例：KP）" title="名前。本文には {名前} と書きます">'
-      + '<input type="text" data-vi="'+i+'" data-vk="def" value="'+esc(v.def)+'" placeholder="既定値" title="値を入れていないときに出す文字">'
-      + '<input type="text" data-vi="'+i+'" data-vk="note" value="'+esc(v.note)+'" placeholder="説明" title="出力したHTMLで入力欄の下に出す説明">'
-      + '<button data-vdel="'+i+'" title="この変数を消す">×</button></div>').join('')
-    + (!hos.length && !(S.vars||[]).length ? '<div class="hint" style="margin:0">まだありません。</div>' : '');
+  S.vars = S.vars || [];
+  const a = document.activeElement;
+  const keep = (a && box.contains(a) && a.dataset.vrow) ? {row:a.dataset.vrow, k:a.dataset.vk, s:a.selectionStart, e:a.selectionEnd} : null;
+  const shown = new Set();
+  let h = varList().map(v=>{
+    if(v.ho){
+      const f = findBlock(v.id), ho = f ? ensureHo(f.b) : {def:'',note:'',ttl:''};
+      return varRowHTML('h'+v.id, v.n, ho.def, ho.note, {cls:'ho', defPh:v.n, notePh:hoNoteDef(ho),
+        cap:'{'+esc(v.n)+'}・ハンドアウト'+(ho.ttl.trim()?'「'+esc(ho.ttl)+'」':''), tip:'ハンドアウトの番号・既定値・説明。ハンドアウトのプロパティと同じものです'});
+    }
+    if(v.auto) return varRowHTML('a'+v.n, v.n, '', '', {cls:'auto', nameRO:true, defPh:v.n, notePh:v.note,
+        cap:'本文に書いた HO＋数字から自動', tip:'打つと登録した変数になります'});
+    shown.add(v.vi);
+    return varRowHTML('r'+v.vi, v.n, v.def, v.note, {del:v.vi});
+  }).join('');
+  /* まだ名前のない行・使えない名前の行も、直せるように後ろに並べる */
+  S.vars.forEach((v,i)=>{ if(!shown.has(i)) h += varRowHTML('r'+i, v.n, v.def, v.note, {del:i, cls:v.n?'bad':''}); });
+  box.innerHTML = h || '<div class="hint" style="margin:0">まだありません。</div>';
+  if(keep){
+    const el = box.querySelector('[data-vrow="'+keep.row+'"][data-vk="'+keep.k+'"]');
+    if(el){ el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch(_){} }
+  }
   const cand = varCandidates();
   document.getElementById('varFound').innerHTML = cand.length
     ? '<div class="hint" style="margin:8px 0 4px">本文で見つかった、まだ登録していない名前：</div><div class="row">'
       + cand.map(n=>'<button data-vfound="'+esc(n)+'" title="変数として登録します">＋ {'+esc(n)+'}</button>').join('') + '</div>'
     : '';
 }
+/* ハンドアウトのプロパティで直したとき、一覧も追いつかせる（打っている欄はプロパティ側なので、一覧は作り直してよい） */
+let varUiTimer = null;
+function varUiSoon(){ clearTimeout(varUiTimer); varUiTimer = setTimeout(()=>{ if(subCur==='doc') buildVarUI(); }, 200); }
+/* 変数の行が指すもの */
+function varRowTarget(row){
+  if(!row) return null;
+  if(row[0]==='r'){ const v=(S.vars||[])[+row.slice(1)]; return v ? {kind:'reg', v:v} : null; }
+  if(row[0]==='h'){ const f=findBlock(row.slice(1)); return f ? {kind:'ho', b:f.b, h:ensureHo(f.b)} : null; }
+  if(row[0]==='a') return {kind:'auto', n:row.slice(1)};
+  return null;
+}
 (function initVarUI(){
   const pane = document.querySelector('#subBody .pane[data-p="doc"]') || document;
   pane.addEventListener('input', e=>{
-    const el = e.target.closest('[data-vi]'); if(!el) return;
-    const v = (S.vars||[])[+el.dataset.vi]; if(!v) return;
-    v[el.dataset.vk] = el.value; save();
+    const el = e.target.closest('[data-vrow]'); if(!el) return;
+    let t = varRowTarget(el.dataset.vrow); if(!t) return;
+    const k = el.dataset.vk;
+    if(t.kind==='auto'){
+      /* 本文に書いた HO＋数字に値を入れたら、登録した変数にする。同じ行のほかの欄もそちらを指すよう付け替える */
+      S.vars = S.vars || [];
+      S.vars.push({n:t.n, def:'', note:''});
+      const row = 'r'+(S.vars.length-1);
+      el.parentElement.querySelectorAll('[data-vrow]').forEach(x=>x.dataset.vrow=row);
+      t = varRowTarget(row);
+    }
+    if(t.kind==='reg'){ if(k!=='n') t.v[k] = el.value; else t.v.n = el.value; }
+    else if(t.kind==='ho'){
+      if(k==='def') t.h.def = el.value;
+      else if(k==='note') t.h.note = el.value;
+      else return;                       // 番号は欄を離れたときに確かめてから受け取る
+      if(propId===t.b.id) renderProps();
+    }
+    save(); repaginateSoon();
   });
   /* 名前は変数として使える形のときだけ受け取る。使えない名前は欄を赤くして知らせる */
   pane.addEventListener('change', e=>{
-    const el = e.target.closest('[data-vk="n"]'); if(!el) return;
-    const n = el.value.trim(), dup = varList().filter(v=>v.n===n).length > (S.vars.some(v=>v.n===n)?1:0);
+    const el = e.target.closest('[data-vrow][data-vk="n"]'); if(!el) return;
+    const t = varRowTarget(el.dataset.vrow); if(!t) return;
+    const n = el.value.trim();
     const ok = VAR_NAME_RE.test(n) && !VAR_RESERVED.includes(n);
-    el.style.borderColor = ok ? '' : 'var(--vermilion)';
-    if(!ok) setStatus('名前は英数字・かな・漢字の16字までです（title・page・total は使えません）','#ff9b83');
-    else if(dup) setStatus('同じ名前がすでにあります','#ff9b83');
-    buildVarUI(); render();
+    if(t.kind==='ho'){
+      const dup = allBlocks().some(x=>x!==t.b && x.type==='handout' && x.ho && x.ho.no===n);
+      if(ok && !dup){ t.h.no = n; if(propId===t.b.id) renderProps(); }
+      else { setStatus(dup ? 'その番号はほかのハンドアウトで使っています' : '番号は英数字・かな・漢字の16字までです','#ff9b83'); el.value = t.h.no; }
+    }else if(t.kind==='reg'){
+      t.v.n = n;
+      const dup = S.vars.filter(v=>v.n===n).length > 1 || allBlocks().some(x=>x.type==='handout' && x.ho && x.ho.no===n);
+      if(!ok) setStatus('名前は英数字・かな・漢字の16字までです（title・page・total は使えません）','#ff9b83');
+      else if(dup) setStatus('同じ名前がすでにあります','#ff9b83');
+    }
+    /* 欄を離れた知らせ（change）は、押した次の欄に焦点が移る前に来る。
+       ここで作り直すと押したばかりの欄が消えるので、焦点が移ってから作り直す */
+    save(); render(); setTimeout(buildVarUI, 0);
   });
   pane.addEventListener('click', e=>{
     const a = e.target.closest('#varAdd, [data-vdel], [data-vfound]'); if(!a) return;
@@ -10632,8 +10720,8 @@ function buildVarUI(){
     if(a.id==='varAdd') S.vars.push({n:'', def:'', note:''});
     else if(a.dataset.vdel!=null) S.vars.splice(+a.dataset.vdel, 1);
     else S.vars.push({n:a.dataset.vfound, def:'', note:''});
-    save(); buildVarUI(); render();
-    if(a.id==='varAdd'){ const ins = document.querySelectorAll('#varList [data-vk="n"]'); if(ins.length) ins[ins.length-1].focus(); }
+    save(); render(); buildVarUI();
+    if(a.id==='varAdd'){ const el = document.querySelector('#varList [data-vrow="r'+(S.vars.length-1)+'"][data-vk="n"]'); if(el) el.focus(); }
   });
 })();
 function dl(blob,name){
@@ -11284,7 +11372,7 @@ const HELP = [
 <h3>はじめに</h3>
 <p>左が本文のテキスト、右が組み上がったページです。左に書いた内容がそのまま右へ流れ、はみ出したぶんは自動で次のページへ送られます。</p>
 <h4>書きかたと選びかた</h4>
-<p>モードの切り替えはありません。本文はいつでもそのまま打てて、<b>文章に触れた段落がそのまま選択されます</b>。つまみや書式名の欄を押しても選べます。どれも選んでいない状態にしたいときは、<code>Esc</code>をもう一度押すか、本文欄の余白を押すか、右上の段落の操作の<b>選択を外す</b>を使います（何も選んでいなければ、書式は末尾に新しく足します）。<code>Enter</code>で次の段落、段落の先頭で<code>Backspace</code>で前の段落とつながります。</p>
+<p>モードの切り替えはありません。本文はいつでもそのまま打てて、<b>文章に触れた段落がそのまま選択されます</b>。つまみや書式名の欄を押しても選べます。どれも選んでいない状態にしたいときは、<code>Esc</code>をもう一度押すか、本文欄の余白を押すか、右上の段落の操作の<b>選択を外す</b>を使います（何も選んでいなければ、書式は末尾に新しく足します）。<code>Enter</code>で次の段落（段落を足すと、紙面はその段落が見える位置まで動きます）、段落の先頭で<code>Backspace</code>で前の段落とつながります。</p>
 <h4>画面の並び</h4>
 <p>左から<b>書式ツールバー・本文のテキスト・紙面・プロパティ等</b>の順に並びます。よく触るものほど広く、たまにしか触らないものは奥にしまってあります。</p>
 <table>
@@ -11429,7 +11517,8 @@ const HELP = [
 <p>本文・見出し・表・別窓など、どこにでも <code>{名前}</code> と書いておくと、<b>出力したHTMLで入れた値に置き換わります</b>。たとえば <code>{HO1}は机の上の日記に目を留める。</code> と書いておけば、HTMLを開いた人が HO1 の欄に「佐藤 千景」と入れた時点で、文中の <code>{HO1}</code> がすべて「佐藤 千景」になります。</p>
 <ul>
 <li>置き換わるのは、<b>HO1・HO2 のような「HO＋数字」</b>（ハンドアウトの枠がなくても、書くだけで使えます）と、左下の「ドキュメント設定」の<b>変数</b>の欄で<b>登録した名前</b>（例：<code>{KP}</code>）だけです。ココフォリアの <code>{SAN}</code> のような書き方は、登録しなければそのまま残ります。</li>
-<li>変数の欄には、本文で見つかったまだ登録していない名前が並ぶので、押せば登録できます。既定値（値を入れていないときに出す文字）と説明も付けられます。</li>
+<li>ドキュメント設定の変数の欄には、<b>すべての変数</b>（ハンドアウトの番号、本文に書いた HO＋数字、登録した名前）が並び、どれも<b>名前・既定値（値を入れていないときに出す文字）・説明</b>をその場で直せます。本文で見つかったまだ登録していない名前も並ぶので、押せば登録できます。</li>
+<li>ハンドアウトの変数は、ハンドアウトを選んだときの右のプロパティの<b>変数</b>の欄でも直せます（一覧と同じものです）。一覧で番号を変えると、ハンドアウトの番号も変わります。本文に書いた <code>{HO1}</code> は自動では書き換わりません。</li>
 <li>出力したHTMLでは、左の目次の上に<b>登場人物（変数）</b>の欄が出ます。入れた値はそのブラウザに覚えさせるので、開き直しても残ります。値を入れるまでは既定値（なければ名前）を淡く出します。コピーで写す文にも、入れた値が入ります。</li>
 <li>編集画面の紙面は、出力したHTMLを開いた直後と同じく<b>既定値（なければ名前）</b>で表示します（<code>{HO1}</code> は「HO1」）。変数を含む段落は紙面の上では直接書き換えられないので、左の原稿で直してください（左の原稿には <code>{HO1}</code> のまま出ます）。</li>
 </ul>
