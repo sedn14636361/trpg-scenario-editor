@@ -594,7 +594,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.10.4</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.10.5</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -11154,6 +11154,8 @@ body.fx.tocmask .nv .nvt{color:#a99d82}
 .fx #doc{display:block;margin-left:240px;padding:44px 32px 100vh}
 body.fx.notoc #doc{margin-left:0}
 .fx-body.page-body{height:auto;overflow:visible;max-width:178mm;margin:0 auto;padding:0 !important}
+/* 印刷は紙の大きさどおりにするので、画面で広げた分（zoom）は戻す */
+@media print{ .fx-body.page-body{zoom:1 !important} }
 .fx-body .blk{scroll-margin-top:28px}
 .fx .toc-line .pn,.fx .toc-line .dots,.fx .nv i{display:none}
 .fx-appx{margin-top:16mm;padding-top:8mm;border-top:1px dashed rgba(35,32,28,.3)}
@@ -11239,6 +11241,16 @@ body.fx.notoc #doc{margin-left:0}
 <script>
 (function(){
   var UP=${JSON.stringify(flowUpMap(idx))}, stack=[], btn=document.getElementById('fxBack');
+  /* 窓の幅に合わせて本文を拡大する。本文の欄は紙の版面（178mm）の幅なので、
+     広い窓ではそのままだと字が小さく、左右が空きすぎる。字も余白も同じ割合で大きくする（1〜1.5倍） */
+  var BODY=document.querySelector('.fx-body'), DOC=document.getElementById('doc');
+  function fit(){
+    if(!BODY || !DOC) return;
+    var avail = DOC.clientWidth - 64;                 // #doc の左右の内側の余白（32px ずつ）を除く
+    var z = Math.max(1, Math.min(1.5, avail * 0.94 / (178*96/25.4)));
+    BODY.style.zoom = z.toFixed(3);
+  }
+  fit(); addEventListener('resize', fit);
   /* 見出しに、その見出しを載せている目次へ戻るリンクを付ける */
   Object.keys(UP).forEach(function(id){
     var el=document.getElementById('b'+id); if(!el) return;
