@@ -321,7 +321,7 @@ kbd{background:#0e1219;border:1px solid var(--line);border-radius:3px;padding:0 
 /* 右上の × 。右の欄は段落を選んでいるときだけ出るので、閉じる＝選択を外す */
 #dockClose{margin-left:auto;align-self:center;flex:0 0 auto;border:0;background:transparent;color:var(--muted);font-size:17px;line-height:1;padding:2px 7px}
 #dockClose:hover{color:#fff;background:#252b38}
-#ppActs{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;margin-top:8px}
+#ppActs{display:grid;grid-template-columns:repeat(9,1fr);gap:2px;margin-top:8px}
 #ppActs button{height:28px;padding:0;display:flex;align-items:center;justify-content:center;border:1px solid transparent;
   background:transparent;border-radius:4px;color:#cbd5e1}
 #ppActs button:hover{background:#252b38;border-color:#3a4252;color:#fff}
@@ -599,7 +599,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.13.2</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.13.3</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -772,7 +772,6 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
             <button id="blkCopy" data-tip="ブロックをコピー（Ctrl+C）"><svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="1"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></button>
             <button id="blkPaste" data-tip="貼り付け（Ctrl+V）" disabled><svg viewBox="0 0 24 24"><path d="M9 4h6v3H9z"/><path d="M7 5H5v16h14V5h-2"/></svg></button>
             <button id="btnCopyAll" data-tip="文章をコピー（選んでいなければ全文）"><svg viewBox="0 0 24 24"><path d="M5 6h14M12 6v13"/></svg></button>
-            <button id="btnDesel" data-tip="選択を外す（Esc）"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" stroke-dasharray="2 2"/><path d="M9 9l6 6M15 9l-6 6"/></svg></button>
             <button id="delBlk" class="danger" data-tip="削除"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
           </div>
         </div>
@@ -918,7 +917,6 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
       </div>
       <div class="grid2" style="margin-top:6px">
         <button data-popact="btnCopyAll" title="選んだ段落の文章だけをコピーします">文章をコピー</button>
-        <button data-popact="btnDesel" title="どの段落も選ばない状態にします（Escでも同じ）">選択を外す</button>
       </div>
       <div class="grid2" style="margin-top:6px">
         <button data-popact="blkCopy" title="選んだ段落まるごと控えます">ブロックをコピー</button>
@@ -5044,7 +5042,7 @@ function tocEntriesFor(b){
 /* 目次に出す文字。見出しそのものとは別に決められる（b.tl）。
    b.tocOff が立っている段落は、どの目次にも載せない */
 function tocTextOf(b){
-  const own = String(b.tl==null?'':b.tl).trim();
+  const own = b.type==='title' ? '' : String(b.tl==null?'':b.tl).trim();   // タイトルは目次での書き方を持たない
   if(own) return own;
   return rubyPlain(String(b.text||'').trim().split('\n')[0]);
 }
@@ -5055,6 +5053,7 @@ function tocLevelOf(type){
 /* 見出しごとの載せかた。'' は目次の側の設定に従う、'on' はかならず載せる、'off' は載せない。
    古い原稿の b.tocOff（載せないの真偽）もそのまま読めるようにしてある */
 function tocModeOf(b){
+  if(b.type==='title') return '';              // タイトルは目次の設定どおり
   const m = String(b.tocMode||'');
   if(m==='on' || m==='off') return m;
   return b.tocOff ? 'off' : '';
@@ -9772,6 +9771,7 @@ function propsToc(b){
 /* 見出しの側に出す「目次での書き方」。目次に載る書式のときだけ出す */
 function propsTocItem(b){
   if(!TOC_PICKS.some(x=>x[0]===b.type)) return '';
+  if(b.type==='title') return '';             // タイトルは書いた文字のまま、目次の設定どおりに載せる
   const m = tocModeOf(b);
   return pRow('目次での書き方',
       '<input type="text" data-p="tocown" value="'+esc(String(b.tl||''))+'" placeholder="'
@@ -10402,7 +10402,6 @@ function deselectAll(quiet){
   paintSel(); syncBlockPanel();
   if(!quiet) setStatus('選択を外しました');
 }
-document.getElementById('btnDesel').onclick=()=>deselectAll();
 document.getElementById('dockClose').onclick=()=>deselectAll();
 /* ブロックそのものの控え。表もNPCシートも内容ごと写す */
 let blkClip = null;
@@ -11574,7 +11573,7 @@ const HELP = [
 <h3>はじめに</h3>
 <p>左が本文のテキスト、右が組み上がったページです。左に書いた内容がそのまま右へ流れ、はみ出したぶんは自動で次のページへ送られます。</p>
 <h4>書きかたと選びかた</h4>
-<p>モードの切り替えはありません。本文はいつでもそのまま打てて、<b>文章に触れた段落がそのまま選択されます</b>。つまみや書式名の欄を押しても選べます。どれも選んでいない状態にしたいときは、<code>Esc</code>をもう一度押すか、本文欄の余白を押すか、右上の段落の操作の<b>選択を外す</b>を使います（何も選んでいなければ、書式は末尾に新しく足します）。<code>Enter</code>で次の段落（段落を足すと、紙面はその段落が見える位置まで動きます）、段落の先頭で<code>Backspace</code>で前の段落とつながります。</p>
+<p>モードの切り替えはありません。本文はいつでもそのまま打てて、<b>文章に触れた段落がそのまま選択されます</b>。つまみや書式名の欄を押しても選べます。どれも選んでいない状態にしたいときは、<code>Esc</code>をもう一度押すか、本文欄の余白を押すか、右の段落の欄の右上の <b>&#215;</b> を使います（何も選んでいなければ、書式は末尾に新しく足します）。<code>Enter</code>で次の段落（段落を足すと、紙面はその段落が見える位置まで動きます）、段落の先頭で<code>Backspace</code>で前の段落とつながります。</p>
 <h4>画面の並び</h4>
 <p>左から<b>書式ツールバー・本文のテキスト・紙面・プロパティ等</b>の順に並びます。よく触るものほど広く、たまにしか触らないものは奥にしまってあります。</p>
 <table>
@@ -11584,7 +11583,7 @@ const HELP = [
 <tr><th>左下・ドキュメント設定／ページ一覧</th><td>ツールバーのいちばん下の2つのアイコンです。押すとツールバーの右に引き出しが開き、原稿欄はそのぶん狭くなります（重ならないので、開いたまま段落を選べます）。もう一度押すか、右上の <b>&#215;</b>、引き出しの中で <code>Esc</code> を押すと閉じます。<br>
 <b>ドキュメント設定</b>：段組・対象のページ・背景（ここまでページごと）と、シナリオ名・余白・ページ番号・変数・文字サイズ・フォント・全部消して最初から（文書全体）。<b>ページ一覧</b>：1ページずつ見て、そのページの見出しへ飛べます（「段組とページ」を参照）。</td></tr>
 <tr><th>右・段落の設定</th><td><b>段落を選んでいるときだけ</b>紙面の右に出ます。右上の <b>&#215;</b> か <code>Esc</code> で閉じます（選択が外れ、紙面が広くなります）。いちばん上の列は段落の操作
-（上へ・下へ・複製・下に追加・結合・ブロックをコピー・貼り付け・文章をコピー・選択を外す・削除）。
+（上へ・下へ・複製・下に追加・結合・ブロックをコピー・貼り付け・文章をコピー・削除）。
 その下に、書式ごとの欄（表・キャラシ・画像・処理など）と、どの段落にも共通の欄（入れ子の書式、ルビ、2段のときの置き方、コメント、文字の色、字下げ、この段落だけの余白）が出ます。</td></tr>
 </table>
 <h4>本文の表示</h4>
@@ -11838,7 +11837,7 @@ const HELP = [
 </ul>
 <p>ここまでは<b>書式ごと</b>（見出し1、見出し2…）の決めです。<b>見出し1つずつ</b>の決めは、その見出しを選ぶと右の設定欄に出ます。</p>
 <ul>
-<li><b>目次での書き方</b>：目次に出る文字を、見出し本体とは別に決められます（例：見出しは「第一章　雨の交差点」、目次では「第一章」）。空なら見出しの文字がそのまま出ます。</li>
+<li><b>目次での書き方</b>：目次に出る文字を、見出し本体とは別に決められます（例：見出しは「第一章　雨の交差点」、目次では「第一章」）。空なら見出しの文字がそのまま出ます。タイトルにはこの欄はなく、書いた文字のまま目次の設定どおりに載ります。</li>
 <li><b>目次に載せるか</b>：<b>目次の設定どおり</b>／<b>かならず載せる</b>／<b>載せない</b>の3つから選びます。「かならず載せる」を使うと、目次の側で外してある書式でも、その見出しだけ載せられます。逆に「載せない」で、同じ書式の中からその1つだけ外せます。</li>
 </ul>
 <p>書式ツールバーの<b>装丁ブロック → 目次</b>で作れます。タイトルと見出し1〜3から組み立てられ、書き出したHTMLでは目次からその位置へ飛べます。<b>ページ一覧</b>の欄を「見出し」に切り替えると、いまの見出しが一覧で出て、押すとその位置へ飛べます。</p>`],
