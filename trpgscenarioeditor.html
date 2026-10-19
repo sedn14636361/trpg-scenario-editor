@@ -594,7 +594,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.12.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.12.1</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -10064,17 +10064,16 @@ document.getElementById('tocMake').onclick=()=>{
 
 /* ================= ページ（段組と背景） ================= */
 const bgWrap=document.getElementById('bgPresets');
-function buildBgSwatches(){
-  bgWrap.innerHTML=BGS.map(b=>'<button class="swatch" data-bg="'+b.k+'"><div class="page '+(b.k==='none'?'':b.k)
-    +'" style="width:210mm;height:297mm;position:absolute;left:0;top:0;transform:scale(.12);transform-origin:0 0;box-shadow:none;'+padVars()+'"><div class="page-bg '+(b.k==='none'?'':b.k)
-    +'"></div></div><span>'+b.n+'</span></button>').join('');
-}
-buildBgSwatches();
 /* 画像を挿入するのは書式ツールバーの「画像」なので、ここでは柄だけを選ぶ。
    前の版で敷いた画像は、そのまま出す（「背景を外す」で外せる） */
 let bgPick='none';
+/* 柄のボタン。縮めた見本はどれも同じに見えて役に立たないので、名前だけのボタンにする */
+function buildBgSwatches(){
+  bgWrap.innerHTML=BGS.map(b=>'<button data-bg="'+b.k+'"'+(b.k===bgPick?' class="on"':'')+'>'+b.n+'</button>').join('');
+}
+buildBgSwatches();
 bgWrap.onclick=e=>{const b=e.target.closest('[data-bg]');if(!b)return;bgPick=b.dataset.bg;
-  bgWrap.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('on',x===b));};
+  bgWrap.querySelectorAll('[data-bg]').forEach(x=>x.classList.toggle('on',x===b));};
 function buildBgPages(){
   const box=document.getElementById('bgPages');
   box.innerHTML=S.pages.map((p,i)=>'<label><input type="checkbox" class="bgpg" value="'+i+'"'+(pgSel.has(p.id)?' checked':'')
