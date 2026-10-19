@@ -345,6 +345,9 @@ kbd{background:#0e1219;border:1px solid var(--line);border-radius:3px;padding:0 
 #subBody{flex:1;overflow:auto;min-height:0}
 #tbarSub{margin-top:auto;padding-top:6px;border-top:1px solid var(--line);display:flex;flex-direction:column;align-items:center}
 #subBody section.pane{padding:12px}
+#paperChips{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+#paperChips button{height:26px;padding:0;border:1px solid #3a4252;border-radius:13px}
+#paperChips button.on{border-color:var(--brass);box-shadow:0 0 0 2px var(--brass)}
 #subBody .dsh{margin:4px 0 2px;padding:0 0 4px;border-bottom:1px solid var(--line);color:var(--text);font-size:12px;letter-spacing:.12em}
 #subBody hr + .dsh,#subBody .dsh:not(:first-child){margin-top:18px}
 .varrow{display:flex;gap:4px;align-items:center;margin:0 0 4px}
@@ -594,7 +597,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.12.1</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.13.0</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -655,7 +658,16 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
           </div>
           <div class="hint">そのページに載っている段落ごと消えます。</div>
           <label class="f">背景</label>
+          <span class="hint" style="display:block;margin-top:2px">柄</span>
           <div class="grid3" id="bgPresets"></div>
+          <span class="hint" style="display:block;margin-top:10px">紙の色</span>
+          <div id="paperChips"></div>
+          <div class="row" style="margin-top:6px;align-items:center;gap:6px">
+            <select id="paperMood" title="おまかせで作る色の雰囲気" style="flex:1;min-width:0"></select>
+            <button id="paperAuto" title="選んだ雰囲気で、淡い紙の色を作ります" style="flex:0 0 auto">おまかせ</button>
+            <input type="color" id="paperPick" title="好きな色を選びます（文字が読みにくい色は、読める明るさまで自動で明るくします）" style="flex:0 0 40px;padding:2px">
+          </div>
+          <div class="hint" id="paperInfo"></div>
           <div class="row" style="margin-top:10px">
             <button id="bgApply" class="on">選択ページに適用</button>
             <button id="bgClear" class="danger">背景を外す</button>
@@ -1475,8 +1487,7 @@ input.npc-artw{width:3.4em;font-family:inherit;font-size:1em;background:#fff !im
   linear-gradient(rgba(35,32,28,.85),rgba(35,32,28,.85)) left top/100% var(--bh) no-repeat,
   linear-gradient(rgba(168,51,31,.6),rgba(168,51,31,.6)) left 0 top calc(var(--bh) + .8mm)/100% .3mm no-repeat,
   linear-gradient(rgba(35,32,28,.85),rgba(35,32,28,.85)) left bottom/100% var(--bh) no-repeat,
-  linear-gradient(rgba(168,51,31,.6),rgba(168,51,31,.6)) left 0 bottom calc(var(--bh) + .8mm)/100% .3mm no-repeat,
-  #f1efea}
+  linear-gradient(rgba(168,51,31,.6),rgba(168,51,31,.6)) left 0 bottom calc(var(--bh) + .8mm)/100% .3mm no-repeat}
 .bg-grid{background-image:linear-gradient(rgba(35,32,28,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(35,32,28,.10) 1px,transparent 1px);background-size:5mm 5mm}
 .bg-rule{background-image:linear-gradient(rgba(35,32,28,.13) 1px,transparent 1px);background-size:100% 8mm}
 .bg-dot{background-image:radial-gradient(rgba(35,32,28,.18) 1px,transparent 1.2px);background-size:4mm 4mm}
@@ -2053,6 +2064,71 @@ const TYPE_NAME = k => (TYPES.find(t=>t.k===k)||{n:k}).n;
 /* k はそのまま紙に付ける印（class）の名前 */
 const BGS = [ {k:'none',n:'無地'}, {k:'bg-grid5',n:'方眼'}, {k:'bg-dot5',n:'ドット'}, {k:'bg-aged',n:'古紙'},
   {k:'bg-washi',n:'和紙'}, {k:'bg-frame',n:'飾り枠'}, {k:'bg-corner',n:'四隅の飾り'}, {k:'bg-band2',n:'上下の帯'} ];
+/* ================= 紙の色 =================
+   色の作り方・呼び名・コントラスト比は、同じ作者の Patternplate（ベクターパターンの道具）から移したもの。
+   本文の文字（#23201c）が読めるよう、紙の色は文字とのコントラスト比 7:1（WCAG の AAA）を下回らないようにする */
+const PAPER_DEF = '#f7f3ea';                 // 紙の色を決めていないときの色（生成り）
+const INK = '#23201c';
+const PAPERS = [['#f7f3ea','生成り'],['#fbfbf8','白'],['#f6f0dc','象牙'],['#f1e8d8','砂'],['#f8ece9','桜'],
+  ['#eef2e2','若草'],['#e9f0f3','空'],['#efecf4','藤'],['#eeeeec','灰'],['#e6e4df','薄墨']];
+/* ムード（Patternplate の MOODS のうち、地色が明るいものだけ。暗い地色は本文の黒が読めなくなるので使わない） */
+const PAPER_MOODS = {
+  dreamy :{ja:'ドリーミー',  hue:null,      S:34, L:94},
+  sherbet:{ja:'シャーベット',hue:null,      S:24, L:96},
+  sunset :{ja:'サンセット',  hue:[332,410], S:44, L:91},
+  earth  :{ja:'アース',      hue:[14,62],   S:22, L:92},
+  mono   :{ja:'ワントーン',  hue:null,      S:8,  L:94}
+};
+function hex2rgb(h){ h=String(h).replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join('');
+  return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+function hsl2hex(h,s,l){
+  h=((h%360)+360)%360; s=Math.min(100,Math.max(0,s))/100; l=Math.min(100,Math.max(0,l))/100;
+  const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2;
+  let r,g,b;
+  if(h<60)[r,g,b]=[c,x,0]; else if(h<120)[r,g,b]=[x,c,0]; else if(h<180)[r,g,b]=[0,c,x];
+  else if(h<240)[r,g,b]=[0,x,c]; else if(h<300)[r,g,b]=[x,0,c]; else [r,g,b]=[c,0,x];
+  return '#'+[r,g,b].map(v=>Math.round((v+m)*255).toString(16).padStart(2,'0')).join('');
+}
+function rgb2hsl(r,g,b){ r/=255; g/=255; b/=255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn, l=(mx+mn)/2;
+  let h=0, sa=0;
+  if(d){ sa=d/(1-Math.abs(2*l-1)); h = mx===r ? 60*(((g-b)/d)%6) : mx===g ? 60*((b-r)/d+2) : 60*((r-g)/d+4); }
+  return [((h%360)+360)%360, sa*100, l*100]; }
+/* WCAG の相対輝度とコントラスト比 */
+function lum(hex){ const f=v=>{ v/=255; return v<=.03928 ? v/12.92 : Math.pow((v+.055)/1.055,2.4); };
+  const [r,g,b]=hex2rgb(hex); return .2126*f(r)+.7152*f(g)+.0722*f(b); }
+function contrastRatio(a,b){ const x=lum(a), y=lum(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); }
+function grade(r){ return r>=7?'AAA':r>=4.5?'AA':r>=3?'A':'—'; }
+/* 色の呼び名（Patternplate の colorName）。色相と明るさから短い名前を当てる */
+const HUE_NAMES=[[15,'ROSE'],[32,'EMBER'],[45,'AMBER'],[62,'STRAW'],[85,'MOSS'],[120,'FERN'],
+  [160,'JADE'],[185,'LAGOON'],[205,'TIDE'],[228,'IBIS'],[252,'INDIGO'],[280,'IRIS'],
+  [310,'ORCHID'],[338,'PLUM'],[360,'ROSE']];
+const TONE_NAMES=[[14,'NIGHT'],[28,'DEEP'],[42,'TEA'],[56,'CLAY'],[70,'HAZE'],[84,'RICE'],[93,'MIST'],[101,'FROST']];
+function colorName(hex){
+  const [h,sa,l]=rgb2hsl.apply(null,hex2rgb(hex));
+  const a=(HUE_NAMES.find(x=>h<=x[0])||HUE_NAMES[0])[1];
+  const b=(TONE_NAMES.find(x=>l<=x[0])||TONE_NAMES[TONE_NAMES.length-1])[1];
+  return sa<10 ? 'ASH '+b : a+' '+b;
+}
+/* 文字とのコントラスト比が 7:1 を下回る色は、色合いはそのままで 7:1 になるところまで明るくする */
+function readablePaper(hex){
+  if(!/^#[0-9a-f]{6}$/i.test(String(hex||''))) return PAPER_DEF;
+  hex = hex.toLowerCase();
+  if(contrastRatio(hex, INK) >= 7) return hex;
+  const [h,sa,l] = rgb2hsl.apply(null, hex2rgb(hex));
+  for(let L=Math.ceil(l); L<=100; L++){ const c=hsl2hex(h,sa,L); if(contrastRatio(c,INK)>=7) return c; }
+  return '#ffffff';
+}
+/* おまかせ：ムードの色相の範囲から、淡い紙の色を一つ作る（Patternplate の makePalette の地色の作り方） */
+function paperFromMood(key){
+  const M = PAPER_MOODS[key] || PAPER_MOODS.dreamy, R = Math.random;
+  const h = M.hue ? M.hue[0] + R()*(M.hue[1]-M.hue[0]) : R()*360;
+  return readablePaper(hsl2hex(h, M.S, M.L + (R()-.5)*4));
+}
+function paperName(hex){ const f=PAPERS.find(x=>x[0]===hex); return (f?f[1]+'・':'')+colorName(hex); }
+/* その紙の色（決めていなければ ''） */
+function pageColor(st){ const c=st && st.bg && st.bg.color; return /^#[0-9a-f]{6}$/i.test(String(c||'')) ? c : ''; }
+function paperVar(st){ const c=pageColor(st); return c ? ';--paper:'+c : ''; }
 /* 紙の余白の大きさ。背景の飾りを余白の中に収めるのに使う */
 function padVars(){ const v = (typeof S!=='undefined' && S) ? S : {padV:18, padH:16};   // 読み込む前は既定の余白
   return '--mv:'+v.padV+'mm;--mh:'+v.padH+'mm'; }
@@ -6219,7 +6295,7 @@ function makePage(i){
     + '<label><input type="checkbox" class="pgsel" data-pi="'+i+'"'+(pgSel.has(st.id)?' checked':'')+'> 選択</label>'
     + '<span class="sp"></span><span>'+(st.cols===2?'2段組':'1段組')+'</span>'
     + '<button data-pcol="'+i+'">段組を切替</button></div>'
-    + '<div class="page pv '+cls+'" data-pi="'+i+'" style="'+padVars()+'">'
+    + '<div class="page pv '+cls+'" data-pi="'+i+'" style="'+padVars()+paperVar(st)+'">'
       + '<div class="page-bg '+cls+'"></div>'+img
       + '<div class="page-body'+(st.cols===2?' cols2':'')+'" style="padding:'+S.padV+'mm '+S.padH+'mm;font-size:'+S.base+'pt"></div>'
       + footHTML(i)
@@ -10067,29 +10143,63 @@ const bgWrap=document.getElementById('bgPresets');
 /* 画像を挿入するのは書式ツールバーの「画像」なので、ここでは柄だけを選ぶ。
    前の版で敷いた画像は、そのまま出す（「背景を外す」で外せる） */
 let bgPick='none';
+let colorPick='';                 // 紙の色（'' は決めていない＝生成り）
 /* 柄のボタン。縮めた見本はどれも同じに見えて役に立たないので、名前だけのボタンにする */
 function buildBgSwatches(){
   bgWrap.innerHTML=BGS.map(b=>'<button data-bg="'+b.k+'"'+(b.k===bgPick?' class="on"':'')+'>'+b.n+'</button>').join('');
 }
 buildBgSwatches();
+/* 紙の色のボタンと、選んでいる色の名前・文字とのコントラスト比 */
+function buildPaperUI(){
+  const box=document.getElementById('paperChips'); if(!box) return;
+  const cur = colorPick || PAPER_DEF;
+  box.innerHTML = PAPERS.map(([c,n])=>'<button data-pc="'+c+'" title="'+n+'" aria-label="'+n+'" style="background:'+c+'"'+(c===cur?' class="on"':'')+'></button>').join('');
+  const r = contrastRatio(cur, INK);
+  document.getElementById('paperInfo').textContent = paperName(cur)+'　文字とのコントラスト比 '+r.toFixed(1)+':1（'+grade(r)+'）';
+  document.getElementById('paperPick').value = cur;
+}
+(function initPaperUI(){
+  const mood=document.getElementById('paperMood');
+  mood.innerHTML = Object.keys(PAPER_MOODS).map(k=>'<option value="'+k+'">'+PAPER_MOODS[k].ja+'</option>').join('');
+  document.getElementById('paperChips').addEventListener('click', e=>{
+    const b=e.target.closest('[data-pc]'); if(!b) return;
+    colorPick = b.dataset.pc===PAPER_DEF ? '' : b.dataset.pc; buildPaperUI();
+  });
+  document.getElementById('paperAuto').onclick=()=>{ colorPick = paperFromMood(mood.value); buildPaperUI(); };
+  document.getElementById('paperPick').addEventListener('change', e=>{
+    const want=e.target.value.toLowerCase(), got=readablePaper(want);
+    colorPick = got===PAPER_DEF ? '' : got; buildPaperUI();
+    if(got!==want) setStatus('文字が読みにくい色だったので、読める明るさまで明るくしました','#ffd479');
+  });
+  buildPaperUI();
+})();
+/* 対象のページを選んだら、柄と紙の色のボタンをそのページの今の状態にする。
+   こうしておくと、紙の色だけ変えて適用したときに柄が変わってしまわない */
+function syncBgPicks(){
+  const idx=targetPages(); if(!idx) return;
+  const st=S.pages[idx[0]]; if(!st) return;
+  bgPick = st.bg.preset || 'none'; colorPick = pageColor(st);
+  buildBgSwatches(); buildPaperUI();
+}
 bgWrap.onclick=e=>{const b=e.target.closest('[data-bg]');if(!b)return;bgPick=b.dataset.bg;
   bgWrap.querySelectorAll('[data-bg]').forEach(x=>x.classList.toggle('on',x===b));};
 function buildBgPages(){
   const box=document.getElementById('bgPages');
   box.innerHTML=S.pages.map((p,i)=>'<label><input type="checkbox" class="bgpg" value="'+i+'"'+(pgSel.has(p.id)?' checked':'')
     +'> P.'+(i+1)+'　<span style="color:var(--muted)">'+(p.cols===2?'2段':'1段')+'／'
-    +((BGS.find(b=>b.k===p.bg.preset)||{}).n||'')+(p.bg.img?'＋画像':'')+'</span></label>').join('');
+    +((BGS.find(b=>b.k===p.bg.preset)||{}).n||'')+(p.bg.img?'＋画像':'')
+    +(pageColor(p)?'<i title="'+esc(paperName(pageColor(p)))+'" style="display:inline-block;width:9px;height:9px;margin-left:5px;border:1px solid #556;border-radius:2px;vertical-align:-1px;background:'+pageColor(p)+'"></i>':'')+'</span></label>').join('');
   box.onchange=e=>{
     const c=e.target.closest('.bgpg'); if(!c) return;
     const pg=S.pages[+c.value]; if(!pg) return;
     c.checked ? pgSel.add(pg.id) : pgSel.delete(pg.id);
-    syncPageChecks();
+    syncPageChecks(); syncBgPicks();
   };
 }
 function syncPageChecks(){
   stage.querySelectorAll('.pgsel').forEach(c=>{ const p=S.pages[+c.dataset.pi]; if(p) c.checked = pgSel.has(p.id); });
 }
-document.getElementById('bgAll').onclick=()=>{S.pages.forEach(p=>pgSel.add(p.id));buildBgPages();syncPageChecks();};
+document.getElementById('bgAll').onclick=()=>{S.pages.forEach(p=>pgSel.add(p.id));buildBgPages();syncPageChecks();syncBgPicks();};
 document.getElementById('bgNone').onclick=()=>{pgSel.clear();buildBgPages();syncPageChecks();};
 function targetPages(){
   const idx=S.pages.map((p,i)=>pgSel.has(p.id)?i:-1).filter(i=>i>=0);
@@ -10119,7 +10229,7 @@ stage.addEventListener('click', e=>{
   if(pc){ const p=pageSetting(+pc.dataset.pcol); p.cols = p.cols===2?1:2; render(); save(); return; }
   const cb=e.target.closest('.pgsel');
   if(cb){ const p=S.pages[+cb.dataset.pi]; if(!p) return;
-    cb.checked ? pgSel.add(p.id) : pgSel.delete(p.id); buildBgPages(); }
+    cb.checked ? pgSel.add(p.id) : pgSel.delete(p.id); buildBgPages(); syncBgPicks(); }
 });
 /* ページを消す＝そのページに載っている段落を消すこと */
 document.getElementById('pgDel').onclick=()=>{
@@ -10146,6 +10256,7 @@ document.getElementById('bgApply').onclick=()=>{
   const idx=targetPages(); if(!idx) return alert('適用するページを選んでください。');
   idx.forEach(i=>{
     S.pages[i].bg.preset=bgPick;
+    S.pages[i].bg.color=colorPick;
   });
   render(); save(); setStatus(idx.length+'ページに適用しました','var(--ok)');
 };
@@ -10788,7 +10899,7 @@ function appendixHTML(){
                  : '<div class="blkpad p-desc"><div class="blk t-desc" style="white-space:normal">'
                    + popupBodyHTML(p.body)+'</div></div>');
       }).join('');
-  return '<div class="page '+cls+'" style="'+padVars()+'"><div class="page-bg '+cls+'"></div>'
+  return '<div class="page '+cls+'" style="'+padVars()+paperVar(st)+'"><div class="page-bg '+cls+'"></div>'
     + '<div class="page-body" style="padding:'+S.padV+'mm '+S.padH+'mm;font-size:'+S.base+'pt;height:auto;min-height:100%">'
     + body + '</div></div>';
 }
@@ -10894,7 +11005,7 @@ function pageStaticHTML(i, withAnchor){
   const freeHTML = freeImgs(i).map(b=>
       '<div class="blkpad p-image span free" style="'+cornerCss(b)+'">'
       + '<div class="blk t-image">'+imageInnerHTML(b)+'</div></div>').join('');
-  return '<div class="page '+cls+'" id="p'+(i+1)+'" style="'+padVars()+'">'
+  return '<div class="page '+cls+'" id="p'+(i+1)+'" style="'+padVars()+paperVar(st)+'">'
     + '<div class="page-bg '+cls+'"></div>'+img
     + '<div class="page-body'+(st.cols===2?' cols2':'')+'" style="padding:'+S.padV+'mm '+S.padH+'mm;font-size:'+S.base+'pt">'+freeShape+body+freeHTML+'</div>'
     + footHTML(i) + '</div>';
@@ -10960,7 +11071,9 @@ function flowBodyHTML(idx){
   return idx.map(i=>{
     const free = freeImgs(i).map(b=>'<div class="blkpad p-image span"><div class="blk t-image" style="width:'
       + fnum(imgWmm(b))+'mm;margin:0 auto">'+imageInnerHTML(b)+'</div></div>').join('');
-    return free + (pageMap[i]||[]).map(id=>{
+    /* ページのはじまりの段落に、そのページの紙の色の印を付ける（グラデーションの位置を測るため） */
+    const mark = h => h.replace('<div', '<div data-pc="'+(pageColor(S.pages[i])||(S.pages[i]&&S.pages[i].bg.preset==='bg-band2'?'#f1efea':PAPER_DEF))+'"');
+    return mark(free + (pageMap[i]||[]).map(id=>{
       const f=findBlock(id); if(!f) return '';
       const b=f.b;
       if(b.type==='break' || b.type==='colbr') return '';
@@ -10968,7 +11081,7 @@ function flowBodyHTML(idx){
       let top=''; if(!topDone){ top=' pagetop'; topDone=true; }
       const anchor = ANCHOR_TYPES.includes(b.type) ? ' id="b'+b.id+'"' : '';
       return blockStaticHTML(b, 1, pull, top, anchor);
-    }).join('');
+    }).join(''));
   }).join('');
 }
 /* 区切りなしの1枚の巻末。新規ウィンドウの内容を節にして並べ、本文へ戻るリンクを付ける */
@@ -11094,6 +11207,9 @@ body.notoc #tocBtn{left:10px}
   idx.forEach(i=>{ const k=((S.pages[i]||{}).bg||{}).preset||'none'; bgCount[k]=(bgCount[k]||0)+1; });
   const bgTop = Object.keys(bgCount).sort((x,y)=>bgCount[y]-bgCount[x])[0] || 'none';
   const fxCls = bgTop==='none' ? '' : bgTop;
+  /* 紙の色：どのページも同じならその色。違うページがあれば、表示してから位置を測ってグラデーションにする（flowJs） */
+  const pcs = idx.map(i=>pageColor(S.pages[i]) || (S.pages[i]&&S.pages[i].bg.preset==='bg-band2'?'#f1efea':PAPER_DEF));
+  const fxPaper = pcs.every(c=>c===pcs[0]) ? ' style="--paper:'+pcs[0]+'"' : ' style="--paper:'+pcs[0]+'" data-grad="1"';
   const flowCss = `
 body.fx{background:#f7f3ea}
 .fx-paper.page{display:block;width:auto;height:auto;min-height:100vh;overflow:visible;box-shadow:none}
@@ -11101,7 +11217,7 @@ body.fx{background:#f7f3ea}
 .fx-paper .page-bg.bg-aged{position:fixed}                     /* 古紙：画面のふちが焼ける */
 .fx-paper .page-bg.bg-frame::before{display:none}               /* 飾り枠：本文の欄を二重罫で囲む */
 .fx-paper.bg-frame .fx-body.page-body{padding:9mm 8mm !important;border:1px solid rgba(122,91,50,.55);
-  box-shadow:inset 0 0 0 2px #f7f3ea,inset 0 0 0 2.5px rgba(122,91,50,.35)}
+  box-shadow:inset 0 0 0 2px var(--paper,#f7f3ea),inset 0 0 0 2.5px rgba(122,91,50,.35)}
 .fx-paper .page-bg.bg-corner{position:fixed;left:240px;--cs:11mm;--co:3mm}   /* 四隅：画面の四隅（目次の右から） */
 body.fx.notoc .fx-paper .page-bg.bg-corner{left:0}
 @media (max-width:1000px){ .fx-paper .page-bg.bg-corner{left:0} }
@@ -11219,6 +11335,22 @@ body.fx.notoc #doc{margin-left:0}
     BODY.style.zoom = z.toFixed(3);
   }
   fit(); addEventListener('resize', fit);
+  /* ページごとに紙の色が違うときは、区切りなしの1枚の上で色をグラデーションでつなぐ。
+     各ページの中ほどでそのページの色そのものになり、あいだは前後の色を混ぜる。
+     拡大率や窓の幅で位置が変わるので、表示のたびに測り直す */
+  var PAPER=document.querySelector('.fx-paper[data-grad]');
+  function paint(){
+    if(!PAPER) return;
+    var ms=[].slice.call(document.querySelectorAll('.fx-body [data-pc]')); if(!ms.length) return;
+    var top=PAPER.getBoundingClientRect().top, H=PAPER.scrollHeight;
+    var ys=ms.map(function(m){ return m.getBoundingClientRect().top - top; });
+    var end=document.querySelector('.fx-body').getBoundingClientRect().bottom - top;
+    var st=['linear-gradient(to bottom', ms[0].getAttribute('data-pc')+' 0px'];
+    ms.forEach(function(m,k){ var a=ys[k], b=(k+1<ys.length)?ys[k+1]:end; st.push(m.getAttribute('data-pc')+' '+Math.round((a+b)/2)+'px'); });
+    st.push(ms[ms.length-1].getAttribute('data-pc')+' '+Math.max(H,end)+'px');
+    PAPER.style.background = st.join(',')+')';
+  }
+  paint(); addEventListener('resize', paint); addEventListener('load', paint);
   /* 見出しに、その見出しを載せている目次へ戻るリンクを付ける */
   Object.keys(UP).forEach(function(id){
     var el=document.getElementById('b'+id); if(!el) return;
@@ -11376,7 +11508,7 @@ body.tocmask .nv .nvt{color:#5b6478;letter-spacing:.05em}
 </style></head><body class="tocmask`+(flow?' fx':'')+`">
 `+'<button id="tocBtn" type="button" title="目次を隠す" aria-label="目次を隠す">'
 + '<i></i><i></i><i></i></button>'
-+ (flow ? '<div class="page fx-paper '+fxCls+'"><div class="page-bg '+fxCls+'"></div>' : '')
++ (flow ? '<div class="page fx-paper '+fxCls+'"'+fxPaper+'><div class="page-bg '+fxCls+'"></div>' : '')
 + '<nav id="nav"'+(flow?' class="fx-nav"':'')+'><h1>'+esc(S.title||'目次')+'</h1>'
 + varPanel
 + '<button id="tocMask" type="button">見出しを見せる</button>'
@@ -11559,6 +11691,10 @@ const HELP = [
 <p>段組は<b>ページ単位</b>で決まります。左下の「ドキュメント設定」の<b>選んだ段落のページの段組</b>で、選んでいる段落が載っているページを切り替えます（同じ欄の「対象のページ」でページを選んでいれば、そちらが対象になります）。2段組にすると<b>半分の幅の縦長の段</b>になり、文章は左の段を最後まで埋めてから右の段へ流れます。ページ見出しの「段組を切替」でも変えられます。</p>
 <h4>背景の柄</h4>
 <p>ドキュメント設定の<b>背景</b>で、「対象のページ」で選んだページに柄を付けられます。<b>無地・方眼・ドット・古紙・和紙・飾り枠・四隅の飾り・上下の帯</b>の8つです。読みやすさのため、本文の下にかかる柄はどれもごく薄く（文字とのコントラスト比 7:1 以上）、枠・四隅・帯の飾りは紙面の余白の中だけに置きます（余白を狭くすると飾りも小さくなります）。</p>
+<h4>紙の色</h4>
+<p>ドキュメント設定の背景の<b>紙の色</b>で、ページごとに紙の色を変えられます。色のボタン（生成り・白・象牙・砂・桜・若草・空・藤・灰・薄墨）から選ぶか、雰囲気（ドリーミー・シャーベット・サンセット・アース・ワントーン）を選んで<b>おまかせ</b>を押すと淡い色を作ります。右の色の欄では好きな色も選べます。選んだ色の呼び名と、文字とのコントラスト比が下に出ます。柄と同じく「対象のページ」を選んで<b>選択ページに適用</b>を押します（対象のページを選ぶと、柄と紙の色のボタンはそのページの今の状態になるので、色だけ変えても柄はそのままです）。</p>
+<p>本文が読みにくくならないよう、紙の色は文字とのコントラスト比が <b>7:1（WCAG の AAA）</b>を下回らないようにしてあります。濃い色を選ぶと、色合いはそのままで読める明るさまで自動で明るくします。色の作り方と呼び名は、同じ作者の Patternplate から移したものです。</p>
+<p>区切りなしで出力したときは、ページごとの紙の色を<b>上から順にグラデーションでつなぎます</b>。各ページの中ほどでそのページの色そのものになり、あいだは前後の色が混ざります。どのページも同じ色なら、その一色になります。</p>
 <p>区切りなしで出力したときは、出力するページで<b>いちばん多く使っている柄</b>を画面全体に使います。古紙と四隅の飾りは画面のふちに付いてスクロールしても動かず、飾り枠は本文の欄を囲み、上下の帯は文書のいちばん上と下に出ます。四隅の飾りは、文字にかかる狭い画面では出しません。</p>
 <h4>ブロックの置き方</h4>
 <table>
