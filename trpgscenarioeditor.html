@@ -540,9 +540,9 @@ button.pop-btn.pop-miss{background:#a8331f;opacity:.75}
    本体をつかむと文字のカーソルが入ってしまう。
    左の外側に取っ手を出して、そこからだけ動かせるようにする */
 #stage .blkpad[data-id],#popBlocks .blkpad[data-id]{position:relative}
-/* ただし自由配置の画像は紙面に直に置くもの。上の規則が勝つと流れの中に置かれてしまい、
+/* ただし隅に置く画像は紙面に直に置くもの。上の規則が勝つと流れの中に置かれてしまい、
    編集画面だけ画像が下へずれていた（出力したHTMLと、文字が避ける場所は正しかった） */
-#stage .blkpad.p-image.free[data-id]{position:absolute;cursor:move;touch-action:none}
+#stage .blkpad.p-image.free[data-id]{position:absolute}
 #stage .blkpad.p-image.free[data-id]::before{display:none}  /* 段落の並べ替えの取っ手は使わない（流れの外なので） */
 #stage .blkpad[data-id]::before,#popBlocks .blkpad[data-id]::before{
   content:"⠿";position:absolute;left:-6.4mm;top:.2em;width:5.6mm;text-align:right;
@@ -594,7 +594,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.10.5</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.11.0</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -1104,7 +1104,9 @@ const DOC_CSS = `
   font-family:"Hiragino Mincho ProN","Yu Mincho",YuMincho,"Noto Serif JP",serif;
   -webkit-print-color-adjust:exact;print-color-adjust:exact}
 .page-bg,.page-img{position:absolute;inset:0;z-index:0;pointer-events:none}
-.page-body{position:relative;z-index:1;height:100%;overflow:hidden}
+/* 高さに余白を含める。含めないと、出力したHTMLでは紙より余白ぶん高くなり、下の隅に置いた画像が紙の外へ出ていた
+   （編集画面は全体に border-box がかかっているので、もともと紙の高さだった） */
+.page-body{position:relative;z-index:1;height:100%;overflow:hidden;box-sizing:border-box}
 /* 段落は「透明な外枠 .blkpad」と「内容 .blk」の二重にしている。
    段の上端に来たブロックは margin-top がブラウザに切り詰められて余白が変わってしまうため、
    上の余白は外枠の padding で持たせている。padding は切り詰められないので、
@@ -1503,9 +1505,9 @@ input.npc-artw{width:3.4em;font-family:inherit;font-size:1em;background:#fff !im
 /* 2段組のときだけ左右に余白を入れていたが、画像の幅を mm で決めるようになったので
    その余白のぶんだけ実寸が縮んでしまう（＝段組で大きさが変わる）。余白は入れない。 */
 .page-body.cols2 > .blkpad.p-image.span:not(.free){padding-left:0;padding-right:0}
-/* 自由配置：紙面のどこにでも置ける。文字は避けないので、飾りや隅の絵に向く */
+/* 隅に置く画像：流れの外で、本文の範囲の四隅に置く */
 .blkpad.p-image.free{position:absolute;margin:0 !important;padding:0 !important;z-index:3}
-/* 自由配置の画像を文字がよけるための、見えない浮き箱 */
+/* 隅に置く画像を文字がよけるための、見えない浮き箱 */
 .imgshape{pointer-events:none;visibility:hidden}
 .blkpad.p-image.free .t-image{margin:0}
 .blkpad.p-image.free img{width:100% !important}
@@ -4176,10 +4178,10 @@ function fixBlock(nb){
     if(!nb.pos) nb.pos = (nb.fl==='l'?'left':nb.fl==='r'?'right':'inline');
     nb.fl = (nb.pos==='left'?'l':nb.pos==='right'?'r':'');
     nb.cols = (nb.pos==='left'||nb.pos==='right') ? 2 : 1;
-    nb.fx = +nb.fx||0; nb.fy = +nb.fy||0; nb.pg = Math.max(1, +nb.pg||1);
+    nb.pg = Math.max(1, +nb.pg||1);
     if(!nb.w) nb.w=70;
     nb.ar = (+nb.ar>0) ? +nb.ar : 0;                     // 縦横比（高さ÷幅）。避け枠の高さに使う
-    nb.wrap = (nb.wrap==='none') ? 'none' : 'square';    // 自由配置のとき、文字が避けるかどうか
+    delete nb.wrap;                                       // 隅に置く画像は、いつも文字が避ける
   }
   return nb;
 }
@@ -4251,6 +4253,7 @@ function normalize(d){
       out.blocks.push(nb);
     });
   }
+  out.blocks.forEach(b=>freeToCorner(b, out.padH));     // 前の版の自由配置は、いちばん近い隅へ
   if(!out.pages.length) out.pages.push(newPage(out.defCols));
   if(!out.blocks.length) out.blocks = blank().blocks;
   /* 旧データ: 技能判定・特殊ルールは「処理」1つに統合された。
@@ -5053,10 +5056,8 @@ function blockEl(b, pageCols, prevType){
   const pull = gapPull(prevType, b.type);
   if(b.type==='image' && b.pos==='free'){
     w.classList.add('free');
-    w.style.width = fnum(imgWmm(b))+'mm';
-    w.style.left = (+b.fx||0)+'mm';
-    w.style.top  = (+b.fy||0)+'mm';
-    /* 自由配置は流れの外なので、重なりの調整はしない */
+    w.style.cssText += ';'+cornerCss(b);
+    /* 隅に置く画像は流れの外なので、重なりの調整はしない */
   }
   else if(b.type==='image' && (b.fl==='l'||b.fl==='r')){
     w.style.width = fnum(imgWmm(b))+'mm';
@@ -6054,15 +6055,15 @@ function noteImgRatio(id, im){
 }
 /* 画像の大きさは、置かれた段の幅ではなく紙面を基準にする。
    段の幅を基準にすると、1段組と2段組・全幅と段の中で実際の大きさが変わってしまう。
-   行内と左右流しは「版面（本文が入る幅）」、自由配置は紙の角が基準なので「紙の幅」。 */
+   どの置き方でも「版面（本文が入る幅）」が基準。 */
 function pageBodyWmm(){ return Math.max(20, 210 - (+S.padH||16)*2); }
 function imgWmm(b){
   const pct = Math.max(1, Math.min(100, +b.w || (isFreeImg(b)?40:70)));
-  return (isFreeImg(b) ? 210 : pageBodyWmm()) * pct / 100;
+  return pageBodyWmm() * pct / 100;
 }
 function imageInnerHTML(b){
   if(!b.img) return '<div class="t-imgph">画像が未設定です（右の設定の「画像を選び直す」から選んでください）</div>';
-  /* 外枠が幅を持つ置き方（左右流し・自由配置）では、画像は枠いっぱいにする */
+  /* 外枠が幅を持つ置き方（左右流し・隅に置く）では、画像は枠いっぱいにする */
   const wst = (b.pos==='left'||b.pos==='right'||b.pos==='free'||b.fl==='l'||b.fl==='r')
     ? 'width:100%' : 'width:'+fnum(imgWmm(b))+'mm;max-width:100%';
   /* alt は属性なので素の文字のまま。目に見える説明のほうはルビを効かせる */
@@ -6101,19 +6102,41 @@ function markPageTop(body){
     return;
   }
 }
-/* 自由配置の画像は、文章の流れに入れず「そのページに直に置くもの」として扱う。
+/* 隅に置く画像は、文章の流れに入れず「そのページに直に置くもの」として扱う。
    段落の並びに影響しないので、本文を書き足してもずれない。 */
-function isFreeImg(b){ return b.type==='image' && b.pos==='free'; }
-/* 自由配置の画像を紙（A4）の中に収める。はみ出す位置は紙の端で止める。
-   高さは縦横比から出す（まだ分からないときは上端だけ守る） */
 const PAPER_W = 210, PAPER_H = 297;
-function clampFree(b){
-  const w = imgWmm(b), h = w * (+b.ar||0);
-  const r = v => Math.round(v*10)/10;
-  b.fx = r(Math.max(0, Math.min(PAPER_W - w, +b.fx||0)));
-  b.fy = r(Math.max(0, Math.min(PAPER_H - h, +b.fy||0)));
+function isFreeImg(b){ return b.type==='image' && b.pos==='free'; }
+/* 隅に置く画像（内部の名前は free のまま）。紙面の余白を除いた範囲＝本文の範囲の四隅のどれかに置く。
+   corner は 'tl' 左上・'tr' 右上・'bl' 左下・'br' 右下 */
+const CORNERS = [['tl','左上'],['tr','右上'],['bl','左下'],['br','右下']];
+function imgCorner(b){ return ['tl','tr','bl','br'].includes(b.corner) ? b.corner : 'tl'; }
+/* 説明（キャプション）があるときの、画像の下の行のおおよその高さ（mm）。文字の避け方にだけ使う */
+const CAP_H = 6;
+/* 画像の外枠の、紙の左上からの位置（mm）。下の隅は画像の高さから出す */
+function cornerXY(b){
+  const c = imgCorner(b), w = imgWmm(b), h = w*(+b.ar||0) + (String(b.cap||'').trim() ? CAP_H : 0);
+  return { x: c[1]==='l' ? S.padH : PAPER_W - S.padH - w,
+           y: c[0]==='t' ? S.padV : PAPER_H - S.padV - h, w:w, h:h };
 }
-/* 自由配置の画像は position:absolute なので、そのままでは文字がまったく避けない。
+/* 外枠の置き場所の CSS。右と下の隅は right・bottom で付けるので、説明の行があってもぴったり隅に付く */
+function cornerCss(b){
+  const c = imgCorner(b);
+  return 'width:'+fnum(imgWmm(b))+'mm;'
+    + (c[1]==='l' ? 'left:'+S.padH+'mm;' : 'right:'+S.padH+'mm;')
+    + (c[0]==='t' ? 'top:'+S.padV+'mm;' : 'bottom:'+S.padV+'mm;');
+}
+/* 前の版の「自由配置」（紙の左上からの mm で置いていた）を、いちばん近い隅に置き直す。
+   大きさの％の基準も紙の幅から本文の幅に変わったので、見た目の幅を保つよう直す */
+function freeToCorner(b, padH){
+  if(b.type!=='image' || b.pos!=='free' || ['tl','tr','bl','br'].includes(b.corner)) return;
+  const bodyW = Math.max(20, PAPER_W - (+padH||16)*2);
+  const wOld = PAPER_W * Math.max(1, Math.min(100, +b.w||40)) / 100;
+  const cx = (+b.fx||0) + wOld/2, cy = (+b.fy||0) + wOld*(+b.ar||0)/2;
+  b.corner = (cy < PAPER_H/2 ? 't' : 'b') + (cx < PAPER_W/2 ? 'l' : 'r');
+  b.w = Math.max(5, Math.min(100, Math.round(wOld / bodyW * 100)));
+  delete b.fx; delete b.fy;
+}
+/* 隅に置く画像は position:absolute なので、そのままでは文字がまったく避けない。
    Wordの「四角」に近い見え方にするため、本文の先頭に「見えない浮き箱」を差し込み、
    画像の四角ぶんだけ行を短くする。浮き箱は float なので、
    画像より上の行は全幅のまま、画像にかかる行だけが避ける。
@@ -6121,11 +6144,9 @@ function clampFree(b){
    高さは画像の縦横比から出す（読み込み時に b.ar を覚えている）。 */
 const FREE_GAP = 3;                                       // 画像と文字のあいだ（mm）
 function freeShapeHTML(b, pageCols){
-  if(String(b.wrap||'square')==='none') return '';
   const ar = +b.ar||0; if(!ar) return '';                 // 縦横比が分からないうちは何もしない
-  const pw = 210, w = imgWmm(b);          // 実際に描く幅と同じ出し方にする
-  const h  = w * ar;
-  const x0 = +b.fx||0, y0 = +b.fy||0;
+  const pw = PAPER_W, xy = cornerXY(b), w = xy.w, h = xy.h;
+  const x0 = xy.x, y0 = xy.y;
   const cl = S.padH, cr = pw - S.padH;                    // 本文の左右
   if(x0 + w <= cl || x0 >= cr) return '';                 // 版面の外なら文字は避けなくてよい
   /* 2段組では浮き箱が最初の段にしか入らず、段の流れを壊すので効かせない */
@@ -6193,7 +6214,7 @@ function firstOverflow(body){
   const bottom = cr.bottom - parseFloat(cs.paddingBottom) * scale + 1;
   const kids = body.children;
   for(let i=0;i<kids.length;i++){
-    if(kids[i].classList.contains('free')) continue;   // 自由配置は流れの外
+    if(kids[i].classList.contains('free')) continue;   // 隅に置く画像は流れの外
     const r = kids[i].getBoundingClientRect();
     if(r.right > right || r.bottom > bottom) return i;
   }
@@ -6405,7 +6426,7 @@ function srcRowHTML(b){
         + (isOnlyPopup(b)?'<span style="color:var(--muted)">　升目から指すだけ</span>':'') + '</div>';
     else if(isFreeImg(b)) inner = '<div class="srctext st-image" data-id="'+b.id+'">'
         + (b.img?'<img class="srcthumb" src="'+b.img+'" alt="">':'［画像 未設定］')
-        + '<span>P.'+Math.max(1,+b.pg||1)+'　紙面に直接置いた画像</span></div>';
+        + '<span>P.'+Math.max(1,+b.pg||1)+'　'+({tl:'左上',tr:'右上',bl:'左下',br:'右下'})[imgCorner(b)]+'に置いた画像</span></div>';
     else if(b.type==='image') inner = '<div class="srctext st-image" data-id="'+b.id+'">'
         + (b.img?'<img class="srcthumb" src="'+b.img+'" alt="">':'［画像 未設定］')
         + '<span>'+esc(String(b.cap||'').trim()||'（説明なし）')+'</span></div>';
@@ -6481,7 +6502,7 @@ function srcPageGroups(){
   const rest = S.blocks.filter(b=>!seen.has(b.id));   // 改ページなど、紙面に出ないもの
   if(rest.length) groups.push({page:null, blocks:rest});
   const fi = S.blocks.filter(isFreeImg);
-  if(fi.length) groups.push({page:null, label:'紙面に直接置いた画像', blocks:fi});
+  if(fi.length) groups.push({page:null, label:'隅に置いた画像', blocks:fi});
   return groups;
 }
 /* 新規ウィンドウの中の文章欄。開いている新規ウィンドウの内容だけを並べる */
@@ -7165,56 +7186,6 @@ function moveBlocksTo(ids, list, index){
    文字を打つ欄のカーソルを奪ってしまう（升目が「選べるのに打てない」原因だった） */
 const NPC_UI_SEL = '[data-tname],[data-btext],[data-cellkey] input,'
   + 'input,textarea,select,[data-rowadd],[data-rowdel],[data-cocfree],[data-dxbreed],[data-cbadd],[data-cbdel],[data-tprev],[data-popopen],[data-popmake],[data-npcfield],[data-npcsys],[data-npcver],[data-ccf],[data-acc],[data-emoadd],[data-emodel],[data-npcopen],[data-npcart],[data-npcartdel],[data-npcartw],[data-npctab],[data-npctabdel],[data-npctabadd],[data-pcol],.pgsel,.pagehead';
-/* 自由配置の画像は、紙面の上でつかんで動かす。離した場所のページに置き、紙の中に収める */
-let freeDrag = null;
-function syncFreeInputs(b){
-  if(propId!==b.id) return;
-  const q = k => document.querySelector('#propBody [data-p="'+k+'"]');
-  if(q('ifx')) q('ifx').value=b.fx; if(q('ify')) q('ify').value=b.fy; if(q('ipg')) q('ipg').value=b.pg;
-}
-stage.addEventListener('pointerdown', e=>{
-  if(e.button!==0 || spaceHeld) return;
-  const pad = e.target.closest('.blkpad.p-image.free[data-id]'); if(!pad) return;
-  const id = pad.dataset.id, f = findBlock(id); if(!f) return;
-  if(!sel.has(id) || sel.size>1){ sel.clear(); sel.add(id); lastPick=id; paintSel(); }
-  const r = pad.getBoundingClientRect();
-  freeDrag = {id:id, pad:pad, x:e.clientX, y:e.clientY, l0:+f.b.fx||0, t0:+f.b.fy||0, r0:r, moved:false};
-  try{ pad.setPointerCapture(e.pointerId); }catch(_){}
-  e.preventDefault(); e.stopImmediatePropagation();
-}, true);
-stage.addEventListener('pointermove', e=>{
-  if(!freeDrag) return;
-  const page = freeDrag.pad.closest('.page'); if(!page) return;
-  const k = page.getBoundingClientRect().width / PAPER_W;
-  const dx = e.clientX-freeDrag.x, dy = e.clientY-freeDrag.y;
-  if(!freeDrag.moved && Math.abs(dx)+Math.abs(dy) < 4) return;
-  if(!freeDrag.moved){ freeDrag.moved = true; document.body.classList.add('moving'); }
-  /* 動かしている間は見た目だけを動かす（離したときに位置を決めて組み直す） */
-  freeDrag.pad.style.left = (freeDrag.l0 + dx/k)+'mm';
-  freeDrag.pad.style.top  = (freeDrag.t0 + dy/k)+'mm';
-}, true);
-function endFreeDrag(e){
-  if(!freeDrag) return;
-  const d = freeDrag; freeDrag = null;
-  document.body.classList.remove('moving');
-  try{ d.pad.releasePointerCapture(e.pointerId); }catch(_){}
-  if(!d.moved) return;
-  const f = findBlock(d.id); if(!f) return;
-  const b = f.b;
-  /* 画像の真ん中が載っているページへ置く。どのページにもかからなければ、元のページの中で動かす */
-  const r = d.pad.getBoundingClientRect(), cx = (r.left+r.right)/2, cy = (r.top+r.bottom)/2;
-  let page = null;
-  stage.querySelectorAll('.page[data-pi]').forEach(pg=>{ const q=pg.getBoundingClientRect(); if(cy>=q.top && cy<=q.bottom && cx>=q.left-40 && cx<=q.right+40) page=pg; });
-  page = page || d.pad.closest('.page');
-  const q = page.getBoundingClientRect(), k = q.width / PAPER_W;
-  b.pg = (+page.dataset.pi||0)+1;
-  b.fx = (r.left - q.left)/k; b.fy = (r.top - q.top)/k;
-  clampFree(b);
-  render(); save(); syncFreeInputs(b);
-  setStatus('P.'+b.pg+' の 左から'+b.fx+'mm・上から'+b.fy+'mm に置きました','var(--ok)');
-}
-stage.addEventListener('pointerup', endFreeDrag, true);
-stage.addEventListener('pointercancel', endFreeDrag, true);
 stage.addEventListener('pointerdown', e=>{
   if(e.button!==0) return;
   /* 取っ手をつかんだときは、内容が打てる段落でも動かせる */
@@ -9490,8 +9461,7 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
     }
     if(b.type==='image'){
       if(k==='ipos'){ sel.clear(); sel.add(b.id); setImgFlow(v); propId=null; renderProps(); return; }
-      if(k==='isnap'){ sel.clear(); sel.add(b.id); imgSnap(v); propId=null; renderProps(); return; }
-      if(k==='iwrap'){ b.wrap = (v==='none') ? 'none' : 'square'; propId=null; re(); return; }
+      if(k==='icorner'){ b.corner=v; propId=null; render(); save(); setStatus(({tl:'左上',tr:'右上',bl:'左下',br:'右下'})[v]+'に置きました','var(--ok)'); return; }
       if(k==='ipick'){ imgReplaceId=b.id; document.getElementById('imgFile').click(); return; }
     }
     if(k==='addsub'){
@@ -9576,7 +9546,6 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
         b.w=n;
         const r1=body.querySelector('[data-p="iw"]'), r2=body.querySelector('[data-p="iwn"]');
         if(r1&&r1!==el) r1.value=n; if(r2&&r2!==el) r2.value=n;
-        if(isFreeImg(b)){ clampFree(b); syncFreeInputs(b); }   // 大きくして紙からはみ出したら内側へ戻す
         soft(); return; }
       if(k==='icap'){ b.cap=v; soft(); return; }
     }
@@ -9604,10 +9573,6 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
     if(np && k==='artw'){ np.artW=Math.max(15,Math.min(50,Math.round(+el.value||30))); render(); save(); return; }
     if(b.type==='image'){
       const num=k=>Math.round(+el.value||0);
-      if(k==='ifx'||k==='ify'){
-        if(k==='ifx') b.fx=num(); else b.fy=num();
-        clampFree(b); el.value = (k==='ifx' ? b.fx : b.fy);   // 紙からはみ出す値は端で止めて見せる
-        render(); save(); return; }
       if(k==='ipg'){ b.pg=Math.max(1,Math.min(Math.max(1,pageMap.length),num())); el.value=b.pg; render(); save(); return; }
       if(k==='idy'){ b.dy=num(); render(); save(); return; }
       if(k==='idx'){ b.dx=num(); render(); save(); return; }
@@ -9808,28 +9773,16 @@ function propsImage(b){
   return pRow('置き方',
       pSeg('ipos', pos, [['inline','行内'],['left','左に流す'],['right','右に流す']])
     + '<div class="row" style="margin-top:6px">'
-      + '<button data-p="ipos" data-v="free"'+(free?' class="on"':'')+'>自由配置（本文と別口）</button></div>',
-      free ? '本文の流れから外れています。書き足しても位置は動きません。' : '')
+      + '<button data-p="ipos" data-v="free"'+(free?' class="on"':'')+'>隅に置く</button></div>',
+      free ? '本文の流れから外れて、本文の範囲（紙面の余白を除いたところ）の隅に置きます。本文の文字は画像を避けます。' : '')
     + pRow('大きさ（％）',
       '<div class="row" style="align-items:center;gap:6px">'
       + '<input type="range" data-p="iw" min="5" max="100" value="'+(b.w||70)+'" style="flex:1">'
       + '<input type="number" data-p="iwn" min="1" max="100" value="'+(b.w||70)+'" style="width:64px;flex:0 0 auto"></div>')
     + (free
-        ? pRow('文字の流し方',
-            pSeg('iwrap', (b.wrap==='none'?'none':'square'), [['square','よける（四角）'],['none','重ねる']]),
-            (b.wrap==='none')
-              ? '文字は画像を避けずに、下を通ります。'
-              : ((+b.ar>0) ? '画像の四角ぶんだけ、いくつもの段落にまたがって文字が避けます。'
-                           : '画像の縦横比がまだ分かりません。一度表示されると避けるようになります。'))
-        + pRow('紙の左上からの位置（mm）',
-            '<div class="grid2"><div><span class="hint">左から</span><input type="number" data-p="ifx" value="'+(+b.fx||0)+'"></div>'
-          + '<div><span class="hint">上から</span><input type="number" data-p="ify" value="'+(+b.fy||0)+'"></div></div>'
-          + '<label class="f">どのページに置くか</label>'
-          + '<input type="number" data-p="ipg" min="1" value="'+Math.max(1,+b.pg||1)+'">'
-          + '<div class="grid2" style="margin-top:6px"><button data-p="isnap" data-v="top">上端へ</button>'
-          + '<button data-p="isnap" data-v="bottom">下端へ</button></div>'
-          + '<div class="grid2" style="margin-top:6px"><button data-p="isnap" data-v="left">左端へ</button>'
-          + '<button data-p="isnap" data-v="right">右端へ</button></div>')
+        ? pRow('置く隅',
+            '<div class="grid2">'+CORNERS.map(([c,n])=>'<button data-p="icorner" data-v="'+c+'"'+(imgCorner(b)===c?' class="on"':'')+'>'+n+'</button>').join('')+'</div>')
+        + pRow('どのページに置くか', '<input type="number" data-p="ipg" min="1" value="'+Math.max(1,+b.pg||1)+'">')
         : (pos==='left'||pos==='right')
           ? pRow('置く位置をずらす（mm）',
               '<div class="grid2"><div><span class="hint">下へ</span><input type="number" data-p="idy" value="'+(+b.dy||0)+'"></div>'
@@ -10615,44 +10568,20 @@ function setImgFlow(v){
     const b=f.b;
     const wasFree = isFreeImg(b);
     const here = (v==='free' && !wasFree) ? imgPlaceOnPaper(b.id) : null;
-    const wmm0 = imgWmm(b);                    // 切り替える前の実際の幅（mm）
     b.pos = v;
     b.fl  = (v==='left'?'l':v==='right'?'r':'');
     b.cols = (v==='left'||v==='right') ? 2 : 1;
     if(v==='free' && !wasFree){
-      /* 紙の左上の角に飛ばさず、いま画像がある場所にそのまま置く。
-         大きさの％は基準が版面から紙の幅に変わるので、見た目の幅が変わらないよう直す */
-      b.w  = Math.max(1, Math.min(100, Math.round(wmm0 / PAPER_W * 100)));
-      b.fx = here ? here.fx : S.padH;
-      b.fy = here ? here.fy : S.padV;
+      /* いま画像があるページの、いちばん近い隅に置く（大きさの％はどの置き方でも本文の幅が基準なのでそのまま） */
+      const cx = here ? here.fx + here.wmm/2 : 0, cy = here ? here.fy + here.wmm*(+b.ar||0)/2 : 0;
+      b.corner = (cy < PAPER_H/2 ? 't' : 'b') + (cx < PAPER_W/2 ? 'l' : 'r');
       b.pg = here ? here.pg : (pageOfBlock(b.id) || 1);
       b.cols=1;
-      clampFree(b);
-    }else if(wasFree && v!=='free'){
-      /* 自由配置から戻すときも、見た目の幅を保つ（基準が紙の幅から版面に戻る） */
-      b.w = Math.max(5, Math.min(100, Math.round(wmm0 / pageBodyWmm() * 100)));
     }
     n++;});
   if(!n){ setStatus('画像の段落を選んでください','#ff9b83'); return; }
   render(); save();
-  setStatus({inline:'行内に置きました',left:'左に流しました',right:'右に流しました',free:'自由配置にしました'}[v],'var(--ok)');
-}
-/* 紙面の端に寄せる。紙はA4（210×297mm）で、余白のぶんだけ内側に置く */
-function imgSnap(which){
-  const f = sel.size?findBlock([...sel][0]):null;
-  if(!f || f.b.type!=='image' || f.b.pos!=='free'){ setStatus('自由配置の画像を選んでください','#ff9b83'); return; }
-  const b=f.b;
-  /* 自由配置は紙（A4）の角が基準。幅も紙の幅に対する％で出す */
-  const PW = 210, PH = 297;
-  const imgW = imgWmm(b);
-  const el = stage.querySelector('.blk[data-id="'+b.id+'"] img');
-  const ratio = el && el.naturalWidth ? el.naturalHeight/el.naturalWidth : 1;
-  const imgH = imgW * ratio;
-  if(which==='bottom') b.fy = Math.max(0, Math.round(PH - imgH - S.padV));
-  if(which==='top')    b.fy = S.padV;
-  if(which==='right')  b.fx = Math.max(0, Math.round(PW - imgW - S.padH));
-  if(which==='left')   b.fx = S.padH;
-  render(); save(); setStatus('端に寄せました','var(--ok)');
+  setStatus({inline:'行内に置きました',left:'左に流しました',right:'右に流しました',free:'隅に置きました'}[v],'var(--ok)');
 }
 /* Wordの「文字列の折り返しの解除」にあたる。ここから下は画像の横に入らない */
 document.getElementById('imgClearFloat').onclick=()=>{
@@ -10872,7 +10801,7 @@ function blockStaticHTML(b, cols, pull, top, anchor, edit){
     const free = (b.type==='image' && b.pos==='free');
     const flc = free ? ' free' : (b.type==='image' && (b.fl==='l'||b.fl==='r')) ? ' fl-'+b.fl : '';
     const ost = free
-        ? 'width:'+fnum(imgWmm(b))+'mm;left:'+(+b.fx||0)+'mm;top:'+(+b.fy||0)+'mm;'
+        ? cornerCss(b)
         : flc
           ? 'width:'+fnum(imgWmm(b))+'mm;'+imgOffStyle(b, cols, pull)
             + (b.mt!=null?'padding-top:'+b.mt+'mm;':'')
@@ -10935,7 +10864,7 @@ function pageStaticHTML(i, withAnchor){
   }).join('');
   const freeShape = freeImgs(i).map(b=>freeShapeHTML(b, st.cols)).join('');
   const freeHTML = freeImgs(i).map(b=>
-      '<div class="blkpad p-image span free" style="width:'+fnum(imgWmm(b))+'mm;left:'+(+b.fx||0)+'mm;top:'+(+b.fy||0)+'mm">'
+      '<div class="blkpad p-image span free" style="'+cornerCss(b)+'">'
       + '<div class="blk t-image">'+imageInnerHTML(b)+'</div></div>').join('');
   return '<div class="page '+cls+'" id="p'+(i+1)+'">'
     + '<div class="page-bg '+cls+'"></div>'+img
@@ -10997,7 +10926,7 @@ function doPrint(a,b){
 
 /* ================= 閲覧HTMLの書き出し ================= */
 /* 区切りなしの1枚の本文。ページの区切り（改ページ・改段・ページ番号・2段組）を外して1本に流す。
-   自由配置の画像は位置を持てないので、そのページの頭に中央そろえで差し込む */
+   隅に置いた画像は位置を持てないので、そのページの頭に中央そろえで差し込む */
 function flowBodyHTML(idx){
   let prevType=null, topDone=false;
   return idx.map(i=>{
@@ -11737,7 +11666,7 @@ const HELP = [
 
  ['image','画像', `
 <h3>画像</h3>
-<p>大きさの％は<b>紙面が基準</b>です。行内と左右の回り込みは版面（本文が入る幅）の、自由配置は紙の幅の何％かで決まります。段組を1段と2段で切り替えても、全幅と段の中のどちらに置いても、<b>実際の大きさは変わりません</b>。</p>
+<p>大きさの％は<b>本文の幅（版面）が基準</b>です。どの置き方でも、本文が入る幅の何％かで決まります。段組を1段と2段で切り替えても、全幅と段の中のどちらに置いても、<b>実際の大きさは変わりません</b>。</p>
 <ul>
 <li>書式ツールバーの<b>図表 → 画像</b>を押すとファイルを選ぶ画面が開き、いちばん後ろに入ります。段落を選んでから押すと、その段落が画像に変わります。</li>
 <li><b>文字との並べ方</b>を選べます。Wordの「四角」と同じように、画像の横に本文が流れます。
@@ -11751,7 +11680,7 @@ const HELP = [
 <li>回り込ませているときは、<b>大きさ</b>が画像の占める幅になります（35〜45%くらいが読みやすいです）。数値は右の欄に直接打ち込めます。</li>
 <li><b>置く位置をずらす</b>で、段落の並びを無視して好きな位置に置けます。「下へ」で紙面の下の方へ、「内側へ」で紙面の中央寄りへ、mmで動かします。<b>文字は自動でよけます。</b>ページの先頭に画像を置いてから数値で動かすと、そのページの好きな場所に配置できます。</li>
 <li>ずらしが効くのは<b>1段組のページだけ</b>です。2段組では段の枠から画像がはみ出して文字と重なってしまうため、ずらしは無視されます。</li>
-<li><b>自由配置</b>にすると、段落の並びから外れて、紙の上の好きな位置に置けます（ページ数にも影響しません）。切り替えたときは、<b>いま画像がある場所と大きさのまま</b>置かれます。<b>紙面の上で画像をつかんで動かせます</b>。下や上のページまで運べば、そのページに移ります。右の設定の「紙の左上からの位置（mm）」に数値を入れたり、<b>上端へ</b>などのボタンで余白の内側にぴたりと合わせたりもできます。画像は<b>紙からはみ出さない</b>よう、端で止まります。文字は「よける（四角）」なら画像を避け、「重ねる」なら画像の下を通ります。</li>
+<li><b>隅に置く</b>にすると、段落の並びから外れて、本文の範囲（紙面の余白を除いたところ）の<b>左上・右上・左下・右下</b>のどれかにぴったり置けます。どのページに置くかは番号で選びます（切り替えたときは、画像が今あるページのいちばん近い隅になります）。本文の文字は画像の四角ぶんだけ避けます。</li>
 <li>段落パネルで<b>大きさ</b>（段の幅に対する％）と<b>説明</b>を指定できます。</li>
 <li>長辺が1600pxを超える画像は、保存できる大きさに自動で縮めてから取り込みます。</li>
 <li>他のブロックと同じく「全幅」「段の中を流す」を選べます。</li>
@@ -11822,14 +11751,10 @@ const HELP = [
 <table>
 <tr><th>行内</th><td>画像だけで一行を使います。</td></tr>
 <tr><th>左に流す／右に流す</th><td>本文の流れの中に置き、<b>そのあとに続く段落が何段落あっても</b>横に流れます。書き足しても位置は本文についていきます。</td></tr>
-<tr><th>自由配置</th><td>紙の好きな位置に固定します。本文を書き足しても動きません。紙面の上でつかんで動かせます。</td></tr>
+<tr><th>隅に置く</th><td>本文の範囲の四隅のどれかに置きます。本文を書き足しても動きません。</td></tr>
 </table>
-<p>自由配置には<b>文字の流し方</b>の設定があります。</p>
-<table>
-<tr><th>よける（四角）</th><td>Wordの「四角」と同じで、画像の四角ぶんだけ<b>いくつもの段落にまたがって</b>文字が避けます。画像より上と下の段落は全幅のままです。<b>これが既定です。</b></td></tr>
-<tr><th>重ねる</th><td>文字は避けず、画像の下を通ります。地紋や飾りを敷きたいときに。</td></tr>
-</table>
-<p>「よける」が効くのは<b>1段組のページ</b>だけです。2段組では段の流れを壊してしまうため効かせていません。2段組で回り込ませたいときは「左に流す」「右に流す」を使ってください。<br>
+<p>隅に置いた画像のまわりでは、Wordの「四角」と同じで、画像の四角ぶんだけ<b>いくつもの段落にまたがって</b>文字が避けます。画像より上と下の段落は全幅のままです。</p>
+<p>文字が避けるのは<b>1段組のページ</b>だけです。2段組では段の流れを壊してしまうため効かせていません。2段組で回り込ませたいときは「左に流す」「右に流す」を使ってください。<br>
 また、画像の縦横比が分かっていないと避ける高さを決められません。古い原稿の画像は<b>一度紙面に表示された時点で</b>縦横比を覚え、そこから避けるようになります。</p>
 <h3>ccfoliaのコマを読み込む</h3>
 <p>NPCシートを選ぶと、右の設定欄に<b>コマを読み込む</b>が出ます。ccfoliaでコマを右クリックしてコピーした文字や、キャラクターシート作成ツールの「ccfolia出力」で得た文字を、そのまま貼り付けてください。</p>
@@ -11861,7 +11786,7 @@ const HELP = [
   <li><b>区切りなしの1枚</b>：ページの区切り（改ページ・改段・ページ番号・2段組）をなくし、画面ぜんたいを1枚の紙にして、スクロールだけで読めるようにします。左の目次も紙の一部です。
     新規ウィンドウは巻末の「追記」へのリンクになります。目次や新規ウィンドウで飛んだときは、右下の<b>↩ 戻る</b>で飛ぶ前の場所へ戻れます（続けて飛んだときは1つずつさかのぼります）。
     目次ブロックに載っている見出しには<b>↑ 目次へ</b>（章の目次なら<b>↑ 章の目次へ</b>）が付き、追記の節には<b>↩ 本文へ戻る</b>が付きます。
-    自由配置の画像は、そのページの頭に中央そろえで入ります。</li>
+    隅に置いた画像は、そのページの頭に中央そろえで入ります。</li>
   </ul>どちらの形式でも、変数（<code>{HO1}</code> など）があれば左の目次の上に<b>登場人物（変数）</b>の欄が出ます。</li>
 <li>編集中の内容そのものは「保存」でJSONとして残せます。読み込めば続きから編集できます。</li>
 </ul>`]
