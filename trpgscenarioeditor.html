@@ -594,7 +594,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.11.2</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.11.3</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -609,10 +609,8 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
     <span id="topR">
     <span id="status">&#8212;</span>
     <button id="btnPrj" title="シナリオを選ぶ・新しく作る・複製する・消す">シナリオ</button>
-    <span class="seggrp">
-      <button id="btnSave" title="いまの内容をファイルに保存します（Ctrl+S）">保存</button>
-      <button id="btnOpen" title="保存したファイルを読み込みます">開く</button>
-    </span>
+    <!-- 保存したファイルを開くのは、シナリオの画面の「JSONを読み込む」で行う -->
+    <button id="btnSave" title="いまの内容をファイルに保存します（Ctrl+S）">保存</button>
     <button id="btnPrint" title="ブラウザの印刷からPDFにできます">印刷 / PDF</button>
     <button id="btnExport" title="配布用の閲覧HTMLを出力します">HTML</button>
     <button id="btnHelp" title="使い方">ヘルプ</button>
@@ -10217,7 +10215,6 @@ addEventListener('keyup', e=>{
 });
 addEventListener('blur', ()=>{ spaceHeld=false; cw.classList.remove('panready'); });
 document.getElementById('btnSave').onclick=saveToFile;
-document.getElementById('btnOpen').onclick=()=>document.getElementById('jsonFile').click();
 
 /* ---- 画像の挿入と設定 ---- */
 /* いま選んでいる画像を選び直す（無ければ新しく足す）。
@@ -11466,14 +11463,14 @@ const HELP = [
 <li>編集内容はこのブラウザに自動保存されます。打ち終えて0.7秒、打ち続けていても3秒ごとに保存します。</li>
 <li>タブを閉じたり再読み込みしたりしても、打った字は残ります。保存しきれなかった分は控えておき、次に開いたときに戻します。</li>
 <li>ツールバーの<b>保存</b>（<code>Ctrl</code>+<code>S</code>）で、ファイルに残せます。大切な原稿はこちらでも残してください。</li>
-<li>Chrome・Edge では、はじめの<b>保存</b>でファイルの置き場所を選ぶと、以後は自動保存のたびにそのファイルにも書きます。ブラウザのデータが消えても、そのファイルを<b>開く</b>で戻せます。書く許可が切れたときは、上に帯が出るので<b>再開する</b>を押してください。</li>
+<li>Chrome・Edge では、はじめの<b>保存</b>でファイルの置き場所を選ぶと、以後は自動保存のたびにそのファイルにも書きます。ブラウザのデータが消えても、そのファイルを<b>シナリオ</b>の画面の<b>JSONを読み込む</b>で戻せます。書く許可が切れたときは、上に帯が出るので<b>再開する</b>を押してください。</li>
 <li>保存に失敗すると、上に赤い帯が出て、直るまで消えません。</li>
 <li>ファイルに保存していない変更があると、ステータスに「未保存の変更あり」と出ます。</li>
-<li><b>開く</b>で読み込んだファイルは、いまのシナリオを上書きせず、新しいシナリオとして足されます。</li>
+<li>保存したファイルは、<b>シナリオ</b>の画面の<b>JSONを読み込む</b>で読み込みます。いまのシナリオを上書きせず、新しいシナリオとして足されます。</li>
 </ul>
 <h4>シナリオ</h4>
 <ul>
-<li>シナリオはいくつでもこのブラウザに置いておけます。上の<b>シナリオ</b>で一覧を出し、開く・新しく作る・複製・削除ができます。保存したJSONファイルは、一覧の下の<b>JSONを読み込む</b>（または上の<b>開く</b>）で新しいシナリオとして足せます。一覧の右下の<b>開く</b>は、一覧で選んだシナリオを開くボタンです。一覧には、最後にファイルへ保存した日時も出ます。</li>
+<li>シナリオはいくつでもこのブラウザに置いておけます。上の<b>シナリオ</b>で一覧を出し、開く・新しく作る・複製・削除ができます。保存したJSONファイルは、一覧の下の<b>JSONを読み込む</b>で新しいシナリオとして足せます。一覧の右下の<b>開く</b>は、一覧で選んだシナリオを開くボタンです。一覧には、最後にファイルへ保存した日時も出ます。</li>
 <li>起動すると一覧が出ます。最後に開いていたシナリオが選ばれているので、そのまま<b>開く</b>か <code>Enter</code> で続きから書けます。<code>↑</code> <code>↓</code> で選び直せます。</li>
 <li>同じシナリオは1つのタブでしか開けません。ほかのタブで開いているシナリオには「別のタブで編集中」と出ます。</li>
 <li><b>過去の版</b>：シナリオごとに、開いたとき・書いているあいだ10分ごと・「全部消して最初から」の直前の姿を、10個まで残します。戻すと新しいシナリオになり、いまのシナリオはそのまま残ります。</li>
@@ -12352,7 +12349,7 @@ document.getElementById('prjList').addEventListener('dblclick', e=>{
 });
 document.getElementById('prjOpenBtn').onclick=prjDlgOpenPick;
 document.getElementById('prjNew').onclick=async()=>{ await prjNew(null); prjDlgHide(); };
-/* 一覧の「開く」は選んだシナリオを開くもの。JSON の読み込みはこちらで、上の帯の「開く」と同じ処理を通す */
+/* 一覧の「開く」は選んだシナリオを開くもの。保存したJSONの読み込みはこちらのボタンで行う */
 document.getElementById('prjImport').onclick=()=>document.getElementById('jsonFile').click();
 document.getElementById('prjDup').onclick=async()=>{
   if(!prjPick) return;
