@@ -599,7 +599,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.13.1</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.13.2</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -2069,10 +2069,11 @@ const BGS = [ {k:'none',n:'無地'}, {k:'bg-grid5',n:'方眼'}, {k:'bg-dot5',n:'
 /* ================= 紙の色 =================
    色の作り方・呼び名・コントラスト比は、同じ作者の Patternplate（ベクターパターンの道具）から移したもの。
    本文の文字（#23201c）が読めるよう、紙の色は文字とのコントラスト比 7:1（WCAG の AAA）を下回らないようにする */
-const PAPER_DEF = '#f7f3ea';                 // 紙の色を決めていないときの色（生成り）
+const PAPER_DEF = '#f7f3ea';                 // 紙の色を決めていないときの色（オフホワイト）
 const INK = '#23201c';
-const PAPERS = [['#f7f3ea','生成り'],['#fbfbf8','白'],['#f6f0dc','象牙'],['#f1e8d8','砂'],['#f8ece9','桜'],
-  ['#eef2e2','若草'],['#e9f0f3','空'],['#efecf4','藤'],['#eeeeec','灰'],['#e6e4df','薄墨']];
+/* 名前は情緒的な和名ではなく、色に近い一般的な名前にする */
+const PAPERS = [['#f7f3ea','オフホワイト'],['#fbfbf8','白'],['#f6f0dc','クリーム'],['#f1e8d8','ベージュ'],['#f8ece9','薄いピンク'],
+  ['#eef2e2','薄い黄緑'],['#e9f0f3','薄い水色'],['#efecf4','薄い紫'],['#eeeeec','薄いグレー'],['#e6e4df','グレー']];
 /* ムード（Patternplate の MOODS のうち、地色が明るいものだけ。暗い地色は本文の黒が読めなくなるので使わない） */
 const PAPER_MOODS = {
   dreamy :{ja:'ドリーミー',  hue:null,      S:34, L:94},
@@ -2101,16 +2102,25 @@ function lum(hex){ const f=v=>{ v/=255; return v<=.03928 ? v/12.92 : Math.pow((v
   const [r,g,b]=hex2rgb(hex); return .2126*f(r)+.7152*f(g)+.0722*f(b); }
 function contrastRatio(a,b){ const x=lum(a), y=lum(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); }
 function grade(r){ return r>=7?'AAA':r>=4.5?'AA':r>=3?'A':'—'; }
-/* 色の呼び名（Patternplate の colorName）。色相と明るさから短い名前を当てる */
-const HUE_NAMES=[[15,'ROSE'],[32,'EMBER'],[45,'AMBER'],[62,'STRAW'],[85,'MOSS'],[120,'FERN'],
-  [160,'JADE'],[185,'LAGOON'],[205,'TIDE'],[228,'IBIS'],[252,'INDIGO'],[280,'IRIS'],
-  [310,'ORCHID'],[338,'PLUM'],[360,'ROSE']];
-const TONE_NAMES=[[14,'NIGHT'],[28,'DEEP'],[42,'TEA'],[56,'CLAY'],[70,'HAZE'],[84,'RICE'],[93,'MIST'],[101,'FROST']];
-function colorName(hex){
-  const [h,sa,l]=rgb2hsl.apply(null,hex2rgb(hex));
-  const a=(HUE_NAMES.find(x=>h<=x[0])||HUE_NAMES[0])[1];
-  const b=(TONE_NAMES.find(x=>l<=x[0])||TONE_NAMES[TONE_NAMES.length-1])[1];
-  return sa<10 ? 'ASH '+b : a+' '+b;
+/* 色の一般的な名前。色合い（色相）・鮮やかさ・明るさから当てる（おまかせや自由に選んだ色に使う）。
+   鮮やかさは HSL の彩度ではなく、いちばん強い光といちばん弱い光の差（chroma）で見る。
+   白に近い色は HSL の彩度が大きく出て、ほとんど色味のない色まで「色あり」に見えてしまうため */
+function generalColorName(hex){
+  const [r,g,b] = hex2rgb(hex), [h,,l] = rgb2hsl(r,g,b);
+  const chroma = (Math.max(r,g,b) - Math.min(r,g,b)) / 255 * 100;
+  if(chroma < 3) return l>=96 ? '白' : l>=85 ? '薄いグレー' : l>=45 ? 'グレー' : l>=20 ? '濃いグレー' : '黒';
+  let n;
+  if(h < 15 || h >= 345) n = l>=65 ? 'ピンク' : '赤';
+  else if(h < 40)  n = (l>=85 && chroma<15) ? 'ベージュ' : 'オレンジ';
+  else if(h < 65)  n = (l>=85 && chroma<20) ? 'クリーム' : '黄色';
+  else if(h < 100) n = '黄緑';
+  else if(h < 160) n = '緑';
+  else if(h < 200) n = l>=70 ? '水色' : '青緑';
+  else if(h < 250) n = l>=75 ? '水色' : '青';
+  else if(h < 290) n = '紫';
+  else n = l>=65 ? 'ピンク' : '赤紫';
+  /* 淡い色には「薄い」を付ける（ベージュ・クリームは名前そのものが淡い色） */
+  return (l>=88 && n!=='ベージュ' && n!=='クリーム') ? '薄い'+n : n;
 }
 /* 文字とのコントラスト比が 7:1 を下回る色は、色合いはそのままで 7:1 になるところまで明るくする */
 function readablePaper(hex){
@@ -2127,7 +2137,7 @@ function paperFromMood(key){
   const h = M.hue ? M.hue[0] + R()*(M.hue[1]-M.hue[0]) : R()*360;
   return readablePaper(hsl2hex(h, M.S, M.L + (R()-.5)*4));
 }
-function paperName(hex){ const f=PAPERS.find(x=>x[0]===hex); return (f?f[1]+'・':'')+colorName(hex); }
+function paperName(hex){ const f=PAPERS.find(x=>x[0]===hex); return f ? f[1] : generalColorName(hex); }
 /* その紙の色（決めていなければ ''） */
 function pageColor(st){ const c=st && st.bg && st.bg.color; return /^#[0-9a-f]{6}$/i.test(String(c||'')) ? c : ''; }
 function paperVar(st){ const c=pageColor(st); return c ? ';--paper:'+c : ''; }
@@ -10145,7 +10155,7 @@ const bgWrap=document.getElementById('bgPresets');
 /* 画像を挿入するのは書式ツールバーの「画像」なので、ここでは柄だけを選ぶ。
    前の版で敷いた画像は、そのまま出す（「背景を外す」で外せる） */
 let bgPick='none';
-let colorPick='';                 // 紙の色（'' は決めていない＝生成り）
+let colorPick='';                 // 紙の色（'' は決めていない＝オフホワイト）
 /* 柄のボタン。縮めた見本はどれも同じに見えて役に立たないので、名前だけのボタンにする */
 function buildBgSwatches(){
   bgWrap.innerHTML=BGS.map(b=>'<button data-bg="'+b.k+'"'+(b.k===bgPick?' class="on"':'')+'>'+b.n+'</button>').join('');
@@ -10155,9 +10165,9 @@ buildBgSwatches();
 function buildPaperUI(){
   const box=document.getElementById('paperChips'); if(!box) return;
   const cur = colorPick || PAPER_DEF;
-  box.innerHTML = PAPERS.map(([c,n])=>'<button data-pc="'+c+'" title="'+n+'（'+colorName(c)+'）"'+(c===cur?' class="on"':'')+'><i style="background:'+c+'"></i>'+n+'</button>').join('');
+  box.innerHTML = PAPERS.map(([c,n])=>'<button data-pc="'+c+'" title="'+n+'（'+c+'）"'+(c===cur?' class="on"':'')+'><i style="background:'+c+'"></i>'+n+'</button>').join('');
   const r = contrastRatio(cur, INK);
-  document.getElementById('paperInfo').textContent = paperName(cur)+'　文字とのコントラスト比 '+r.toFixed(1)+':1（'+grade(r)+'）';
+  document.getElementById('paperInfo').textContent = paperName(cur)+'（'+cur+'）　文字とのコントラスト比 '+r.toFixed(1)+':1（'+grade(r)+'）';
   document.getElementById('paperPick').value = cur;
 }
 (function initPaperUI(){
@@ -11694,8 +11704,8 @@ const HELP = [
 <h4>背景の柄</h4>
 <p>ドキュメント設定の<b>背景</b>で、「対象のページ」で選んだページに柄を付けられます。<b>無地・方眼・ドット・古紙・和紙・飾り枠・四隅の飾り・上下の帯</b>の8つです。読みやすさのため、本文の下にかかる柄はどれもごく薄く（文字とのコントラスト比 7:1 以上）、枠・四隅・帯の飾りは紙面の余白の中だけに置きます（余白を狭くすると飾りも小さくなります）。</p>
 <h4>紙の色</h4>
-<p>ドキュメント設定の背景の<b>紙の色</b>で、ページごとに紙の色を変えられます。色のボタン（生成り・白・象牙・砂・桜・若草・空・藤・灰・薄墨）から選ぶか、雰囲気（ドリーミー・シャーベット・サンセット・アース・ワントーン）を選んで<b>おまかせ</b>を押すと淡い色を作ります。右の色の欄では好きな色も選べます。選んだ色の呼び名と、文字とのコントラスト比が下に出ます。柄と同じく「対象のページ」を選んで<b>選択ページに適用</b>を押します（対象のページを選ぶと、柄と紙の色のボタンはそのページの今の状態になるので、色だけ変えても柄はそのままです）。</p>
-<p>本文が読みにくくならないよう、紙の色は文字とのコントラスト比が <b>7:1（WCAG の AAA）</b>を下回らないようにしてあります。濃い色を選ぶと、色合いはそのままで読める明るさまで自動で明るくします。色の作り方と呼び名は、同じ作者の Patternplate から移したものです。</p>
+<p>ドキュメント設定の背景の<b>紙の色</b>で、ページごとに紙の色を変えられます。色のボタン（オフホワイト・白・クリーム・ベージュ・薄いピンク・薄い黄緑・薄い水色・薄い紫・薄いグレー・グレー）から選ぶか、雰囲気（ドリーミー・シャーベット・サンセット・アース・ワントーン）を選んで<b>おまかせ</b>を押すと淡い色を作ります。右の色の欄では好きな色も選べます。選んだ色の一般的な名前（例：薄いピンク）と色の番号、文字とのコントラスト比が下に出ます。柄と同じく「対象のページ」を選んで<b>選択ページに適用</b>を押します（対象のページを選ぶと、柄と紙の色のボタンはそのページの今の状態になるので、色だけ変えても柄はそのままです）。</p>
+<p>本文が読みにくくならないよう、紙の色は文字とのコントラスト比が <b>7:1（WCAG の AAA）</b>を下回らないようにしてあります。濃い色を選ぶと、色合いはそのままで読める明るさまで自動で明るくします。色の作り方とコントラスト比の計算は、同じ作者の Patternplate から移したものです。</p>
 <p>区切りなしで出力したときは、ページごとの紙の色を<b>上から順にグラデーションでつなぎます</b>。各ページの中ほどでそのページの色そのものになり、あいだは前後の色が混ざります。どのページも同じ色なら、その一色になります。</p>
 <p>区切りなしで出力したときは、出力するページで<b>いちばん多く使っている柄</b>を画面全体に使います。古紙と四隅の飾りは画面のふちに付いてスクロールしても動かず、飾り枠は本文の欄を囲み、上下の帯は文書のいちばん上と下に出ます。四隅の飾りは、文字にかかる狭い画面では出しません。</p>
 <h4>ブロックの置き方</h4>
