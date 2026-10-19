@@ -542,7 +542,8 @@ button.pop-btn.pop-miss{background:#a8331f;opacity:.75}
 #stage .blkpad[data-id],#popBlocks .blkpad[data-id]{position:relative}
 /* ただし自由配置の画像は紙面に直に置くもの。上の規則が勝つと流れの中に置かれてしまい、
    編集画面だけ画像が下へずれていた（出力したHTMLと、文字が避ける場所は正しかった） */
-#stage .blkpad.p-image.free[data-id]{position:absolute}
+#stage .blkpad.p-image.free[data-id]{position:absolute;cursor:move;touch-action:none}
+#stage .blkpad.p-image.free[data-id]::before{display:none}  /* 段落の並べ替えの取っ手は使わない（流れの外なので） */
 #stage .blkpad[data-id]::before,#popBlocks .blkpad[data-id]::before{
   content:"⠿";position:absolute;left:-6.4mm;top:.2em;width:5.6mm;text-align:right;
   color:rgba(35,32,28,.30);font-size:.95em;line-height:1.2;cursor:grab;opacity:0;
@@ -593,7 +594,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.10.3</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.10.4</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -6103,6 +6104,15 @@ function markPageTop(body){
 /* 自由配置の画像は、文章の流れに入れず「そのページに直に置くもの」として扱う。
    段落の並びに影響しないので、本文を書き足してもずれない。 */
 function isFreeImg(b){ return b.type==='image' && b.pos==='free'; }
+/* 自由配置の画像を紙（A4）の中に収める。はみ出す位置は紙の端で止める。
+   高さは縦横比から出す（まだ分からないときは上端だけ守る） */
+const PAPER_W = 210, PAPER_H = 297;
+function clampFree(b){
+  const w = imgWmm(b), h = w * (+b.ar||0);
+  const r = v => Math.round(v*10)/10;
+  b.fx = r(Math.max(0, Math.min(PAPER_W - w, +b.fx||0)));
+  b.fy = r(Math.max(0, Math.min(PAPER_H - h, +b.fy||0)));
+}
 /* 自由配置の画像は position:absolute なので、そのままでは文字がまったく避けない。
    Wordの「四角」に近い見え方にするため、本文の先頭に「見えない浮き箱」を差し込み、
    画像の四角ぶんだけ行を短くする。浮き箱は float なので、
@@ -7155,6 +7165,56 @@ function moveBlocksTo(ids, list, index){
    文字を打つ欄のカーソルを奪ってしまう（升目が「選べるのに打てない」原因だった） */
 const NPC_UI_SEL = '[data-tname],[data-btext],[data-cellkey] input,'
   + 'input,textarea,select,[data-rowadd],[data-rowdel],[data-cocfree],[data-dxbreed],[data-cbadd],[data-cbdel],[data-tprev],[data-popopen],[data-popmake],[data-npcfield],[data-npcsys],[data-npcver],[data-ccf],[data-acc],[data-emoadd],[data-emodel],[data-npcopen],[data-npcart],[data-npcartdel],[data-npcartw],[data-npctab],[data-npctabdel],[data-npctabadd],[data-pcol],.pgsel,.pagehead';
+/* 自由配置の画像は、紙面の上でつかんで動かす。離した場所のページに置き、紙の中に収める */
+let freeDrag = null;
+function syncFreeInputs(b){
+  if(propId!==b.id) return;
+  const q = k => document.querySelector('#propBody [data-p="'+k+'"]');
+  if(q('ifx')) q('ifx').value=b.fx; if(q('ify')) q('ify').value=b.fy; if(q('ipg')) q('ipg').value=b.pg;
+}
+stage.addEventListener('pointerdown', e=>{
+  if(e.button!==0 || spaceHeld) return;
+  const pad = e.target.closest('.blkpad.p-image.free[data-id]'); if(!pad) return;
+  const id = pad.dataset.id, f = findBlock(id); if(!f) return;
+  if(!sel.has(id) || sel.size>1){ sel.clear(); sel.add(id); lastPick=id; paintSel(); }
+  const r = pad.getBoundingClientRect();
+  freeDrag = {id:id, pad:pad, x:e.clientX, y:e.clientY, l0:+f.b.fx||0, t0:+f.b.fy||0, r0:r, moved:false};
+  try{ pad.setPointerCapture(e.pointerId); }catch(_){}
+  e.preventDefault(); e.stopImmediatePropagation();
+}, true);
+stage.addEventListener('pointermove', e=>{
+  if(!freeDrag) return;
+  const page = freeDrag.pad.closest('.page'); if(!page) return;
+  const k = page.getBoundingClientRect().width / PAPER_W;
+  const dx = e.clientX-freeDrag.x, dy = e.clientY-freeDrag.y;
+  if(!freeDrag.moved && Math.abs(dx)+Math.abs(dy) < 4) return;
+  if(!freeDrag.moved){ freeDrag.moved = true; document.body.classList.add('moving'); }
+  /* 動かしている間は見た目だけを動かす（離したときに位置を決めて組み直す） */
+  freeDrag.pad.style.left = (freeDrag.l0 + dx/k)+'mm';
+  freeDrag.pad.style.top  = (freeDrag.t0 + dy/k)+'mm';
+}, true);
+function endFreeDrag(e){
+  if(!freeDrag) return;
+  const d = freeDrag; freeDrag = null;
+  document.body.classList.remove('moving');
+  try{ d.pad.releasePointerCapture(e.pointerId); }catch(_){}
+  if(!d.moved) return;
+  const f = findBlock(d.id); if(!f) return;
+  const b = f.b;
+  /* 画像の真ん中が載っているページへ置く。どのページにもかからなければ、元のページの中で動かす */
+  const r = d.pad.getBoundingClientRect(), cx = (r.left+r.right)/2, cy = (r.top+r.bottom)/2;
+  let page = null;
+  stage.querySelectorAll('.page[data-pi]').forEach(pg=>{ const q=pg.getBoundingClientRect(); if(cy>=q.top && cy<=q.bottom && cx>=q.left-40 && cx<=q.right+40) page=pg; });
+  page = page || d.pad.closest('.page');
+  const q = page.getBoundingClientRect(), k = q.width / PAPER_W;
+  b.pg = (+page.dataset.pi||0)+1;
+  b.fx = (r.left - q.left)/k; b.fy = (r.top - q.top)/k;
+  clampFree(b);
+  render(); save(); syncFreeInputs(b);
+  setStatus('P.'+b.pg+' の 左から'+b.fx+'mm・上から'+b.fy+'mm に置きました','var(--ok)');
+}
+stage.addEventListener('pointerup', endFreeDrag, true);
+stage.addEventListener('pointercancel', endFreeDrag, true);
 stage.addEventListener('pointerdown', e=>{
   if(e.button!==0) return;
   /* 取っ手をつかんだときは、内容が打てる段落でも動かせる */
@@ -9516,6 +9576,7 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
         b.w=n;
         const r1=body.querySelector('[data-p="iw"]'), r2=body.querySelector('[data-p="iwn"]');
         if(r1&&r1!==el) r1.value=n; if(r2&&r2!==el) r2.value=n;
+        if(isFreeImg(b)){ clampFree(b); syncFreeInputs(b); }   // 大きくして紙からはみ出したら内側へ戻す
         soft(); return; }
       if(k==='icap'){ b.cap=v; soft(); return; }
     }
@@ -9543,8 +9604,10 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
     if(np && k==='artw'){ np.artW=Math.max(15,Math.min(50,Math.round(+el.value||30))); render(); save(); return; }
     if(b.type==='image'){
       const num=k=>Math.round(+el.value||0);
-      if(k==='ifx'){ b.fx=num(); render(); save(); return; }
-      if(k==='ify'){ b.fy=num(); render(); save(); return; }
+      if(k==='ifx'||k==='ify'){
+        if(k==='ifx') b.fx=num(); else b.fy=num();
+        clampFree(b); el.value = (k==='ifx' ? b.fx : b.fy);   // 紙からはみ出す値は端で止めて見せる
+        render(); save(); return; }
       if(k==='ipg'){ b.pg=Math.max(1,Math.min(Math.max(1,pageMap.length),num())); el.value=b.pg; render(); save(); return; }
       if(k==='idy'){ b.dy=num(); render(); save(); return; }
       if(k==='idx'){ b.dx=num(); render(); save(); return; }
@@ -10536,17 +10599,38 @@ function insertRichMark(mark, label, blk){
 
 document.getElementById('indIn').onclick =()=>setIndent(1);
 document.getElementById('indOut').onclick=()=>setIndent(-1);
+/* 紙面に描かれている画像の、紙の左上からの位置（mm）とページ。見つからなければ null */
+function imgPlaceOnPaper(id){
+  const pad = stage.querySelector('.blkpad[data-id="'+id+'"]') || (stage.querySelector('.blk[data-id="'+id+'"]')||{}).parentElement;
+  if(!pad || !pad.closest) return null;
+  const page = pad.closest('.page'); if(!page) return null;
+  const img = pad.querySelector('img') || pad;
+  const pr = page.getBoundingClientRect(), r = img.getBoundingClientRect();
+  const k = pr.width / PAPER_W;                              // 1mm が画面で何px か（拡大率込み）
+  return { fx:(r.left-pr.left)/k, fy:(r.top-pr.top)/k, pg:(+page.dataset.pi||0)+1, wmm:r.width/k };
+}
 function setImgFlow(v){
   let n=0;
   sel.forEach(id=>{const f=findBlock(id); if(!f || f.b.type!=='image') return;
     const b=f.b;
+    const wasFree = isFreeImg(b);
+    const here = (v==='free' && !wasFree) ? imgPlaceOnPaper(b.id) : null;
+    const wmm0 = imgWmm(b);                    // 切り替える前の実際の幅（mm）
     b.pos = v;
     b.fl  = (v==='left'?'l':v==='right'?'r':'');
     b.cols = (v==='left'||v==='right') ? 2 : 1;
-    if(v==='free'){
-      if(b.fx==null) b.fx=0; if(b.fy==null) b.fy=0;
-      if(!b.pg) b.pg = pageOfBlock(b.id) || 1;   // いま載っているページを引き継ぐ
+    if(v==='free' && !wasFree){
+      /* 紙の左上の角に飛ばさず、いま画像がある場所にそのまま置く。
+         大きさの％は基準が版面から紙の幅に変わるので、見た目の幅が変わらないよう直す */
+      b.w  = Math.max(1, Math.min(100, Math.round(wmm0 / PAPER_W * 100)));
+      b.fx = here ? here.fx : S.padH;
+      b.fy = here ? here.fy : S.padV;
+      b.pg = here ? here.pg : (pageOfBlock(b.id) || 1);
       b.cols=1;
+      clampFree(b);
+    }else if(wasFree && v!=='free'){
+      /* 自由配置から戻すときも、見た目の幅を保つ（基準が紙の幅から版面に戻る） */
+      b.w = Math.max(5, Math.min(100, Math.round(wmm0 / pageBodyWmm() * 100)));
     }
     n++;});
   if(!n){ setStatus('画像の段落を選んでください','#ff9b83'); return; }
@@ -11655,7 +11739,7 @@ const HELP = [
 <li>回り込ませているときは、<b>大きさ</b>が画像の占める幅になります（35〜45%くらいが読みやすいです）。数値は右の欄に直接打ち込めます。</li>
 <li><b>置く位置をずらす</b>で、段落の並びを無視して好きな位置に置けます。「下へ」で紙面の下の方へ、「内側へ」で紙面の中央寄りへ、mmで動かします。<b>文字は自動でよけます。</b>ページの先頭に画像を置いてから数値で動かすと、そのページの好きな場所に配置できます。</li>
 <li>ずらしが効くのは<b>1段組のページだけ</b>です。2段組では段の枠から画像がはみ出して文字と重なってしまうため、ずらしは無視されます。</li>
-<li><b>自由配置</b>にすると、紙の左上からの距離（mm）で好きな位置に置けます。段落の並びから完全に外れるので、ページ数にも影響しません。<b>下端に寄せる</b>などのボタンで、紙の余白の内側にぴたりと合わせられます。ただし<b>文字は避けません</b>（重ねて置く用です）。文字によけてほしいときは「左に流す」「右に流す」を使ってください。</li>
+<li><b>自由配置</b>にすると、段落の並びから外れて、紙の上の好きな位置に置けます（ページ数にも影響しません）。切り替えたときは、<b>いま画像がある場所と大きさのまま</b>置かれます。<b>紙面の上で画像をつかんで動かせます</b>。下や上のページまで運べば、そのページに移ります。右の設定の「紙の左上からの位置（mm）」に数値を入れたり、<b>上端へ</b>などのボタンで余白の内側にぴたりと合わせたりもできます。画像は<b>紙からはみ出さない</b>よう、端で止まります。文字は「よける（四角）」なら画像を避け、「重ねる」なら画像の下を通ります。</li>
 <li>段落パネルで<b>大きさ</b>（段の幅に対する％）と<b>説明</b>を指定できます。</li>
 <li>長辺が1600pxを超える画像は、保存できる大きさに自動で縮めてから取り込みます。</li>
 <li>他のブロックと同じく「全幅」「段の中を流す」を選べます。</li>
@@ -11726,7 +11810,7 @@ const HELP = [
 <table>
 <tr><th>行内</th><td>画像だけで一行を使います。</td></tr>
 <tr><th>左に流す／右に流す</th><td>本文の流れの中に置き、<b>そのあとに続く段落が何段落あっても</b>横に流れます。書き足しても位置は本文についていきます。</td></tr>
-<tr><th>自由配置</th><td>紙の好きな位置に固定します。本文を書き足しても動きません。</td></tr>
+<tr><th>自由配置</th><td>紙の好きな位置に固定します。本文を書き足しても動きません。紙面の上でつかんで動かせます。</td></tr>
 </table>
 <p>自由配置には<b>文字の流し方</b>の設定があります。</p>
 <table>
