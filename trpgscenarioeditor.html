@@ -594,7 +594,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.11.3</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.12.0</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -1456,6 +1456,27 @@ input.npc-artw{width:3.4em;font-family:inherit;font-size:1em;background:#fff !im
 }
 
 /* 背景の柄 */
+/* 背景の柄（v3.12）。読みやすさのため、本文の下は薄く（文字とのコントラスト比 7:1 以上）、
+   飾り（枠・四隅・帯）は紙面の余白の中だけに置く。余白の大きさは .page の --mv（上下）・--mh（左右）で受け取る。
+   .page にも同じ名前の印が付くので、柄は .page-bg のほうにだけ描く */
+.page-bg.bg-grid5{background-image:linear-gradient(rgba(35,32,28,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(35,32,28,.06) 1px,transparent 1px);background-size:5mm 5mm}
+.page-bg.bg-dot5{background-image:radial-gradient(rgba(35,32,28,.16) .55px,transparent .8px);background-size:5mm 5mm}
+.page-bg.bg-aged{background:radial-gradient(110% 80% at 50% 48%,transparent 50%,rgba(120,88,40,.34) 100%)}
+.page-bg.bg-washi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.06' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.37  0 0 0 0 0.25  0 0 0 0.06 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");background-size:240px 240px}
+/* 飾り枠：外側の細い罫と、内側のさらに細い罫。ページ番号（下から7mm）より外に置く */
+.page-bg.bg-frame::before{content:"";position:absolute;inset:calc(min(4mm,var(--mv,18mm)*.45)) calc(min(4mm,var(--mh,16mm)*.45));
+  border:1px solid rgba(122,91,50,.55);box-shadow:inset 0 0 0 2px var(--paper,#f7f3ea),inset 0 0 0 2.5px rgba(122,91,50,.35)}
+.page-bg.bg-corner{--cs:calc(min(11mm,min(var(--mv,18mm),var(--mh,16mm))*.75));--co:calc(min(3mm,min(var(--mv,18mm),var(--mh,16mm))*.2));
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg transform=''%3E%3Cpath d='M3 30 V3 H30' fill='none' stroke='%237a5b32' stroke-opacity='.6' stroke-width='1.1'/%3E%3Cpath d='M7 22 C7 12 11 7 21 7' fill='none' stroke='%237a5b32' stroke-opacity='.5' stroke-width='.8'/%3E%3Ccircle cx='3' cy='3' r='2' fill='%237a5b32' fill-opacity='.55'/%3E%3Cpath d='M10 16 q4 -6 10 -6' fill='none' stroke='%23a8331f' stroke-opacity='.45' stroke-width='.7'/%3E%3C/g%3E%3C/svg%3E"),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg transform='translate(40 0) scale(-1 1)'%3E%3Cpath d='M3 30 V3 H30' fill='none' stroke='%237a5b32' stroke-opacity='.6' stroke-width='1.1'/%3E%3Cpath d='M7 22 C7 12 11 7 21 7' fill='none' stroke='%237a5b32' stroke-opacity='.5' stroke-width='.8'/%3E%3Ccircle cx='3' cy='3' r='2' fill='%237a5b32' fill-opacity='.55'/%3E%3Cpath d='M10 16 q4 -6 10 -6' fill='none' stroke='%23a8331f' stroke-opacity='.45' stroke-width='.7'/%3E%3C/g%3E%3C/svg%3E"),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg transform='translate(0 40) scale(1 -1)'%3E%3Cpath d='M3 30 V3 H30' fill='none' stroke='%237a5b32' stroke-opacity='.6' stroke-width='1.1'/%3E%3Cpath d='M7 22 C7 12 11 7 21 7' fill='none' stroke='%237a5b32' stroke-opacity='.5' stroke-width='.8'/%3E%3Ccircle cx='3' cy='3' r='2' fill='%237a5b32' fill-opacity='.55'/%3E%3Cpath d='M10 16 q4 -6 10 -6' fill='none' stroke='%23a8331f' stroke-opacity='.45' stroke-width='.7'/%3E%3C/g%3E%3C/svg%3E"),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg transform='translate(40 40) scale(-1 -1)'%3E%3Cpath d='M3 30 V3 H30' fill='none' stroke='%237a5b32' stroke-opacity='.6' stroke-width='1.1'/%3E%3Cpath d='M7 22 C7 12 11 7 21 7' fill='none' stroke='%237a5b32' stroke-opacity='.5' stroke-width='.8'/%3E%3Ccircle cx='3' cy='3' r='2' fill='%237a5b32' fill-opacity='.55'/%3E%3Cpath d='M10 16 q4 -6 10 -6' fill='none' stroke='%23a8331f' stroke-opacity='.45' stroke-width='.7'/%3E%3C/g%3E%3C/svg%3E");background-repeat:no-repeat;background-size:var(--cs) var(--cs);
+  background-position:left var(--co) top var(--co),right var(--co) top var(--co),left var(--co) bottom var(--co),right var(--co) bottom var(--co)}
+/* 上下の帯：紙の上端と下端に黒い帯と赤い細線。地は薄い灰色 */
+.page.bg-band2{--paper:#f1efea}
+.page-bg.bg-band2{--bh:calc(min(5mm,var(--mv,18mm)*.3));background:
+  linear-gradient(rgba(35,32,28,.85),rgba(35,32,28,.85)) left top/100% var(--bh) no-repeat,
+  linear-gradient(rgba(168,51,31,.6),rgba(168,51,31,.6)) left 0 top calc(var(--bh) + .8mm)/100% .3mm no-repeat,
+  linear-gradient(rgba(35,32,28,.85),rgba(35,32,28,.85)) left bottom/100% var(--bh) no-repeat,
+  linear-gradient(rgba(168,51,31,.6),rgba(168,51,31,.6)) left 0 bottom calc(var(--bh) + .8mm)/100% .3mm no-repeat,
+  #f1efea}
 .bg-grid{background-image:linear-gradient(rgba(35,32,28,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(35,32,28,.10) 1px,transparent 1px);background-size:5mm 5mm}
 .bg-rule{background-image:linear-gradient(rgba(35,32,28,.13) 1px,transparent 1px);background-size:100% 8mm}
 .bg-dot{background-image:radial-gradient(rgba(35,32,28,.18) 1px,transparent 1.2px);background-size:4mm 4mm}
@@ -2029,7 +2050,12 @@ const SPACE_CSS = Object.keys(SPACE).map(k=>
 document.getElementById('doccss').textContent = DOC_CSS + '\n' + SPACE_CSS;
 const TYPE_NAME = k => (TYPES.find(t=>t.k===k)||{n:k}).n;
 /* 柄は文字の読みやすさを損なうので、無地だけにしている */
-const BGS = [ {k:'none',n:'無地'} ];
+/* k はそのまま紙に付ける印（class）の名前 */
+const BGS = [ {k:'none',n:'無地'}, {k:'bg-grid5',n:'方眼'}, {k:'bg-dot5',n:'ドット'}, {k:'bg-aged',n:'古紙'},
+  {k:'bg-washi',n:'和紙'}, {k:'bg-frame',n:'飾り枠'}, {k:'bg-corner',n:'四隅の飾り'}, {k:'bg-band2',n:'上下の帯'} ];
+/* 紙の余白の大きさ。背景の飾りを余白の中に収めるのに使う */
+function padVars(){ const v = (typeof S!=='undefined' && S) ? S : {padV:18, padH:16};   // 読み込む前は既定の余白
+  return '--mv:'+v.padV+'mm;--mh:'+v.padH+'mm'; }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 /* ================= ルビ =================
    青空文庫の注記にならう。ただし親文字の自動判定は使わず、｜を必須にしている。
@@ -6193,7 +6219,7 @@ function makePage(i){
     + '<label><input type="checkbox" class="pgsel" data-pi="'+i+'"'+(pgSel.has(st.id)?' checked':'')+'> 選択</label>'
     + '<span class="sp"></span><span>'+(st.cols===2?'2段組':'1段組')+'</span>'
     + '<button data-pcol="'+i+'">段組を切替</button></div>'
-    + '<div class="page pv '+cls+'" data-pi="'+i+'">'
+    + '<div class="page pv '+cls+'" data-pi="'+i+'" style="'+padVars()+'">'
       + '<div class="page-bg '+cls+'"></div>'+img
       + '<div class="page-body'+(st.cols===2?' cols2':'')+'" style="padding:'+S.padV+'mm '+S.padH+'mm;font-size:'+S.base+'pt"></div>'
       + footHTML(i)
@@ -10038,9 +10064,12 @@ document.getElementById('tocMake').onclick=()=>{
 
 /* ================= ページ（段組と背景） ================= */
 const bgWrap=document.getElementById('bgPresets');
-bgWrap.innerHTML=BGS.map(b=>'<button class="swatch" data-bg="'+b.k+'"><div class="page '+(b.k==='none'?'':b.k)
-  +'" style="width:100%;height:100%;position:absolute;inset:0"><div class="page-bg '+(b.k==='none'?'':b.k)
-  +'" style="position:absolute;inset:0"></div></div><span>'+b.n+'</span></button>').join('');
+function buildBgSwatches(){
+  bgWrap.innerHTML=BGS.map(b=>'<button class="swatch" data-bg="'+b.k+'"><div class="page '+(b.k==='none'?'':b.k)
+    +'" style="width:210mm;height:297mm;position:absolute;left:0;top:0;transform:scale(.12);transform-origin:0 0;box-shadow:none;'+padVars()+'"><div class="page-bg '+(b.k==='none'?'':b.k)
+    +'"></div></div><span>'+b.n+'</span></button>').join('');
+}
+buildBgSwatches();
 /* 画像を挿入するのは書式ツールバーの「画像」なので、ここでは柄だけを選ぶ。
    前の版で敷いた画像は、そのまま出す（「背景を外す」で外せる） */
 let bgPick='none';
@@ -10613,7 +10642,7 @@ document.getElementById('btnReset').onclick=async()=>{
   S=blank(); sel.clear(); pgSel.clear(); editingId=null; syncSettings(); render(); save();
 };
 function syncSettings(){
-  applyFonts(); buildFontUI(); buildVarUI();
+  applyFonts(); buildFontUI(); buildVarUI(); buildBgSwatches();
   document.getElementById('docTitle').value=S.title||'';
   document.getElementById('padV').value=S.padV;
   document.getElementById('padH').value=S.padH;
@@ -10760,7 +10789,7 @@ function appendixHTML(){
                  : '<div class="blkpad p-desc"><div class="blk t-desc" style="white-space:normal">'
                    + popupBodyHTML(p.body)+'</div></div>');
       }).join('');
-  return '<div class="page '+cls+'"><div class="page-bg '+cls+'"></div>'
+  return '<div class="page '+cls+'" style="'+padVars()+'"><div class="page-bg '+cls+'"></div>'
     + '<div class="page-body" style="padding:'+S.padV+'mm '+S.padH+'mm;font-size:'+S.base+'pt;height:auto;min-height:100%">'
     + body + '</div></div>';
 }
@@ -10866,7 +10895,7 @@ function pageStaticHTML(i, withAnchor){
   const freeHTML = freeImgs(i).map(b=>
       '<div class="blkpad p-image span free" style="'+cornerCss(b)+'">'
       + '<div class="blk t-image">'+imageInnerHTML(b)+'</div></div>').join('');
-  return '<div class="page '+cls+'" id="p'+(i+1)+'">'
+  return '<div class="page '+cls+'" id="p'+(i+1)+'" style="'+padVars()+'">'
     + '<div class="page-bg '+cls+'"></div>'+img
     + '<div class="page-body'+(st.cols===2?' cols2':'')+'" style="padding:'+S.padV+'mm '+S.padH+'mm;font-size:'+S.base+'pt">'+freeShape+body+freeHTML+'</div>'
     + footHTML(i) + '</div>';
@@ -11062,11 +11091,22 @@ body.notoc #tocBtn{left:10px}
 @media print{ #popOv,#tocBtn,.copybtn,#cmtRail{display:none !important} .appx{display:block} #nav{display:none}
   .cmt{border-bottom:0} .cmt-n{display:none} }`;
   /* 区切りなしの1枚。画面ぜんたいを1枚の紙にして、目次もその紙の左に罫線で区切って置く */
-  const st0 = S.pages[a] || S.pages[0] || {bg:{preset:'none'}};
-  const fxCls = st0.bg.preset==='none' ? '' : st0.bg.preset;
+  const bgCount = {};
+  idx.forEach(i=>{ const k=((S.pages[i]||{}).bg||{}).preset||'none'; bgCount[k]=(bgCount[k]||0)+1; });
+  const bgTop = Object.keys(bgCount).sort((x,y)=>bgCount[y]-bgCount[x])[0] || 'none';
+  const fxCls = bgTop==='none' ? '' : bgTop;
   const flowCss = `
 body.fx{background:#f7f3ea}
 .fx-paper.page{display:block;width:auto;height:auto;min-height:100vh;overflow:visible;box-shadow:none}
+/* 区切りなしの背景。紙の端を使う柄は、縦に長い1枚の両端では見えないので、画面か本文の欄に合わせる */
+.fx-paper .page-bg.bg-aged{position:fixed}                     /* 古紙：画面のふちが焼ける */
+.fx-paper .page-bg.bg-frame::before{display:none}               /* 飾り枠：本文の欄を二重罫で囲む */
+.fx-paper.bg-frame .fx-body.page-body{padding:9mm 8mm !important;border:1px solid rgba(122,91,50,.55);
+  box-shadow:inset 0 0 0 2px #f7f3ea,inset 0 0 0 2.5px rgba(122,91,50,.35)}
+.fx-paper .page-bg.bg-corner{position:fixed;left:240px;--cs:11mm;--co:3mm}   /* 四隅：画面の四隅（目次の右から） */
+body.fx.notoc .fx-paper .page-bg.bg-corner{left:0}
+@media (max-width:1000px){ .fx-paper .page-bg.bg-corner{left:0} }
+@media (max-width:700px){ .fx-paper .page-bg.bg-corner{display:none} }  /* 狭い画面では文字にかかるので出さない */
 #nav.fx-nav{position:fixed;left:0;top:0;bottom:0;width:240px;background:transparent;color:#23201c;
   border-right:1px solid rgba(35,32,28,.16);padding:58px 16px 24px 20px;z-index:9;overflow:auto}
 #nav.fx-nav h1{color:#a8331f;font-size:15px;letter-spacing:.16em;margin:0 0 14px}
@@ -11518,6 +11558,9 @@ const HELP = [
 <p>改ページは自動です。区切りたい位置には書式ツールバーの<b>改め → 改ページ</b>で区切りを置けます。</p>
 <h4>ページの段組</h4>
 <p>段組は<b>ページ単位</b>で決まります。左下の「ドキュメント設定」の<b>選んだ段落のページの段組</b>で、選んでいる段落が載っているページを切り替えます（同じ欄の「対象のページ」でページを選んでいれば、そちらが対象になります）。2段組にすると<b>半分の幅の縦長の段</b>になり、文章は左の段を最後まで埋めてから右の段へ流れます。ページ見出しの「段組を切替」でも変えられます。</p>
+<h4>背景の柄</h4>
+<p>ドキュメント設定の<b>背景</b>で、「対象のページ」で選んだページに柄を付けられます。<b>無地・方眼・ドット・古紙・和紙・飾り枠・四隅の飾り・上下の帯</b>の8つです。読みやすさのため、本文の下にかかる柄はどれもごく薄く（文字とのコントラスト比 7:1 以上）、枠・四隅・帯の飾りは紙面の余白の中だけに置きます（余白を狭くすると飾りも小さくなります）。</p>
+<p>区切りなしで出力したときは、出力するページで<b>いちばん多く使っている柄</b>を画面全体に使います。古紙と四隅の飾りは画面のふちに付いてスクロールしても動かず、飾り枠は本文の欄を囲み、上下の帯は文書のいちばん上と下に出ます。四隅の飾りは、文字にかかる狭い画面では出しません。</p>
 <h4>ブロックの置き方</h4>
 <table>
 <tr><th>全幅</th><td>2段組のページで、段をまたいで横いっぱいに置きます。タイトルや見出し、NPCシート、画像に向きます。</td></tr>
