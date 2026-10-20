@@ -605,7 +605,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.15.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.15.1</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -6183,12 +6183,14 @@ function flowHTML(b, edit){
   }).join('');
   return '<div class="fwc" style="width:'+fnum(W)+'mm;height:'+fnum(H)+'mm">'+svg+txt+'</div>';
 }
-/* 古い原稿の画像は縦横比を持っていない。表示できたところで一度だけ覚えて、
-   避け枠の高さを出せるようにする（覚えたら組み直す） */
+/* 古い原稿の画像は縦横比を持っていない。表示できたところで覚えて、
+   読み込む前から画像の高さぶんの枠を取れるようにする（覚えたら組み直す）。
+   覚えていた縦横比が実物とずれている（1%より大きい）ときも覚え直す */
 function noteImgRatio(id, im){
-  const f = findBlock(id); if(!f || f.b.type!=='image') return;
-  if(+f.b.ar > 0 || !im.naturalWidth) return;
-  f.b.ar = im.naturalHeight / im.naturalWidth;
+  const f = findBlock(id); if(!f || f.b.type!=='image' || !im.naturalWidth) return;
+  const ar = im.naturalHeight / im.naturalWidth;
+  if(+f.b.ar > 0 && Math.abs(+f.b.ar - ar) <= ar*0.01) return;
+  f.b.ar = ar;
   save(); repaginateSoon();
 }
 /* 画像の大きさは、置かれた段の幅ではなく紙面を基準にする。
@@ -6222,8 +6224,11 @@ function imageInnerHTML(b){
   /* 外枠が幅を持つ置き方（左右流し・ページに置く）では、画像は枠いっぱいにする */
   const wst = (!b.type||b.pos==='left'||b.pos==='right'||b.fl==='l'||b.fl==='r')
     ? 'width:100%' : 'width:'+fnum(imgWmm(b))+'mm;max-width:100%';
+  /* 画像は読み込みが終わるまで高さ0なので、そのまま組むと最初のページ割りだけ画像が縮んで測られる。
+     覚えている縦横比で先に枠を取っておく（auto なので、読み込めたら実物の縦横比が勝つ） */
+  const ast = (+b.ar>0) ? ';aspect-ratio:auto 1 / '+(+b.ar).toFixed(4) : '';
   /* alt は属性なので素の文字のまま。目に見える説明のほうはルビを効かせる */
-  return '<img src="'+b.img+'" style="'+wst+'" alt="'+esc(rubyPlain(b.cap||''))+'">'
+  return '<img src="'+b.img+'" style="'+wst+ast+'" alt="'+esc(rubyPlain(b.cap||''))+'">'
        + (String(b.cap||'').trim() ? '<div class="t-imgcap">'+rubyHTML(b.cap)+'</div>' : '');
 }
 /* 画像は大きすぎると保存できなくなるので、長辺1600pxまで縮めてから取り込む */
@@ -6474,6 +6479,11 @@ function paginate(){
   stage.querySelectorAll('.pimg[data-pimg] img').forEach(im=>{
     const o = findPimg(im.closest('.pimg').dataset.pimg); if(!o || +o.ar>0) return;
     const f = ()=>{ if(!im.naturalWidth || +o.ar>0) return; o.ar = im.naturalHeight/im.naturalWidth; save(); repaginateSoon(); };
+    if(im.complete) f(); else im.addEventListener('load', f);
+  });
+  /* 段落の画像も、読み込めたところで縦横比を確かめる。覚えていないか実物とずれていれば、覚え直して組み直す */
+  stage.querySelectorAll('.blkpad.p-image img').forEach(im=>{
+    const id = im.closest('.blkpad').dataset.id, f = ()=>noteImgRatio(id, im);
     if(im.complete) f(); else im.addEventListener('load', f);
   });
   /* フッターは総ページ数を使うので、ページ割りが終わってから入れ直す */
