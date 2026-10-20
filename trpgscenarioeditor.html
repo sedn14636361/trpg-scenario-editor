@@ -606,7 +606,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.16.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.17.1</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -5466,7 +5466,7 @@ function popupInnerHTML(b){
      |項目|内容| 表
    箇条書きの段下げは、行の頭の空白2つ（全角1つ）で1段。
    コメントの位置が狂わないよう、切り分けは「もとの文字位置」で持ち回る。 */
-const RICH_MARK = /^[ 　\t]*(?:[■◆]|[◇]|[※＊]|[＞>]|[・･]|[-*+][ \t]|\d+[.．)）]|[□☐]|[＠@]|[|｜])/;
+const RICH_MARK = /^[ 　\t]*(?:#{4,6}[ \t]|[■◆]|[◇]|[※＊]|[＞>]|[・･]|[-*+][ \t]|\d+[.．)）]|[□☐]|[＠@]|[|｜])/;
 const RICH_TALK = /^\s*(?:([^「『、。！？\s]{1,10})\s*)?[「『][\s\S]*[」』]\s*$/;
 /* 入れ子の書式が使える書式 */
 /* 入れ子の書式を通す書式。会話はそれ自体が入れ子の書式なので入れない
@@ -5614,6 +5614,15 @@ function slashBefore(fd){
 function slashCheck(fd){
   const before = fd ? slashBefore(fd) : null;
   if(before==null){ closeSlash(); return; }
+  /* 描写の段落の頭の :: と # には、markdown の書き方の候補を出す */
+  const md = mdSuggest(fd, before);
+  if(md){
+    const was = (slashMenu && slashMenu.el===fd.el && slashMenu.md) ? slashMenu.list[slashMenu.i] : null;
+    slashMenu = {el:fd.el, ta:false, md:true, list:md.list,
+      shown:md.list.map(x=>(md.q && x.names && x.names.find(a=>a.startsWith(md.q))) ? x.gl+x.names.find(a=>a.startsWith(md.q)) : x.cm),
+      i:Math.max(0, was ? md.list.indexOf(was) : 0)};
+    drawSlash(); return;
+  }
   const line = before.slice(before.lastIndexOf('\n')+1);
   const m = line.match(/^[ 　\t]*[\/／]([^\s　\/／]{0,16})$/);
   if(!m){ closeSlash(); return; }
@@ -5622,7 +5631,7 @@ function slashCheck(fd){
   const list = SLASH_ITEMS.filter(x=>!q || x.cmds.some(k=>k.startsWith(q)) || x.words.some(k=>slashNorm(k).includes(q)));
   if(!list.length){ closeSlash(); return; }
   /* 絞り込んでも、選んでいたものが残っていればそのまま選んでおく */
-  const was = (slashMenu && slashMenu.el===fd.el) ? slashMenu.list[slashMenu.i] : null;
+  const was = (slashMenu && slashMenu.el===fd.el && !slashMenu.md) ? slashMenu.list[slashMenu.i] : null;
   /* 別名で合ったときは、その別名を見せる（/ch で「選択」が出るのは /check に合ったから、とわかるように） */
   const shown = list.map(x=>(q && x.cmds.find(k=>k.startsWith(q))) || x.cmd);
   slashMenu = {el:fd.el, ta:fd.ta, back:m[1].length+1, list, shown, i:Math.max(0, was ? list.indexOf(was) : 0)};
@@ -5644,12 +5653,14 @@ function drawSlash(){
       if(it && slashMenu && +it.dataset.i!==slashMenu.i){ slashMenu.i=+it.dataset.i; paintSlash(); }
     });
   }
-  m.innerHTML = '<div class="sh">書式</div>'
+  const md = !!slashMenu.md;
+  m.innerHTML = '<div class="sh">'+(md ? '段落の書式（markdown）' : '書式')+'</div>'
     + slashMenu.list.map((x,i)=>'<div class="it" role="option" data-i="'+i+'">'
-        + '<span class="gl">'+esc(x.mk.trim())+'</span>'
+        + '<span class="gl">'+esc(md ? x.gl : x.mk.trim())+'</span>'
         + '<span class="tx">'+esc(x.lb)+'<small>'+esc(x.ds)+'</small></span>'
-        + '<span class="cm">/'+esc(slashMenu.shown[i])+'</span></div>').join('')
-    + '<div class="ft">↑↓ 選ぶ　Enter 入れる　Esc 閉じる<br>続けて打つと絞り込めます（ko・みだし など）</div>';
+        + '<span class="cm">'+(md ? '' : '/')+esc(slashMenu.shown[i])+'</span></div>').join('')
+    + (md ? '<div class="ft">↑↓ 選ぶ　Enter その書式にする　Esc 閉じる<br>続けて打つと絞り込めます（pa・かいぺーじ など）</div>'
+          : '<div class="ft">↑↓ 選ぶ　Enter 入れる　Esc 閉じる<br>続けて打つと絞り込めます（ko・みだし など）</div>');
   m.style.display='block';
   paintSlash();
   placeSlash();
@@ -5704,6 +5715,7 @@ function applySlash(i){
   const it = sm.list[i==null ? sm.i : i];
   closeSlash();
   if(!it || !sm.el.isConnected) return;
+  if(sm.md){ mdApplySuggest(sm.el, it); return; }
   const inside = it.mk==='「」';
   if(sm.ta){
     const ta = sm.el, c = ta.selectionStart;
@@ -5755,7 +5767,7 @@ document.addEventListener('focusout', e=>{ if(slashMenu && e.target===slashMenu.
 document.addEventListener('scroll', ()=>{ if(slashMenu) placeSlash(); }, true);
 addEventListener('resize', ()=>{ if(slashMenu) placeSlash(); });
 /* 行の頭についている印。書式を付け替えるとき、まずこれを外す */
-const RICH_HEAD_RE = /^[ 　\t]*(?:[■◆]|[◇]|[※＊]|[＞>]|[・･]|[-*+][ \t]*\[[ xX]?\]|[-*+][ \t]|\d+[.．)）]|[□☐]|[＠@]|#{1,3})[ 　\t]*/;
+const RICH_HEAD_RE = /^[ 　\t]*(?:[■◆]|[◇]|[※＊]|[＞>]|[・･]|[-*+][ \t]*\[[ xX]?\]|[-*+][ \t]|\d+[.．)）]|[□☐]|[＠@]|#{1,6})[ 　\t]*/;
 /* その印がどの書式のものかを返す。付け直しと「もう一度押して外す」の判定に使う */
 function markKey(s){
   const m = String(s||'').match(RICH_HEAD_RE); if(!m) return '';
@@ -5770,6 +5782,8 @@ function markKey(s){
   if(/^\d/.test(c))    return 'num';
   if(/^[□☐]/.test(c)) return 'box';
   if(/^[＠@]/.test(c)) return 'pop';
+  if(/^#{5}/.test(c))  return 'heads';  // ##### と ###### は ◇ と同じ
+  if(/^####/.test(c))  return 'head';   // #### は ■ と同じ
   if(/^###/.test(c))   return 'h3';
   if(/^##/.test(c))    return 'h2';
   if(/^#/.test(c))     return 'h1';
@@ -5862,8 +5876,12 @@ function richIndent(sp){
 /* 1行を見て、どの書式かを返す。ofs はその行の本文が始まる位置のずれ */
 function richKind(ln, opt){
   let m;
+  /* markdown の見出しの4〜6段目は、囲みの中の小見出しにする。
+     1〜3段目は段落の書式（見出し1〜3）が持っているので、その下の段として ■ と ◇ に当てる */
+  if((m = ln.match(/^(#{4,6})[ \t]+(?=\S)/)))
+    return {k:(m[1].length===4 ? 'head' : 'heads'), ofs:m[0].length};
   /* 新規ウィンドウの中だけ、# で見出しにする。本文の段落では # をそのままの文字として扱う */
-  if(opt && opt.heads && (m = ln.match(/^(#{1,3})\s*(?=\S)/)))
+  if(opt && opt.heads && (m = ln.match(/^(#{1,3})(?!#)\s*(?=\S)/)))
     return {k:'h', lv:m[1].length, ofs:m[0].length};
   if((m = ln.match(/^[■◆]\s*/)))            return {k:'head', ofs:m[0].length};
   if((m = ln.match(/^[◇]\s*/)))             return {k:'heads', ofs:m[0].length};
@@ -6926,6 +6944,8 @@ srcOn('input', e=>{
   const t = e.target.closest('.srctext'); if(!t) return;
   /* /komidashi のような合図は、ここで印に化けさせる（化けたあと入力がもう一度来る） */
   if(slashFire(t, e)) return;
+  /* 描写の段落の頭で # と空白を打ったら、見出しにする */
+  if(mdHeadFire(t, e)) return;
   srcDirty = true;
   /* 表の内容の欄は、段落の本文ではなく表の内容へ書き戻す */
   const ts = tsrcOf(t);
@@ -6946,34 +6966,339 @@ srcOn('paste', e=>{
   const raw = (e.clipboardData||window.clipboardData).getData('text/plain').replace(/\r\n?/g,'\n');
   /* 表の内容の欄は段落に分けず、そのまま入れる */
   if(tsrcOf(t)){ document.execCommand('insertText', false, raw); return; }
-  const parts = raw.split(/\n\s*\n+/).map(x=>x.trim()).filter(Boolean);
   const f = findBlock(t.dataset.id); if(!f) return;
-  if(parts.length<=1){ document.execCommand('insertText', false, raw); return; }
-  /* 空行で区切られた文章を貼ると、段落ごとのブロックに分けて取り込む */
-  const made = parts.map(p=>{
-    const [ty, txt, tpl] = guessType(p.split('\n')[0]);
-    const rest = p.split('\n').slice(1).join('\n');
-    const nb = newBlock(ty, rest ? txt+'\n'+rest : txt);
-    if(tpl) applyBxTpl(nb, tpl);
-    return nb;
-  });
+  /* markdown として読み、段落ごとのブロックに分けて取り込む。
+     見出し・罫線・::: の囲みのような書き方が何も無く、1段落だけなら、ただの文字として入れる
+     （「…」で始まる1行を貼っただけで会話に変わったりしないように） */
+  const inPop = allBlocks().some(b=>b.type==='popup' && b.pop && b.pop.blocks===f.list);
+  const md = mdParse(raw, mdCtx(cellOwnerOf(f.list) ? MD_NO_CELL : inPop ? POP_SKIP : []));
+  if(!md.marked && md.blocks.length<=1){ document.execCommand('insertText', false, raw); return; }
+  const made = md.blocks; if(!made.length) return;
   if(!String(f.b.text||'').trim()){ f.list.splice(f.i,1,...made); }
   else { f.list.splice(f.i+1,0,...made); }
   render(); save();
   setStatus(made.length+'段落として取り込みました','var(--ok)');
 });
+/* 段落の1行目から書式を当てる。markdown の書き方で決まらなかった段落だけがここに来る */
 function guessType(line){
   const t=String(line||'').trim();
-  if(/^###\s/.test(t)) return ['h3', t.replace(/^###\s*/,'')];
-  if(/^##\s/.test(t))  return ['h2', t.replace(/^##\s*/,'')];
-  if(/^#\s/.test(t))   return ['h1', t.replace(/^#\s*/,'')];
   if(/^[「『]/.test(t)) return ['dialog', t];
-  if(/^[※＊*]/.test(t)) return ['note', t.replace(/^[※＊*]\s*/,'')];
+  /* 半角の * は markdown の箇条書きなので、注釈にはしない */
+  if(/^[※＊]/.test(t)) return ['note', t.replace(/^[※＊]\s*/,'')];
   if(/^【?(技能判定|判定)】?/.test(t)) return ['proc', t.replace(/^【?(技能判定|判定)】?[：:\s]*/,''), 'skill'];
   if(/^【?特殊ルール】?/.test(t)) return ['proc', t.replace(/^【?特殊ルール】?[：:\s]*/,''), 'rule'];
   if(/[〈《]\S+[〉》].*(成功|失敗|ロール|判定)/.test(t)) return ['proc', t, 'skill'];
   if(/^[（(【\[]?(シーン|場面)/.test(t) || /(へ|に)(移行|移動|続く)[。．]?$/.test(t)) return ['scene', t];
   return ['desc', t];
+}
+/* ================= markdown の読み取り（貼り付けと打ち込み） =================
+   見出し・罫線・画像は markdown（CommonMark）の書き方をそのまま受ける。
+     # ## ###      見出し1〜3（#### より下は段落の中の小見出し ■ ◇ になる）
+     --- *** ___   罫線。本文の行のすぐ下でも罫線にする
+                   （CommonMark ではそこが見出し2になるが、日本語の原稿では区切りのつもりで書くことが多い）
+     ![説明](…)    画像（data:image のときだけ絵も入れる。外の URL は読みにいかない）
+   組版台だけの書式は、remark-directive・Pandoc・markdown-it-container と同じ ::: の形で書く。
+     :::名前[ラベル]{属性}   … 中身 …   :::     囲み（閉じがなければ最後まで）
+     ::名前[ラベル]{属性}                       中身のない1行の書式（改ページなど）
+   閉じは開きと同じかそれより多い : で、内側の囲みから閉じていく。
+   名前は英字が正式で、日本語の別名も受ける。知らない名前は、文字のまま描写に残す。 */
+const MD_NAMES = {
+  desc:'desc', 描写:'desc', note:'note', 注釈:'note', dialog:'dialog', talk:'dialog', 会話:'dialog',
+  proc:'proc', 処理:'proc', skill:'proc:skill', 判定:'proc:skill', 技能判定:'proc:skill',
+  rule:'proc:rule', 特殊ルール:'proc:rule',
+  info:'info', 情報:'info', handout:'handout', ho:'handout', ハンドアウト:'handout',
+  scene:'scene', シーン:'scene', シーン移行:'scene',
+  title:'title', タイトル:'title', subtitle:'subtitle', サブタイトル:'subtitle',
+  popup:'popup', window:'popup', 新規ウィンドウ:'popup', npc:'npc', NPCシート:'npc',
+  flow:'flow', フローチャート:'flow', table:'table', 表:'table', image:'image', 画像:'image',
+  hr:'hr', 罫線:'hr', vr:'vr', 縦線:'vr',
+  pagebreak:'break', break:'break', newpage:'break', 改ページ:'break',
+  colbreak:'colbr', colbr:'colbr', 改段:'colbr',
+  toc:'toc', 目次:'toc', cover:'cover', 表紙:'cover', colophon:'colophon', 奥付:'colophon'
+};
+/* 1行が ::: か :: の書き方なら、その中身を返す。打ち込みでは日本語入力のままの ：［］｛｝ も通す */
+const MD_DIR_RE = /^ {0,3}([:：]{2,})[ \t]*([^\s:：\[\]［］{}｛｝]+)[ \t]*(?:[\[［]([^\]］]*)[\]］])?[ \t]*(?:[{｛]([^}｝]*)[}｝])?[ \t]*$/;
+const MD_CLOSE_RE = /^ {0,3}([:：]{3,})[ \t]*$/;
+function mdDirective(ln){
+  const m = String(ln||'').match(MD_DIR_RE); if(!m) return null;
+  const nm = MD_NAMES[m[2]] || MD_NAMES[m[2].toLowerCase()] || '';
+  const [k, tpl] = nm.split(':');
+  return {n:m[1].length, k:k||null, tpl:tpl||'', lb:(m[3]==null ? null : m[3].trim()), at:mdAttrs(m[4])};
+}
+/* {tpl=rule no="HO2"} を読む。#id や .class は使わないので読み捨てる */
+function mdAttrs(s){
+  const o = {};
+  String(s||'').replace(/([A-Za-z_][\w-]*)[ \t]*[=＝][ \t]*(?:"([^"]*)"|'([^']*)'|([^\s"']+))/g,
+    (x,k,a,b,c)=>{ o[k.toLowerCase()] = (a!=null?a:b!=null?b:c); return ''; });
+  return o;
+}
+/* 罫線（--- *** ___）。打ち込みでは日本語入力で出る ーーー －－－ ＿＿＿ ＊＊＊ も受ける */
+const MD_HR_RE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
+const MD_HR_IME_RE = /^[ 　]*([-－ー*＊_＿])(?:[ 　]*\1){2,}[ 　]*$/;
+/* 読み取りの間で持ち回るもの。skip は置き先に置けない書式（升目・新規ウィンドウの中）。
+   ハンドアウトの番号が重ならないように、使っている番号も控える */
+function mdCtx(skip){
+  return {skip:skip||[],
+    ho:new Set(allBlocks().filter(b=>b.type==='handout' && b.ho).map(b=>String(b.ho.no||'')))};
+}
+/* 書き方ひとつから段落をひとつ作る。body は囲みの中身（:: の形なら null） */
+function mdMake(d, body, ctx){
+  const k = d.k, lb = d.lb, at = d.at || {};
+  const txt = String(body==null ? '' : body).replace(/^\n+|\s+$/g,'');
+  const one = txt || (lb||'');                      // ラベルしか無ければ、それを文字にする
+  let nb;
+  if(k==='proc'){
+    nb = newBlock('proc', txt);
+    const tn = at.tpl || d.tpl || 'skill';
+    const mine = userTpls().find(t=>t.n===tn || t.id===tn);
+    applyBxTpl(nb, BX_TPL[tn] ? tn : (mine ? mine.id : 'skill'));
+    if(lb!=null) nb.lb = lb;
+  }
+  else if(k==='info'){ nb = newBlock('info', txt); if(lb!=null) nb.lb = lb; }
+  else if(k==='handout'){
+    nb = newBlock('handout', txt);
+    let no = String(at.no||'').trim();
+    if(!VAR_NAME_RE.test(no) || VAR_RESERVED.includes(no)){ let n=1; while(ctx.ho.has('HO'+n)) n++; no = 'HO'+n; }
+    ctx.ho.add(no);
+    nb.ho = {no:no, ttl:(lb||'')}; ensureHo(nb);
+  }
+  else if(k==='dialog'){ nb = newBlock('dialog', txt); if(lb) nb.sp = lb; }
+  else if(k==='popup'){
+    nb = newBlock('popup',''); ensurePopup(nb);
+    if(lb) nb.pop.label = lb;
+    const inner = mdParse(txt, Object.assign({}, ctx, {skip:ctx.skip.concat(POP_SKIP)})).blocks;
+    nb.pop.blocks = inner.length ? inner : [newBlock('desc','')];
+  }
+  else if(k==='npc'){ nb = newBlock('npc',''); nb.cols=1; ensureNpc(nb); nb.npc.name = lb||''; nb.npc.memo = txt; }
+  else if(k==='flow'){ nb = newBlock('flow', txt); nb.cols=1; ensureFlow(nb); }
+  else if(k==='table'){
+    nb = newBlock('table','');
+    const rows = txt.split('\n').filter(ln=>/^\s*[|｜].*[|｜]\s*$/.test(ln))
+      .map(ln=>ln.trim().replace(/^[|｜]/,'').replace(/[|｜]$/,'').split(/[|｜]/).map(c=>c.trim()))
+      .filter(r=>!r.every(c=>/^:?-{2,}:?$/.test(c) || /^[ー－-]{2,}$/.test(c)));
+    nb.tbl = newTable(); delete nb.tbl.seed;
+    if(rows.length) nb.tbl.cells = rows; else nb.tbl.seed = newTable().seed;
+    nb.tbl.name = lb||'';
+    ensureTable(nb);
+  }
+  else if(k==='image'){ nb = newBlock('image',''); nb.cols=1; nb.cap = lb||''; if(/^data:image\//.test(at.src||'')) nb.img = at.src; }
+  else if(k==='toc'){ nb = newBlock('toc',''); nb.cols=1; const t=ensureToc(nb); if(lb!=null) t.lb = lb; }
+  else if(k==='break'){ nb = newBlock('break',''); nb.cols=1; }
+  else if(k==='colbr'){ nb = newBlock('colbr',''); nb.cols=2; }
+  else if(k==='hr'){ nb = newBlock('hr', one); }
+  else nb = newBlock(k, one);                       // 描写・注釈・シーン移行・タイトル・縦線・表紙・奥付
+  fixBlock(nb);
+  return nb;
+}
+/* 升目の中には置けない書式（書式ボタンで入れるときと同じ決まり。新規ウィンドウの中は POP_SKIP） */
+const MD_NO_CELL = ['break','colbr','toc','cover','colophon'];
+/* 文章を段落の並びにする。marked は markdown の書き方が1つでもあったか */
+function mdParse(raw, ctx){
+  ctx = ctx || mdCtx();
+  const ls = String(raw==null?'':raw).replace(/\r\n?/g,'\n').split('\n');
+  const out = []; let para = [], marked = false;
+  const push = nb=>{ if(!ctx.skip.includes(nb.type)) out.push(nb); };
+  const flush = ()=>{
+    while(para.length && !para[0].trim()) para.shift();
+    while(para.length && !para[para.length-1].trim()) para.pop();
+    if(!para.length) return;
+    const [ty, txt, tpl] = guessType(para[0]);
+    const rest = para.slice(1).join('\n');
+    const nb = newBlock(ty, rest ? txt+'\n'+rest : txt);
+    if(tpl) applyBxTpl(nb, tpl);
+    push(nb); para = [];
+  };
+  for(let i=0; i<ls.length; i++){
+    const ln = ls[i];
+    let m;
+    /* ``` で囲んだところは読み替えず、そのまま1つの段落に入れる（# のついた行を見出しにしないため） */
+    if((m = ln.match(/^ {0,3}(`{3,}|~{3,})/))){
+      flush();
+      const fc = m[1].charAt(0), fl = m[1].length;
+      para.push(ln);
+      for(i++; i<ls.length; i++){
+        para.push(ls[i]);
+        const c = ls[i].match(/^ {0,3}(`{3,}|~{3,})[ \t]*$/);
+        if(c && c[1].charAt(0)===fc && c[1].length>=fl) break;
+      }
+      flush(); continue;
+    }
+    if(!ln.trim()){ flush(); continue; }
+    /* ATX 見出し。# のあとに空白か行の終わりが要る（#5 は見出しではない）。閉じの # は外す */
+    if((m = ln.match(/^ {0,3}(#{1,6})(?=[ \t]|$)(.*)$/))){
+      const lv = m[1].length;
+      if(lv<=3){
+        flush(); marked = true;
+        const h = m[2].replace(/[ \t]+#+[ \t]*$/,'').replace(/^[ \t]*#+[ \t]*$/,'').trim();
+        push(newBlock('h'+lv, h)); continue;
+      }
+      para.push(ln.replace(/^ {0,3}/,'')); continue;          // 4〜6段目は段落の中の小見出し
+    }
+    if(MD_HR_RE.test(ln)){ flush(); marked = true; push(newBlock('hr','')); continue; }
+    if((m = ln.match(/^ {0,3}!\[([^\]]*)\]\(\s*<?([^\s)>]*)>?(?:\s+"[^"]*")?\s*\)[ \t]*$/))){
+      flush(); marked = true;
+      push(mdMake({k:'image', lb:m[1].trim(), at:{src:m[2]}}, null, ctx)); continue;
+    }
+    const d = mdDirective(ln);
+    if(d && d.k && d.n===2){ flush(); marked = true; push(mdMake(d, null, ctx)); continue; }
+    if(d && d.n>=3){
+      /* 囲み。内側にまた囲みがあれば、閉じはそちらから当てる */
+      const body = [], stack = [d.n];
+      for(i++; i<ls.length; i++){
+        const c = ls[i].match(MD_CLOSE_RE);
+        if(c && c[1].length>=stack[stack.length-1]){ stack.pop(); if(!stack.length) break; }
+        else { const dd = mdDirective(ls[i]); if(dd && dd.n>=3) stack.push(dd.n); }
+        body.push(ls[i]);
+      }
+      if(!d.k){                                             // 知らない名前は、書いたとおりの文字で残す
+        flush(); para.push(ln, ...body); if(i<ls.length) para.push(ls[i]); flush(); continue;
+      }
+      flush(); marked = true;
+      push(mdMake(d, body.join('\n'), ctx)); continue;
+    }
+    para.push(ln);
+  }
+  flush();
+  /* 改ページで終わったら、続きを書けるよう空の描写を添える（書式ボタンで入れるときと同じ） */
+  if(out.length && out[out.length-1].type==='break') out.push(newBlock('desc',''));
+  return {blocks:out, marked:marked};
+}
+/* 打ち込みで書式を変えるのは、描写の段落だけ。見出しや囲みを書いている途中で別の書式に化けないように */
+function mdTypable(f){ return f && f.b.type==='desc'; }
+/* 段落の頭で # ## ### と空白を打ったら、見出し1〜3にする。
+   日本語入力のままでも打てるよう、＃ と全角の空白も受ける */
+function mdHeadFire(t, e){
+  if(!t || (e && e.isComposing)) return false;
+  if(e && e.data!=null && e.data!==' ' && e.data!=='　') return false;
+  if(tsrcOf(t)) return false;
+  const f = findBlock(t.dataset.id); if(!mdTypable(f)) return false;
+  const txt = t.innerText.replace(/\n$/,''), off = caretOffset(t);
+  const m = txt.slice(0, off).match(/^[#＃]{1,3}[ 　\u00a0]$/); if(!m) return false;
+  mdToHead(f, m[0].length-1, txt.slice(off));
+  return true;
+}
+/* その段落を見出し lv にして、rest を見出しの文字にする */
+function mdToHead(f, lv, rest){
+  f.b.type = 'h'+lv;
+  setBlockText(f.b, rest);
+  editingId = f.b.id; sel.clear(); sel.add(f.b.id);
+  render(); focusSrc(f.b.id, false); save();
+  setStatus(TYPE_NAME(f.b.type)+'にしました','var(--ok)');
+}
+/* Enter を押したとき、1行目が :::名前・::名前・--- だけなら、その書式にする。
+   カーソルより後ろの文字は、::: のときは中身に、それ以外は次の段落に送る */
+function mdLineFire(f, txt, off){
+  if(!mdTypable(f)) return false;
+  const head = txt.slice(0, off);
+  if(head.indexOf('\n')>=0) return false;
+  let rest = txt.slice(off).replace(/^\n/,'');
+  let nb, inside = false;
+  if(MD_HR_IME_RE.test(head)) nb = newBlock('hr','');
+  else {
+    const d = mdDirective(head);
+    if(!d || !d.k) return false;
+    if(d.n>=3){
+      nb = mdMake(d, rest, mdCtx()); rest = '';
+      /* ::: で開いた、文字を書く書式（処理・情報など）は、そのまま中に書き続ける。
+         :: の1行の形で書いたものは、書き終えたものとして次の段落へ進む */
+      inside = !NO_TEXT_TYPES.includes(nb.type) && nb.type!=='break' && nb.type!=='colbr';
+    }
+    else nb = mdMake(d, null, mdCtx());
+  }
+  const pop = allBlocks().some(b=>b.type==='popup' && b.pop && b.pop.blocks===f.list);
+  if((cellOwnerOf(f.list) && MD_NO_CELL.includes(nb.type)) || (pop && POP_SKIP.includes(nb.type))){
+    setStatus(TYPE_NAME(nb.type)+'はここには入れられません','#ff9b83'); return true; }
+  /* 同じ段落を作り変えたことにする（並びの中の位置と選択を保つ）。
+     1行目の書き方は消えるので、その文字に付けていたコメントや色は持ち越さない */
+  nb.id = f.b.id;
+  f.list.splice(f.i, 1, nb);
+  if(inside){
+    editingId = nb.id; sel.clear(); sel.add(nb.id);
+    render(); focusSrc(nb.id, false); save();
+  } else {
+    /* 中に書けない書式（罫線・改ページ・表など）は、次の段落を用意して残りの文字をそちらへ送る。
+       表や新規ウィンドウのように自分の設定を持つものは、選んだままにして右に設定を出す */
+    const nx = newBlock('desc', rest); nx.cols = 2;
+    f.list.splice(f.i+1, 0, nx);
+    if(OWN_BODY_TYPES.includes(nb.type)){
+      editingId = null; editSpot = null; sel.clear(); sel.add(nb.id); lastPick = nb.id;
+      render(); save();
+    } else {
+      editingId = nx.id; sel.clear(); sel.add(nx.id);
+      render(); focusSrc(nx.id, false); save();
+    }
+  }
+  setStatus(TYPE_NAME(nb.type)+'にしました','var(--ok)');
+  return true;
+}
+/* ================= markdown の書き方の候補 =================
+   描写の段落の1行目の頭で :: （日本語入力のままなら ：：）か # を打つと、
+   / の候補と同じ一覧に、::: で書ける書式と見出しを出す。
+   選ぶと、その行を書いて Enter を押したときと同じように、段落がすぐその書式になる。
+   : が1つ（「：」で始まる文）や、# のうしろに文字が続いたとき（#タグ）は出さない。
+   絞り込みの手がかりは、英字の名前の頭（pa → pagebreak）と、読み・表示名（かい → 改ページ・改段・会話）。
+   並びは、よく使うものから。 */
+const MD_SUGGEST = [
+  ['proc',     'proc',       '処理',             '判定やルールをくくる囲み',       'しょり はんてい'],
+  ['skill',    'proc:skill', '処理（技能判定）', '技能判定の見た目の囲み',         'ぎのうはんてい'],
+  ['rule',     'proc:rule',  '処理（特殊ルール）','特殊ルールの見た目の囲み',       'とくしゅるーる'],
+  ['info',     'info',       '情報',             '押すと本文をコピーできる枠',     'じょうほう'],
+  ['handout',  'handout',    'ハンドアウト',     '番号と題のついた枠',             'はんどあうと'],
+  ['note',     'note',       '注釈',             '小さめの補足',                   'ちゅうしゃく'],
+  ['dialog',   'dialog',     '会話',             '話し手つきの台詞',               'かいわ'],
+  ['scene',    'scene',      'シーン移行',       '場面の切り替わり',               'しーん'],
+  ['popup',    'popup',      '新規ウィンドウ',   'ボタンから開く補足のページ',     'しんきうぃんどう べつまど'],
+  ['npc',      'npc',        'NPCシート',        '能力値や技能をまとめた囲み',     'えぬぴーしー'],
+  ['flow',     'flow',       'フローチャート',   '箱を線でつなぐ図',               'ふろーちゃーと'],
+  ['table',    'table',      '表',               '行と列の表',                     'ひょう'],
+  ['pagebreak','break',      '改ページ',         'ここでページを区切る',           'かいぺーじ'],
+  ['colbreak', 'colbr',      '改段',             '2段組の次の段へ送る',            'かいだん'],
+  ['hr',       'hr',         '罫線',             '横に一本線を引く（--- でも）',   'けいせん'],
+  ['vr',       'vr',         '縦線',             '左に縦の線を立てて文章を置く',   'たてせん'],
+  ['toc',      'toc',        '目次',             '見出しの一覧',                   'もくじ'],
+  ['title',    'title',      'タイトル',         'シナリオの題',                   'たいとる'],
+  ['subtitle', 'subtitle',   'サブタイトル',     '題の下に添える文',               'さぶたいとる'],
+  ['cover',    'cover',      '表紙',             '表紙のページ',                   'ひょうし'],
+  ['colophon', 'colophon',   '奥付',             '奥付のページ',                   'おくづけ']
+].map(([nm, key, lb, ds, rd])=>{
+  const k = key.split(':')[0];
+  /* 中身を持たない書式は :: の1行の形、ほかは ::: の囲みの形で見せる。
+     （どちらで入れても、文字を書く書式ならカーソルは中に、そうでなければ次の段落に進む） */
+  const leaf = ['hr','vr','break','colbr','toc'].includes(k);
+  const alias = Object.keys(MD_NAMES).filter(a=>MD_NAMES[a]===key && /^[a-z]+$/.test(a));
+  return {nm, k, lb, ds, gl:(leaf?'::':':::'), cm:(leaf?'::':':::')+nm, leaf,
+          names:alias.length ? alias : [nm], words:rd.split(' ').concat([lb])};
+});
+const MD_SUGGEST_H = [1,2,3].map(lv=>({lv, k:'h'+lv, lb:'見出し'+lv, gl:'#'.repeat(lv), cm:'#'.repeat(lv)+' ',
+  ds:['章の頭のいちばん大きい見出し','中くらいの見出し','小さい見出し'][lv-1]}));
+/* いま候補を出す場面なら、出す候補の並びを返す。q は絞り込みに使った文字 */
+function mdSuggest(fd, before){
+  if(!fd || fd.ta || !fd.el.classList.contains('srctext') || tsrcOf(fd.el)) return null;
+  if(before==null || before.indexOf('\n')>=0) return null;
+  const f = findBlock(fd.el.dataset.id); if(!mdTypable(f)) return null;
+  const pop = allBlocks().some(b=>b.type==='popup' && b.pop && b.pop.blocks===f.list);
+  const skip = cellOwnerOf(f.list) ? MD_NO_CELL : pop ? POP_SKIP : [];
+  let m;
+  if((m = before.match(/^[#＃]{1,3}$/)))
+    return {list:MD_SUGGEST_H.filter(x=>x.lv>=m[0].length), q:''};
+  if(!(m = before.match(/^ {0,3}[:：]{2,3}([^\s:：\[\]［］{}｛｝]{0,16})$/))) return null;
+  const q = slashNorm(m[1]);
+  /* 合い方の強いものから並べる。正式な名前の頭 → 別名の頭 → 読み・表示名
+     （::ta で、別名 talk の会話より table の表を先に出すため） */
+  const rank = x=>!q ? 0 : x.nm.startsWith(q) ? 1 : x.names.some(a=>a.startsWith(q)) ? 2
+                : x.words.some(w=>slashNorm(w).includes(q)) ? 3 : 0;
+  const list = MD_SUGGEST.filter(x=>!skip.includes(x.k) && (!q || rank(x)))
+    .map((x,i)=>[rank(x), i, x]).sort((a,b)=>a[0]-b[0] || a[1]-b[1]).map(r=>r[2]);
+  return list.length ? {list, q} : null;
+}
+/* 候補を選んだ。カーソルより後ろの文字は、Enter で変えたときと同じく中身か次の段落に送る */
+function mdApplySuggest(el, it){
+  const f = findBlock(el.dataset.id); if(!mdTypable(f)) return;
+  const txt = el.innerText.replace(/\n$/,''), off = caretOffset(el);
+  const rest = txt.slice(off).replace(/^\n/,'');
+  if(it.lv){ mdToHead(f, it.lv, rest); return; }
+  const head = it.cm;
+  mdLineFire(f, head + (rest ? '\n'+rest : ''), head.length);
 }
 /* かな漢字変換の最中に押す Enter は「変換の確定」であって、
    段落を分ける合図ではない。ここを見分けないと、確定した文字と同じ内容の
@@ -7133,6 +7458,8 @@ srcOn('keydown', e=>{
     /* Enter で次の段落をすぐ作り、そのまま書き続けられる */
     e.preventDefault();
     const off = caretOffset(t), txt = t.innerText.replace(/\n$/,'');
+    /* 1行目に :::proc や ::pagebreak、--- だけを書いて Enter を押したら、その書式にする */
+    if(mdLineFire(f, txt, off)) return;
     f.b.text = txt.slice(0,off);
     /* 改行で増える段落はいつも描写にする。見出しや囲みが続いてしまうのを防ぐ */
     const nt = 'desc';
@@ -10052,7 +10379,7 @@ function pSeg(name, cur, opts){
     '<button data-p="'+name+'" data-v="'+esc(v)+'"'+(cur===v?' class="on"':'')+'>'+esc(t)+'</button>').join('')+'</div>';
 }
 function propsProc(b){
-  const subs = String(b.text||'').split('\n').filter(x=>/^[■◆]/.test(x.trim())).length;
+  const subs = String(b.text||'').split('\n').filter(x=>/^(?:[■◆]|####(?!#)[ \t])/.test(x.trim())).length;
   const x = ensureProc(b);
   const same = t => t && t.ln===x.ln && t.bar===x.bar && t.fill===x.fill && t.sm===x.sm && t.col===x.col;
   const mine = userTpls();
@@ -12339,7 +12666,7 @@ const HELP = [
 <tr><th>印の前の<b>スペース</b></th><td>半角2つ（全角1つ）で<b>1段下がります</b>（3段まで）。<code>  - 鍵がかかっている</code> のように書きます。</td></tr>
 <tr><th><code>「</code>で始まり<code>」</code>で終わる行</th><td><b>会話</b>。<code>灰島「よく来たね」</code> のように前に名前を書くと、話し手として出ます。行の途中で<code>」</code>が閉じたあとに文が続く場合は、ふつうの文のままです。</td></tr>
 <tr><th><code>|項目|内容|</code> の行</th><td><b>表</b>。同じ形の行を続けると1つの表になり、<b>1行目が見出し</b>です。<code>|---|---|</code> の区切り行は書いても無視されます。</td></tr>
-<tr><th><code>■</code>で始まる行</th><td>小見出しになります。「■成功した場合」「■失敗した場合」のように結果を分けて書けます。</td></tr>
+<tr><th><code>■</code>で始まる行</th><td>小見出しになります。「■成功した場合」「■失敗した場合」のように結果を分けて書けます。markdown の <code>#### </code> でも同じです（<code>##### </code> は <code>◇</code> のひとまわり小さい小見出し）。</td></tr>
 <tr><th><code>&gt; </code>で始まる行</th><td>枠の中にもうひとつ<b>入れ子の枠</b>が入ります。<code>&gt; 目星：机の裏の封筒に気づく</code> のように、コロンの前が見出しになります。</td></tr>
 </table>
 <p><b>印は markdown と同じ書き方にそろえてあります。</b>これまでの <code>・</code> <code>□</code> <code>＞</code> もそのまま読めます。古い原稿は、開いたときに一度だけ新しい印へ書き換えます（見た目と注の位置は変わりません）。</p>
@@ -12389,7 +12716,34 @@ const HELP = [
 </ul>
 <div class="note">段落をまたいだドラッグでの文字選択は、ブラウザの仕組み上できません（段落ごとに別々の編集領域になっているためです）。複数の段落をコピーしたいときは、上のやり方をお使いください。</div>
 <h4>貼り付け</h4>
-<p>空行で区切った文章を貼ると、段落ごとのブロックに分かれて取り込まれます。行頭の <code>#</code> <code>##</code> <code>###</code> は見出しに、<code>「</code>で始まる行は会話に、<code>※</code>で始まる行は注釈に、「シーン」で始まる行や「〜へ移行」で終わる行はシーン移行に、自動で振り分けます。段落の中の単独の改行はそのまま残ります。</p>
+<p>貼った文章は <b>markdown として読み</b>、段落ごとのブロックに分けて取り込みます（書き方は下の「markdown の書き方」）。見出しは1行だけが見出しになり、続く行は次の段落になります。<code>&#96;&#96;&#96;</code> で囲んだところは読み替えずにそのまま入ります。<br>
+そのほか、空行で区切った段落の1行目が <code>「</code>で始まれば会話に、<code>※</code>で始まれば注釈に、「シーン」で始まるか「〜へ移行」で終わればシーン移行に、自動で振り分けます。段落の中の単独の改行はそのまま残ります。<br>
+markdown の書き方が何もなく1段落だけの文章は、いつもどおり<b>ただの文字</b>としてカーソルの位置に入ります。</p>
+<h4>markdown の書き方</h4>
+<p>見出し・罫線・画像は <b>markdown（CommonMark）と同じ書き方</b>です。組版台だけの書式は、markdown の拡張としてよく使われる <code>:::</code> の囲み（remark-directive・Pandoc・markdown-it-container と同じ形）で書きます。貼り付けで読むほか、<b>描写の段落の頭で打っても</b>その書式に変わります。</p>
+<table>
+<tr><th><code># </code> <code>## </code> <code>### </code></th><td><b>見出し1〜3</b>。<code>#</code> のうしろに空白が要ります（<code>#5</code> は見出しではありません）。打つときは空白を押した瞬間に変わります。日本語入力のままの <code>＃</code> と全角の空白でも変わります。文字の <code>#</code> のままにしたいときは、変わった直後に <code>Ctrl</code>+<code>Z</code>。</td></tr>
+<tr><th><code>---</code> <code>***</code> <code>___</code></th><td><b>罫線</b>。本文の行のすぐ下に書いても罫線です。打つときは Enter で変わります（日本語入力の <code>ーーー</code> でも）。</td></tr>
+<tr><th><code>![説明](…)</code></th><td><b>画像</b>（貼り付けのみ）。<code>data:image</code> で書いた絵だけを入れます。外のアドレスは読みにいかないので、説明だけの画像になります。</td></tr>
+<tr><th><code>:::名前[ラベル]{属性}</code><br>…中身…<br><code>:::</code></th><td><b>囲み</b>。中身ごとその書式になります。閉じの <code>:::</code> がなければ最後までが中身です。外側を <code>::::</code> にすれば、新規ウィンドウの中に処理を入れるような入れ子もできます。打つときは1行目を書いて Enter を押すと、その書式になってカーソルが中に入ります。</td></tr>
+<tr><th><code>::名前[ラベル]</code></th><td><b>中身のない1行の書式</b>（改ページなど）。打つときは Enter で変わり、次の段落へ進みます。</td></tr>
+</table>
+<p><b>候補の一覧</b>：描写の段落の頭で <code>::</code>（<code>：：</code>）か <code>#</code> を打つと、<code>/</code> の候補と同じ一覧が出ます。続けて打つと絞り込めます（<code>::pa</code> → 改ページ、<code>：：かい</code> → 会話・改ページ・改段）。<code>↑</code><code>↓</code> で選んで <code>Enter</code> か <code>Tab</code> を押すと、段落がすぐその書式になります。見出しの文字（<code>[ ]</code>）を入れたいときは、最後まで打って <code>Enter</code> を押すか、あとで右の設定欄で書きます。升目や新規ウィンドウの中では、そこに置けない書式は出ません。</p>
+<p>名前は英字が正式で、日本語の別名でも通ります。日本語入力のままの <code>：：：</code> <code>［］</code> <code>｛｝</code> も通ります。知らない名前は、書いたとおりの文字で描写に残ります。</p>
+<table>
+<tr><th><code>:::proc[見出し]{tpl=rule}</code></th><td><b>処理</b>（処理・判定・特殊ルール）。<code>[ ]</code> が見出し、<code>tpl</code> は見た目のテンプレ（<code>skill</code>・<code>rule</code>・自分で作ったテンプレの名前）。<code>:::skill</code> <code>:::rule</code> とも書けます</td></tr>
+<tr><th><code>:::info[見出し]</code></th><td><b>情報</b></td></tr>
+<tr><th><code>:::handout[題]{no=HO2}</code></th><td><b>ハンドアウト</b>。<code>no</code> を書かなければ、空いている番号を振ります</td></tr>
+<tr><th><code>:::note</code> ／ <code>:::dialog[話し手]</code></th><td><b>注釈</b> ／ <b>会話</b></td></tr>
+<tr><th><code>:::popup[ボタン名]</code></th><td><b>新規ウィンドウ</b>。中身もまた markdown として段落に分けます</td></tr>
+<tr><th><code>:::npc[名前]</code></th><td><b>NPCシート</b>。中身はメモに入ります</td></tr>
+<tr><th><code>:::flow</code></th><td><b>フローチャート</b>。1行が1つの箱、<code>- </code> で始まる行が横に並ぶ分かれ道です</td></tr>
+<tr><th><code>:::table[表の名前]</code></th><td><b>表</b>。中身は <code>|1d6|内容|</code> の形の行です。囲まずに書いた表は、これまでどおり本文の中の表になります</td></tr>
+<tr><th><code>::scene[書斎へ]</code> <code>::title[…]</code> <code>::subtitle[…]</code></th><td><b>シーン移行</b>・<b>タイトル</b>・<b>サブタイトル</b>（<code>:::</code> で囲んでも書けます）</td></tr>
+<tr><th><code>::pagebreak</code> <code>::colbreak</code></th><td><b>改ページ</b>・<b>改段</b></td></tr>
+<tr><th><code>::vr</code> <code>::toc</code> <code>::cover</code> <code>::colophon</code></th><td><b>縦線</b>・<b>目次</b>・<b>表紙</b>・<b>奥付</b></td></tr>
+</table>
+<p><code>&gt; </code> は markdown では引用ですが、組版台では<b>判定の枠</b>のままです。ルビの <code>｜漢字《かんじ》</code> と変数の <code>{HO1}</code> もこれまでどおりです。</p>
 <h4>目次</h4>
 <p>目次を選ぶと、右の設定欄で内容を決められます。</p>
 <ul>
