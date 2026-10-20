@@ -612,7 +612,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.23.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.24.0</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -828,6 +828,12 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
           <button id="fsClear" style="flex:1" title="段落を選んでいるときは、その段落の中で文字ごとに変えた大きさも戻します">既定に戻す</button>
         </div>
         <div class="hint">文字を選んでいればその文字だけ、選んでいなければ選んだ段落の大きさを変えます（5〜72pt）。段落の中の段落は、それぞれ別に決めます。</div>
+        <label class="f">この段落の上下の余白（mm）</label>
+        <div class="grid2">
+          <div><span class="hint">上</span><input type="number" id="mTop" step="0.5" min="0" placeholder="既定"></div>
+          <div><span class="hint">下</span><input type="number" id="mBot" step="0.5" min="0" placeholder="既定"></div>
+        </div>
+        <div class="hint">空のときは書式ごとの既定（薄く出ている値）です。前後の段落とのあいだは、大きいほうの余白が効きます。</div>
         <label class="f">字下げ</label>
         <div class="row">
           <button id="indOut" title="ひとつ戻す（Ctrl+Shift+[）">&#8592; 戻す</button>
@@ -838,11 +844,6 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
         <label class="f">画像の回り込み</label>
         <div class="row">
           <button id="imgClearFloat" title="選んだ段落は画像の横に入らず、画像の下から始まります">回り込みを解除</button>
-        </div>
-        <label class="f">この段落だけの余白（mm）</label>
-        <div class="grid2">
-          <div><span class="hint">上</span><input type="number" id="mTop" step="1" placeholder="既定"></div>
-          <div><span class="hint">下</span><input type="number" id="mBot" step="1" placeholder="既定"></div>
         </div>
 
         </div>
@@ -7869,21 +7870,14 @@ srcOn('keydown', e=>{
   /* 表の名前の欄。Enter と Esc は打ち止め（段落を分ける合図ではない） */
   const ts = tsrcOf(t);
   if(ts){
-    if(e.key==='Escape'){
-      e.preventDefault(); e.__escHandled = true; t.blur();
-      editingId=null; sel.clear(); sel.add(ts.b.id); lastPick=ts.b.id;
-      render(); return;
-    }
+    if(e.key==='Escape'){ e.preventDefault(); e.__escHandled = true; clearAllSel(); return; }
     if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); t.blur(); }
     return;
   }
   const f = findBlock(t.dataset.id); if(!f) return;
   if(e.key==='Escape'){
-    /* 1回目のEscは、文字の編集をやめてその段落を選んだ状態にする。
-       選択そのものを外すのは、そのあともう一度Escを押したとき。 */
-    e.preventDefault(); e.__escHandled = true; t.blur();
-    editingId=null; sel.clear(); sel.add(f.b.id); lastPick=f.b.id;
-    render(); return;
+    /* Esc は1回で、打っている場所も段落の選択も文字の選択も、すべて外す */
+    e.preventDefault(); e.__escHandled = true; clearAllSel(); return;
   }
   if(e.key==='Enter' && !e.shiftKey){
     /* Enter で次の段落をすぐ作り、そのまま書き続けられる */
@@ -8291,6 +8285,12 @@ stage.addEventListener('pointerdown', e=>{
      .blk しか見ていなかったので、升目の中の段落は押しても選べなかった */
   const blk=e.target.closest('.blk[data-id],.blkpad[data-id]');
   if(blk && blk.dataset.id){
+    /* 紙面で打てない段落を押したら、前の段落で打っていたカーソルを外す。
+       （押した拍子にカーソルが動かないよう止めているので、外さないと打った字が前の段落に入る） */
+    const ae = document.activeElement;
+    if(ae && ae.blur && !blk.contains(ae) && (ae.isContentEditable || ae.tagName==='INPUT' || ae.tagName==='TEXTAREA')){
+      ae.blur(); editingId = null;
+    }
     /* 選んでいない段落でも、つかんだ時点で選んで動かせるようにする
        （一度押して選び直してから、という手順を踏まないと動かせなかった） */
     if(!sel.has(blk.dataset.id)){
@@ -8423,17 +8423,23 @@ function doJumpPreview(id){
   el.classList.add('jumped');
   setTimeout(()=>el.classList.remove('jumped'), 700);
 }
-function paintSel(){
-  if(sel.size && pimgSel){ pimgSel = null; paintPimgSel(); }
+/* 選んだ印だけを付け替える（原稿欄と紙面）。組み直しも設定欄の描き直しもしないので、打っている場所は動かない */
+function paintPicks(){
   srcAll('.src').forEach(el=>el.classList.toggle('pick', sel.has(el.dataset.id)));
   /* 選んだ色はブロック本体ではなく外枠に敷く。
-     見出し1のように自前の背景を持つ書式でも、背景と文字を塗りつぶさないため。 */
+     見出し1のように自前の背景を持つ書式でも、背景と文字を塗りつぶさないため。
+     升目や段落の中の段落は、印（data-id）が外枠のほうにしか付いていないので、外枠からも見る */
   stage.querySelectorAll('.blk').forEach(el=>{
-    const on = sel.has(el.dataset.id);
-    el.classList.toggle('pick', on);
     const w = el.parentElement;
+    const id = el.dataset.id || (w && w.dataset.id);
+    const on = !!id && sel.has(id);
+    el.classList.toggle('pick', on);
     if(w && w.classList.contains('blkpad')) w.classList.toggle('pickwrap', on);
   });
+}
+function paintSel(){
+  if(sel.size && pimgSel){ pimgSel = null; paintPimgSel(); }
+  paintPicks();
   syncBlockPanel();
   renderProps();          // 一度のクリックで右の設定欄が出るように
   renderPopWin();         // 新規ウィンドウも、選んだところを塗り直す
@@ -9778,7 +9784,8 @@ npcOn('focusin', e=>{
   const id = el.dataset.id;
   if(sel.size===1 && sel.has(id)) return;
   sel.clear(); sel.add(id); lastPick = id;
-  srcAll('.src').forEach(x=>x.classList.toggle('pick', sel.has(x.dataset.id)));
+  if(pimgSel){ pimgSel = null; paintPimgSel(); }
+  paintPicks();                                      // 紙面の印も、カーソルを入れた段落へ移す
   syncBlockPanel(); renderProps();
 });
 /* 窓のタイトル欄で名前を変える。升目の ＠名前 は名前で指しているので、
@@ -10654,6 +10661,10 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
     if(k==='tocown'){ b.tl = v; soft(); return; }
     if(k==='btext'){ b.text=v; soft(); return; }
     if(k==='dsp'){ b.sp=v; soft(); return; }
+    if(k==='sjump'){
+      if(String(v).trim()) b.jump = v; else delete b.jump;
+      const hn = document.getElementById('sjumpHint'); if(hn) hn.innerHTML = sceneJumpHint(b);
+      soft(); return; }
     if(b.type==='image'){
       if(k==='iw'||k==='iwn'){ imgSetW(b, v, body, 'data-p', el); soft(); return; }
       if(k==='icap'){ b.cap=v; soft(); return; }
@@ -10735,15 +10746,23 @@ function propsHTML(b){
     : '';
   return h + propsTocItem(b) + propsCellOwner(b);
 }
-/* シーン移行ブロックの設定。行き先の見出しが見つかったかを見せる */
-function propsScene(b){
-  const h = sceneTargetOf(b), names = sceneNames(b.text);
+/* シーン移行ブロックの設定。ジャンプする見出しを自由に書け、見つかったかを見せる */
+function sceneJumpHint(b){
+  const h = sceneTargetOf(b), own = String(b.jump||'').trim();
+  const names = own ? headNames(own) : sceneNames(b.text);
   const pg = h ? pageOfBlockOrNull(h.id) : null;
-  return pRow('つながる見出し',
-    h ? '<div class="hint" style="color:var(--text)">「'+esc(rubyPlain(h.text))+'」'+(pg?'（P.'+pg+'）':'')+'</div>'
-      : '<div class="hint">見つかりません'+(names.length?'（「'+esc(names[names.length-1])+'」という見出しを作るとつながります）':'')+'</div>',
-    '行き先の名前が見出し1・2・3とぴったり同じなら、出力したHTMLとPDFでその見出しへのリンクになります。'
-    + '「書斎へ」「→ 書斎へ移行」「シーン3『書斎』へ」のように書けます。');
+  return h ? '<span style="color:var(--text)">→「'+esc(rubyPlain(h.text))+'」'+(pg?'（P.'+pg+'）':'')+'</span>'
+           : '見つかりません'+(names.length?'（「'+esc(names[0])+'」という見出し1〜3を作るとジャンプできます）':'');
+}
+function propsScene(b){
+  const heads = [];
+  S.blocks.forEach(x=>{ if(SCENE_HEAD_TYPES.includes(x.type)){ const t = rubyPlain(String(x.text||'')).trim(); if(t && !heads.includes(t)) heads.push(t); } });
+  return pRow('ジャンプする見出し',
+      '<input type="text" data-p="sjump" list="dl-sjump" value="'+esc(b.jump||'')+'" placeholder="空なら本文の行き先の名前から探します">'
+    + '<datalist id="dl-sjump">'+heads.map(t=>'<option value="'+esc(t)+'">').join('')+'</datalist>'
+    + '<div class="hint" id="sjumpHint" style="margin-top:4px">'+sceneJumpHint(b)+'</div>',
+    '見出し1・2・3の名前を書くと、出力したHTMLとPDFでその見出しへのリンクになります（候補から選べます）。'
+    + '空のときは、本文の行き先の名前（「書斎へ」「→ 書斎へ移行」「シーン3『書斎』へ」など）が見出しとぴったり同じものへジャンプします。');
 }
 /* 目次ブロックの設定。何を載せるか、見出し、体裁 */
 function propsToc(b){
@@ -11065,6 +11084,10 @@ function syncBlockPanel(){
     : '見出し3の下などを1段内側に寄せられます。';
   document.getElementById('mTop').value = first && first.b.mt!=null ? first.b.mt : '';
   document.getElementById('mBot').value = first && first.b.mb!=null ? first.b.mb : '';
+  /* 決めていないときは、書式ごとの既定の余白を薄く出す */
+  const sp0 = first ? SP(spKey(first.b)) : null;
+  document.getElementById('mTop').placeholder = sp0 ? '既定 '+sp0.t : '既定';
+  document.getElementById('mBot').placeholder = sp0 ? '既定 '+sp0.b : '既定';
   syncPopSideBtns();
 }
 ['mTop','mBot'].forEach(id=>document.getElementById(id).addEventListener('change',e=>{
@@ -11683,15 +11706,22 @@ addEventListener('keydown', e=>{
 });
 document.getElementById('blkCopy').onclick=blkCopyDo;
 document.getElementById('blkPaste').onclick=blkPasteDo;
-/* Esc：文字を打っている最中なら段落の選択へ、選んでいるだけならその選択も外す */
+/* すべての選択を外す。打っている場所（原稿欄・紙面・設定欄の欄）、段落の選択、文字の選択、自由配置の画像の選択 */
+function clearAllSel(){
+  deselectAll(true);
+  const s0 = getSelection(); if(s0 && s0.rangeCount) s0.removeAllRanges();
+  document.getElementById('cmtRail').classList.remove('on');
+  setStatus('選択を外しました');
+}
+/* Esc：1回で、すべての選択を外す。窓や候補の一覧が開いていれば、まずそれを閉じる（そちらの受け口が先に使う） */
 addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
   if(npcModalId || popId) return;
-  if(document.querySelector('#prjDlg[style*="flex"],#helpDlg[style*="flex"],#ccfDlg[style*="flex"],#tblDlg[style*="flex"],#ccfInDlg[style*="flex"],#ytDlg[style*="flex"]')) return;
-  if(e.__escHandled) return;                       // 編集の解除で使われた分は数えない
-  const a=document.activeElement;
-  if(a && (a.isContentEditable||a.tagName==='INPUT'||a.tagName==='TEXTAREA')) return;
-  if(sel.size || pimgSel){ e.preventDefault(); deselectAll(); }
+  if(document.querySelector('#prjDlg[style*="flex"],#helpDlg[style*="flex"],#ccfDlg[style*="flex"],#tblDlg[style*="flex"],#ccfInDlg[style*="flex"],#ytDlg[style*="flex"],#flowDlg[style*="flex"],#prevDlg[style*="flex"]')) return;
+  if(e.__escHandled) return;                       // 候補の一覧を閉じるなどで使われた分は数えない
+  const a=document.activeElement, s0=getSelection();
+  const typing = a && a!==document.body && (a.isContentEditable||a.tagName==='INPUT'||a.tagName==='TEXTAREA');
+  if(sel.size || pimgSel || typing || (s0 && !s0.isCollapsed)){ e.preventDefault(); clearAllSel(); }
 });
 const TEXT_COLORS = [
   ['既定','' ],['朱','#a8331f'],['藍','#1c3f6e'],['深緑','#2f5d40'],
@@ -11833,14 +11863,38 @@ function stepTextPt(d){
   if(nx==null){ setStatus(d>0 ? 'これ以上は大きくできません（'+PT_MAX+'ptまで）' : 'これ以上は小さくできません（'+PT_LIST[0]+'ptまで）','#ff9b83'); return; }
   setTextPt(nx);
 }
-/* 設定欄の「いまの大きさ」。選んだ段落の大きさを pt で出し、同じ大きさのボタンを光らせる */
+/* その段落の a〜z 文字目に出ている大きさの組。文字ごとに変えたところ（飾りの pt）と、段落の大きさ */
+function ptsIn(b, a, z){
+  const base = +curPt(b).toFixed(1), out = new Set();
+  const ms = blockMarks(b).filter(c=>+c.pt>0 && c.b>a && c.a<z);
+  let at = a;
+  ms.slice().sort((x,y)=>x.a-y.a).forEach(c=>{ if(c.a>at) out.add(base); out.add(+(+c.pt).toFixed(1)); at = Math.max(at, c.b); });
+  if(at<z) out.add(base);
+  return out;
+}
+/* 設定欄の「いまの大きさ」。文字を選んでいればその範囲、選んでいなければ選んだ段落の大きさを pt で出し、
+   同じ大きさのボタンを光らせる。大きさが混ざっているときは、どれとも言えないので「—」にして光らせない */
 function syncFsNow(){
   const inp = document.getElementById('ptIn'); if(!inp) return;
-  const f = sel.size ? findBlock([...sel][0]) : null;
-  const v = f ? +curPt(f.b).toFixed(1) : null;
+  let vals = new Set();
+  const rg = selectedTextRange();
+  if(rg) vals = ptsIn(rg.b, rg.a, rg.z);
+  else [...sel].map(findBlock).filter(Boolean).forEach(f=>{
+    const n = String(f.b.text||'').length;
+    ptsIn(f.b, 0, Math.max(1,n)).forEach(v=>vals.add(v));
+  });
+  const v = vals.size===1 ? [...vals][0] : null;
+  inp.placeholder = vals.size>1 ? '—' : '';
   if(document.activeElement!==inp) inp.value = v==null ? '' : v;
+  inp.title = vals.size>1 ? '大きさが混ざっています。ボタンか欄で決めると、そろえられます' : '好きな大きさ（5〜72pt）。Ctrl+Shift+> / < でもひとつずつ変えられます';
   document.querySelectorAll('#ptBtns [data-pt]').forEach(x=>x.classList.toggle('on', v!=null && Math.abs(+x.dataset.pt - v) < .01));
 }
+/* 文字の選び方が変わったら、出している大きさを見直す */
+let fsNowRaf = 0;
+document.addEventListener('selectionchange', ()=>{
+  if(fsNowRaf) return;
+  fsNowRaf = requestAnimationFrame(()=>{ fsNowRaf = 0; syncFsNow(); });
+});
 function setIndent(d, quiet){
   if(!sel.size){ if(!quiet) setStatus('字下げしたい段落を選んでください','#ff9b83'); return; }
   sel.forEach(id=>{const f=findBlock(id); if(!f) return;
@@ -12167,7 +12221,8 @@ function sceneNames(text){
 function sceneTargetOf(b){
   if(!b || b.type!=='scene') return null;
   const at = S.blocks.indexOf(b); if(at<0) return null;
-  const want = sceneNames(b.text); if(!want.length) return null;
+  /* 「ジャンプする見出し」を書いていれば、その名前の見出しへ。なければ行き先の名前（本文）から探す */
+  const want = String(b.jump||'').trim() ? headNames(b.jump) : sceneNames(b.text); if(!want.length) return null;
   const hit = (h)=> SCENE_HEAD_TYPES.includes(h.type) && headNames(h.text).some(n=>want.includes(n));
   for(let i=at+1;i<S.blocks.length;i++) if(hit(S.blocks[i])) return S.blocks[i];
   for(let i=at-1;i>=0;i--) if(hit(S.blocks[i])) return S.blocks[i];
@@ -13086,7 +13141,7 @@ const HELP = [
 <tr><th><code>Backspace</code>/<code>Delete</code></th><td>段落を選んでいる状態（文字を打っていない状態）で押すと、その段落を削除します。</td></tr>
 <tr><th><code>Shift</code>+<code>Enter</code></th><td><b>段落の中で改行します。</b>段落は分かれません。</td></tr>
 <tr><th><code>Backspace</code></th><td>段落の先頭で押すと、前の段落と繋がります。</td></tr>
-<tr><th><code>Esc</code></th><td>1回押すと文字の編集をやめてその段落を選んだ状態に、もう1回押すと<b>選択も外れます</b>。ウィンドウを閉じるときにも使えます。</td></tr>
+<tr><th><code>Esc</code></th><td>1回押すと<b>すべての選択が外れます</b>（段落の選択・文字の選択・打っている場所・自由配置の画像の選択）。候補の一覧やウィンドウが開いているときは、まずそれを閉じます。</td></tr>
 <tr><th><code>Tab</code> / <code>Shift</code>+<code>Tab</code></th><td>左の原稿欄で、その段落を<b>すぐ上の段落の中へ入れます</b>／中から<b>外へ出します</b>。何段でも入れ子にできます（くわしくは「書式と段落」の<b>段落の中の段落</b>）。すぐ上が見出し・タイトル・画像・表など中に段落を持てない書式のときは、今までどおり<b>字下げ</b>になります。</td></tr>
 <tr><th><code>↑</code> / <code>↓</code></th><td>左の原稿欄で、段落の<b>いちばん上の行で↑</b>・<b>いちばん下の行で↓</b>を押すと、前・次の段落へ移ります（横の位置はできるだけそのまま）。画像・表・NPCシートなど文字を打てない段落は<b>選んだ状態</b>にして通り、もう一度押すとさらに先へ進みます。段落を選んでいるだけのときも、↑↓で前・次の段落へ移れます。</td></tr>
 <tr><th><code>Enter</code>（段落を選んでいるとき）</th><td>画像・表など文字を打てない段落なら、<b>すぐ下に空の描写を足して</b>そこで書き始めます。文字の段落なら、その末尾にカーソルが入ります。</td></tr>
@@ -13240,7 +13295,7 @@ const HELP = [
 <table>
 <tr><th>罫線</th><td>横に一本線を引きます。文字を入れると、線の中ほどに小さな見出しとして入ります。</td></tr>
 <tr><th>縦線</th><td>左端に縦の線を立て、その右に文章を置きます。囲み記事や補足に。</td></tr>
-<tr><th>シーン移行</th><td>右に寄せ、本文より少し小さく、太字と下線がつきます。場面の切り替わりを示すのに使います。行き先の名前が見出し1・2・3と<b>ぴったり同じ</b>なら、書き出したHTMLとPDFでその見出しへのリンクになります（「書斎へ」「→ 書斎へ移行」「シーン3『書斎』へ」のように書けます）。つながったかどうかは右の設定欄の<b>つながる見出し</b>で確かめられます。</td></tr>
+<tr><th>シーン移行</th><td>右に寄せ、本文より少し小さく、太字と下線がつきます。場面の切り替わりを示すのに使います。行き先の名前が見出し1・2・3と<b>ぴったり同じ</b>なら、書き出したHTMLとPDFでその見出しへのリンクになります（「書斎へ」「→ 書斎へ移行」「シーン3『書斎』へ」のように書けます）。右の設定欄の<b>ジャンプする見出し</b>に見出しの名前を書けば、本文の書き方にかかわらずその見出しへジャンプします（候補から選べます）。ジャンプ先が見つかったかも、そこに出ます。</td></tr>
 <tr><th>改ページ</th><td>そこでページを区切ります。<code>Ctrl</code>+<code>Alt</code>+<code>B</code>でも入ります。改ページを入れると、次のページに書き始められるよう<b>空の描写がひとつ添えられます</b>。</td></tr>
 <tr><th>改段</th><td>2段組のページで、そこから<b>次の段へ送ります</b>。左の段を途中で切り上げて右の段へ移りたいときに使います。1段組のページでは何も起こりません。<code>Ctrl</code>+<code>Alt</code>+<code>D</code>。</td></tr>
 </table>
@@ -13262,7 +13317,7 @@ const HELP = [
 <ul>
 <li><b>選択を結合</b>：選んだ段落をひとつにまとめます。書式は先頭のものを引き継ぎます。</li>
 <li><b>複製・削除・上下移動</b>：選択中の段落に対して働きます。</li>
-<li><b>この段落だけの余白</b>：上下の余白をmmで指定できます。</li>
+<li><b>この段落の上下の余白</b>：文字の大きさのすぐ下の欄で、上下の余白をmmで指定できます。空のときは書式ごとの既定（薄く出ている値）です。</li>
 </ul>
 <h4>本文のコピー</h4>
 <ul>
