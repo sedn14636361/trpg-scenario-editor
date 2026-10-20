@@ -65,6 +65,13 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 #tbar.mini #tbarShow span{writing-mode:vertical-rl;font-size:10px;letter-spacing:.15em;color:var(--muted)}
 .tic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .tic text{fill:currentColor;stroke:none;font:700 11px sans-serif}
+#saveMenu{position:fixed;z-index:70;background:#1b202b;border:1px solid #3a4252;border-radius:6px;padding:4px;
+  box-shadow:0 8px 24px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:2px;min-width:250px}
+#saveMenu button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:0;background:transparent;padding:7px 10px;border-radius:4px}
+#saveMenu button:hover:not([disabled]){background:#2c3342}
+#saveMenu button small{color:var(--muted);font-size:10px}
+#saveMenu button[disabled]{opacity:.45}
+.prjRow .gn{color:var(--brass);font-weight:700}
 #tbFly{position:fixed;z-index:60;display:none;background:#1b202b;border:1px solid #3a4252;border-radius:6px;
   box-shadow:0 8px 24px rgba(0,0,0,.55);padding:4px;min-width:200px}
 #tbFly .fh{font-size:10px;color:var(--muted);padding:3px 8px 4px;letter-spacing:.1em}
@@ -166,6 +173,11 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
   border-radius:3px}
 .st-cell{color:#d8cfa8}
 .st-cellname{color:#c8b6ff;font-style:italic}
+/* 特殊ブロックの見出しの欄。本文の上に、小さく太く置く */
+.srcstack{flex:1;min-width:0;display:flex;flex-direction:column}
+.srcstack .srctext{flex:0 0 auto}
+.srctext.st-lb{font-size:.82em;font-weight:700;letter-spacing:.12em;color:#e3a07f;min-height:1.4em}
+.srctext.st-lb:empty::before{content:attr(data-ph);color:var(--muted);font-weight:400;letter-spacing:0}
 /* 升目の段落は「表の内容」の金の縦線の内側に、処理の中や新規ウィンドウの中と同じ深さで並べる */
 .srcpop.srccellblk{margin:0 0 3px 0;border-left:0;padding-left:0}
 /* 升目の呼び名。その下にその升目の段落が並ぶ（新規ウィンドウの「〜の内容」と同じ見た目） */
@@ -612,7 +624,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.23.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.26.0</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -628,7 +640,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
     <span id="status">&#8212;</span>
     <button id="btnPrj" title="シナリオを選ぶ・新しく作る・複製する・消す">シナリオ</button>
     <!-- 保存したファイルを開くのは、シナリオの画面の「JSONを読み込む」で行う -->
-    <button id="btnSave" title="いまの内容をファイルに保存します（Ctrl+S）">保存</button>
+    <button id="btnSave" title="ブラウザに版を残すか、ファイル（JSON）に保存するかを選びます（Ctrl+S はファイルに保存）">保存 ▾</button>
     <button id="btnPrint" title="ブラウザの印刷からPDFにできます">印刷 / PDF</button>
     <button id="btnExport" title="配布用の閲覧HTMLを出力します">HTML</button>
     <button id="btnHelp" title="使い方">ヘルプ</button>
@@ -828,6 +840,12 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
           <button id="fsClear" style="flex:1" title="段落を選んでいるときは、その段落の中で文字ごとに変えた大きさも戻します">既定に戻す</button>
         </div>
         <div class="hint">文字を選んでいればその文字だけ、選んでいなければ選んだ段落の大きさを変えます（5〜72pt）。段落の中の段落は、それぞれ別に決めます。</div>
+        <label class="f">この段落の上下の余白（mm）</label>
+        <div class="grid2">
+          <div><span class="hint">上</span><input type="number" id="mTop" step="0.5" min="0" placeholder="既定"></div>
+          <div><span class="hint">下</span><input type="number" id="mBot" step="0.5" min="0" placeholder="既定"></div>
+        </div>
+        <div class="hint">空のときは書式ごとの既定（薄く出ている値）です。前後の段落とのあいだは、大きいほうの余白が効きます。</div>
         <label class="f">字下げ</label>
         <div class="row">
           <button id="indOut" title="ひとつ戻す（Ctrl+Shift+[）">&#8592; 戻す</button>
@@ -838,11 +856,6 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
         <label class="f">画像の回り込み</label>
         <div class="row">
           <button id="imgClearFloat" title="選んだ段落は画像の横に入らず、画像の下から始まります">回り込みを解除</button>
-        </div>
-        <label class="f">この段落だけの余白（mm）</label>
-        <div class="grid2">
-          <div><span class="hint">上</span><input type="number" id="mTop" step="1" placeholder="既定"></div>
-          <div><span class="hint">下</span><input type="number" id="mBot" step="1" placeholder="既定"></div>
         </div>
 
         </div>
@@ -1181,6 +1194,9 @@ const DOC_CSS = `
 .t-proc.bx-bar.bx-thin{border-left:2px solid var(--bxl);padding-left:3mm}
 .t-proc.bx-l-none.bx-bar{padding-left:3.5mm}
 .t-proc.bx-l-none.bx-bar.bx-thin{padding-left:3mm}
+.t-proc.bx-bar.bx-mid{border-left:3px solid var(--bxc)}
+/* 情報の形（枠なし・ふつうの罫）は、前の情報と同じ余白 */
+.blk.t-proc.bx-l-none.sp-info{padding:2.5mm 3.5mm}
 .t-proc.bx-xs{font-size:.86em}
 .t-proc.bx-ink{color:var(--bxc)}
 .t-proc.bx-fill{background:var(--bxf)}
@@ -1889,8 +1905,10 @@ function popInnerViewHTML(pop){
 const TYPES = [
   /* g = 新規ウィンドウのパネルでの区分。よく使うものから順に並べている（本窓のまとめ方は TOOL_GROUPS） */
   {k:'desc',     n:'描写',    s:'0', g:'本文'},
-  {k:'dialog',   n:'会話',    s:'4', g:'本文'},
-  {k:'note',     n:'注釈',      s:'5', g:'本文'},
+  /* 会話・注釈・情報は特殊ブロックのテンプレになった。書式ツールには出さず、キーも割り当てない。
+     名前（TYPE_NAME）と、:::dialog などの書き方の行き先としてだけ残す */
+  {k:'dialog',   n:'会話',    s:'', g:'', hide:true},
+  {k:'note',     n:'注釈',      s:'', g:'', hide:true},
   {k:'proc',     n:'特殊',    s:'6', g:'本文'},
   {k:'flow',     n:'フローチャート',    s:'F', g:'差し込み'},
   {k:'h1',       n:'見出し1',   s:'1', g:'見出し'},
@@ -1910,7 +1928,7 @@ const TYPES = [
   {k:'toc',      n:'目次',      s:'M', g:'差し込み'},
   {k:'cover',    n:'表紙',      s:'C', g:'差し込み'},
   {k:'colophon', n:'奥付',      s:'K', g:'差し込み'},
-  {k:'info',     n:'情報',      s:'L', g:'差し込み'},
+  {k:'info',     n:'情報',      s:'', g:'', hide:true},
   {k:'handout',  n:'ハンドアウト',s:'Y', g:'差し込み'}
 ];
 const TYPE_GROUPS = ['本文','見出し','区切り','差し込み'];
@@ -2040,6 +2058,7 @@ const BX_COLS = [
   {k:'aka',  n:'朱',  c:'#a8331f', l:'rgba(168,51,31,.6)',  f:'rgba(168,51,31,.05)'},
   {k:'sumi', n:'墨',  c:'#23201c', l:'rgba(35,32,28,.55)',  f:'rgba(35,32,28,.045)'},
   {k:'kon',  n:'紺',  c:'#1c2b3c', l:'rgba(28,43,60,.55)',  f:'rgba(28,43,60,.045)'},
+  {k:'nando',n:'納戸',c:'#2f5d73', l:'rgba(47,93,115,.6)',  f:'rgba(47,93,115,.07)'},
   {k:'ai',   n:'藍',  c:'#2b4a6f', l:'rgba(43,74,111,.6)',  f:'rgba(43,74,111,.05)'},
   {k:'koke', n:'苔',  c:'#4a6141', l:'rgba(74,97,65,.6)',   f:'rgba(74,97,65,.05)'},
   {k:'kin',  n:'金茶',c:'#8a6a2f', l:'rgba(138,106,47,.6)', f:'rgba(138,106,47,.055)'},
@@ -2050,18 +2069,20 @@ const BX_COL = k => BX_COLS.find(x=>x.k===k) || BX_COLS[0];
 /* 会話・注釈も特殊ブロックのテンプレにした。前の会話・注釈の見た目を写している
    （会話：枠も罫も地色もなし・紺の文字。注釈：細い罫・地色・小さい字・灰の文字）。見出しは会話なら話し手 */
 const BX_TPL = {
-  skill:  {ln:'dash',  bar:false, thin:false, fill:true,  sm:true,  xs:false, ink:false, col:'aka',  lb:'技能判定'},
-  rule:   {ln:'solid', bar:true,  thin:false, fill:true,  sm:false, xs:false, ink:false, col:'sumi', lb:'特殊ルール'},
-  dialog: {ln:'none',  bar:false, thin:false, fill:false, sm:false, xs:false, ink:true,  col:'kon',  lb:''},
-  note:   {ln:'none',  bar:true,  thin:true,  fill:true,  sm:false, xs:true,  ink:true,  col:'hai',  lb:''}
+  skill:  {ln:'dash',  bar:false, thin:false, mid:false, fill:true,  sm:true,  xs:false, ink:false, copy:false, col:'aka',   lb:'技能判定'},
+  rule:   {ln:'solid', bar:true,  thin:false, mid:false, fill:true,  sm:false, xs:false, ink:false, copy:false, col:'sumi',  lb:'特殊ルール'},
+  dialog: {ln:'none',  bar:false, thin:false, mid:false, fill:false, sm:false, xs:false, ink:true,  copy:false, col:'kon',   lb:''},
+  note:   {ln:'none',  bar:true,  thin:true,  mid:false, fill:true,  sm:false, xs:true,  ink:true,  copy:false, col:'hai',   lb:''},
+  /* 情報：ふつうの太さの罫・地色・納戸。書き出したHTMLで押すと本文が写る */
+  info:   {ln:'none',  bar:true,  thin:false, mid:true,  fill:true,  sm:false, xs:false, ink:false, copy:true,  col:'nando', lb:'情報'}
 };
-/* 会話・注釈の書式ボタンは、そのテンプレの特殊ブロックを作る */
-const TPL_TYPES = ['dialog','note'];
+/* 会話・注釈・情報は、そのテンプレの特殊ブロックとして作る（:::dialog などの書き方・貼り付け） */
+const TPL_TYPES = ['dialog','note','info'];
 /* 原稿欄の札。会話・注釈のテンプレの見た目のままなら、その名前で出す（会話の行が「特殊」と並ばないように） */
 function procName(b){
   const x = ensureProc(b);
   const is = t => t.ln===x.ln && !!t.bar===x.bar && !!t.thin===x.thin && t.fill===x.fill && !!t.xs===x.xs && !!t.ink===x.ink && t.col===x.col;
-  return is(BX_TPL.dialog) ? '会話' : is(BX_TPL.note) ? '注釈' : '特殊';
+  return is(BX_TPL.dialog) ? '会話' : is(BX_TPL.note) ? '注釈' : (is(BX_TPL.info) && !!x.mid) ? '情報' : '特殊';
 }
 function ensureProc(b){
   const d = BX_TPL.skill;
@@ -2070,6 +2091,8 @@ function ensureProc(b){
   x.ln   = ['solid','dash','none'].includes(x.ln) ? x.ln : d.ln;
   x.bar  = !!x.bar;
   x.thin = !!x.thin;                                  // 左の罫を細く（注釈の形）
+  x.mid  = !!x.mid && !x.thin;                         // 左の罫をふつうの太さに（情報の形）
+  x.copy = !!x.copy;                                  // 書き出したHTMLで、押すと本文をコピーする
   x.fill = x.fill!==false;
   x.sm   = !!x.sm;
   x.xs   = !!x.xs;                                    // もっと小さい字（注釈の形）。sm より優先
@@ -2089,7 +2112,7 @@ function bxTplClean(t){
   return { id: String(t.id||'').trim() || uid(),
     n: n.slice(0,24),
     ln: ['solid','dash','none'].includes(t.ln) ? t.ln : 'dash',
-    bar: !!t.bar, thin: !!t.thin, fill: t.fill!==false, sm: !!t.sm, xs: !!t.xs, ink: !!t.ink,
+    bar: !!t.bar, thin: !!t.thin, mid: !!t.mid, fill: t.fill!==false, sm: !!t.sm, xs: !!t.xs, ink: !!t.ink, copy: !!t.copy,
     col: BX_COLS.some(c=>c.k===t.col) ? t.col : 'aka',
     lb: String(t.lb==null?'':t.lb).slice(0,24) };
 }
@@ -2119,7 +2142,7 @@ function mergeUserTpls(){
 function findUserTpl(id){ return userTpls().find(t=>t.id===id) || null; }
 function applyBxTpl(b, key){
   const t = BX_TPL[key] || findUserTpl(key); if(!t) return;
-  b.bx = {ln:t.ln, bar:t.bar, thin:!!t.thin, fill:t.fill, sm:t.sm, xs:!!t.xs, ink:!!t.ink, col:t.col};
+  b.bx = {ln:t.ln, bar:t.bar, thin:!!t.thin, mid:!!t.mid, fill:t.fill, sm:t.sm, xs:!!t.xs, ink:!!t.ink, copy:!!t.copy, col:t.col};
   /* 見出しは、まだ何も書いていないか、他のテンプレの既定のままのときだけ入れ替える。
      「共鳴判定」のように自分で書き換えたものは消さない。 */
   const cur  = b.lb==null ? '' : String(b.lb).trim();
@@ -2130,7 +2153,8 @@ function applyBxTpl(b, key){
 /* 紙面・書き出し・出来上がり窓で同じ見た目にするための、組み立ての共通部分 */
 function procClass(b){
   const x = ensureProc(b);
-  return ' bx-l-'+x.ln + (x.bar?' bx-bar':'') + (x.bar&&x.thin?' bx-thin':'') + (x.fill?' bx-fill':'')
+  return ' bx-l-'+x.ln + (x.bar?' bx-bar':'') + (x.bar&&x.thin?' bx-thin':'') + (x.bar&&x.mid?' bx-mid':'') + (x.fill?' bx-fill':'')
+       + (x.copy?' bx-copy':'')
        + (x.xs?' bx-xs':x.sm?' bx-sm':'') + (x.ink?' bx-ink':'') + (spKey(b)!=='proc'?' sp-'+spKey(b):'');
 }
 function procStyle(b){
@@ -2145,6 +2169,7 @@ function spKey(b){
   const x = b.bx || {};
   if(x.ln==='none' && !x.bar && !x.fill) return 'dialog';
   if(x.bar && x.thin) return 'note';
+  if(x.ln==='none' && x.bar && x.mid) return 'info';
   return 'proc';
 }
 function gapPull(prevType, myType){
@@ -2153,7 +2178,7 @@ function gapPull(prevType, myType){
 }
 const SPACE_CSS = Object.keys(SPACE).map(k=>
   '.blkpad.p-'+k+'{padding-top:'+SPACE[k].t+'mm}\n.t-'+k+'{margin-bottom:'+SPACE[k].b+'mm}').join('\n')
-  + ['dialog','note'].map(k=>'\n.blkpad.sp-'+k+'{padding-top:'+SPACE[k].t+'mm}\n.t-proc.sp-'+k+'{margin-bottom:'+SPACE[k].b+'mm}').join('');
+  + ['dialog','note','info'].map(k=>'\n.blkpad.sp-'+k+'{padding-top:'+SPACE[k].t+'mm}\n.t-proc.sp-'+k+'{margin-bottom:'+SPACE[k].b+'mm}').join('');
 document.getElementById('doccss').textContent = DOC_CSS + '\n' + SPACE_CSS;
 const TYPE_NAME = k => (TYPES.find(t=>t.k===k)||{n:k}).n;
 /* 柄は文字の読みやすさを損なうので、無地だけにしている */
@@ -4076,20 +4101,26 @@ async function prjRepair(){
 }
 /* ---- 過去の版 ----
    置き場にある本体をそのまま写して残す。前に残した版と同じ内容なら残さない */
-async function genSnap(id, json){
-  if(!prjKV || !id) return;
+/* name を渡すと「手動で残した版」になる（保存ボタンの「ブラウザに保存」）。
+   手動の版は、前の版と同じ内容でも名前を付けて残し、自動の版（GEN_MAX 個まで）の数には入れず、押し出されて消えない */
+async function genSnap(id, json, name){
+  if(!prjKV || !id) return false;
   if(json==null) json=await prjRead(id);
-  if(!json) return;
-  const m=(await prjAll()).find(x=>x.id===id); if(!m) return;
+  if(!json) return false;
+  const m=(await prjAll()).find(x=>x.id===id); if(!m) return false;
   const h=strHash(json);
-  if(m.genHash===h) return;
+  if(name==null && m.genHash===h) return false;
   const t=Math.max(Date.now(), ((m.gens||[]).slice(-1)[0]||{t:0}).t+1);
-  const gens=(m.gens||[]).concat([{t:t, z:json.length}]);
-  const drop=gens.slice(0, Math.max(0, gens.length-GEN_MAX));
+  const g0={t:t, z:json.length}; if(name!=null){ g0.n = String(name).slice(0,60); g0.keep = true; }
+  const all=(m.gens||[]).concat([g0]);
+  const autos=all.filter(g=>!g.keep);
+  const drop=autos.slice(0, Math.max(0, autos.length-GEN_MAX));
+  const gens=all.filter(g=>!drop.includes(g));
   await prjKV.batch([[PRJ_GEN+id+':'+t, json]].concat(drop.map(g=>[PRJ_GEN+id+':'+g.t, undefined])), a=>{
     const mm=metaOf(a,id,false);
-    if(mm){ mm.gens=gens.slice(-GEN_MAX); mm.genHash=h; mm.genAt=t; }
+    if(mm){ mm.gens=gens; mm.genHash=h; mm.genAt=t; }
   });
+  return true;
 }
 async function genRead(id,t){ return prjKV.get(PRJ_GEN+id+':'+t); }
 function prjRemember(id){ try{ localStorage.setItem(PRJ_CUR, id); }catch(e){} }
@@ -4692,13 +4723,13 @@ function procSplit(text, ctx){
 /* 前の版の原稿の読み替え（一度だけ）。処理の文章の中の ■ と ＞ を、中の段落に分け直す。
    分けたところに付いていたコメントや色は、位置が合わなくなるので外れる */
 const PK_VER = 1;
-const TK_VER = 1;
+const TK_VER = 2;                                     // 2：情報も特殊ブロックのテンプレにした
 function tplMigrate(list){
   list.forEach(b=>{
-    if(b.type==='dialog' || b.type==='note'){
-      const k = b.type, sp = String(b.sp||'').trim();
+    if(b.type==='dialog' || b.type==='note' || b.type==='info'){
+      const k = b.type, sp = String(b.sp||'').trim(), lb0 = b.lb;
       b.type = 'proc'; b.lb = null; applyBxTpl(b, k); ensureProc(b);
-      b.lb = (k==='dialog') ? sp : '';
+      b.lb = (k==='dialog') ? sp : (k==='info') ? (lb0!=null ? String(lb0) : '情報') : '';
       delete b.sp;
     }
     subLists(b).forEach(tplMigrate);
@@ -6982,7 +7013,11 @@ function srcCellRowHTML(id, key, label, val, ph, cls){
    段落の text ではなく表の内容へ書き戻すために、ここを通す */
 function tsrcOf(el){
   if(!el || !el.dataset || el.dataset.tsrc==null) return null;
-  const f = findBlock(el.dataset.id); if(!f || f.b.type!=='table') return null;
+  const f = findBlock(el.dataset.id); if(!f) return null;
+  /* 特殊ブロックの見出し（会話なら話し手）。段落の本文ではなく見出しへ書き戻す */
+  if(el.dataset.tsrc==='lb' && f.b.type==='proc')
+    return {b:f.b, name:true, lb:true, get:()=>blockLabel(f.b), set:v=>{ f.b.lb = String(v==null?'':v); }};
+  if(f.b.type!=='table') return null;
   const t = ensureTable(f.b), k = el.dataset.tsrc;
   /* 升目の内容は段落の並びになったので、ここで扱うのは表の名前だけ */
   if(k!=='name') return null;
@@ -7017,6 +7052,10 @@ function srcRowHTML(b){
         + '<span>'+esc(String(b.cap||'').trim()||'（説明なし）')+'</span></div>';
     else inner = '<div class="srctext st-'+b.type+'" data-id="'+b.id+'" data-ph="'+ph+'"'
         + (editable?' contenteditable="true" spellcheck="false"':'') + '>'+esc(b.text)+'</div>';
+    /* 特殊ブロックは、本文の上に見出しの欄を置いて、原稿欄でそのまま打てるようにする */
+    if(b.type==='proc')
+      inner = '<div class="srcstack"><div class="srctext st-lb" data-id="'+b.id+'" data-tsrc="lb" contenteditable="true" spellcheck="false"'
+            + ' data-ph="'+(procName(b)==='会話'?'（話し手なし）':'（見出しなし）')+'">'+esc(blockLabel(b))+'</div>'+inner+'</div>';
     return '<div class="src'+(sel.has(b.id)?' pick':'')+(editingId===b.id?' editing':'')
       + (b.ind?' i'+Math.min(4,b.ind):'')+'" data-id="'+b.id+'" data-type="'+b.type+'">'
       + '<div class="srchandle" title="クリックで選択／ドラッグで移動">&#10303;</div>'
@@ -7226,6 +7265,8 @@ srcOn('input', e=>{
     const v = t.innerText.replace(/\n+$/,'');
     ts.set(v);
     mirrorSrcText(t.dataset.id, v, t.dataset.tsrc, t);
+    /* 特殊ブロックの見出しなら、右の設定欄の「見出し」も追いつかせる */
+    if(ts.lb){ const pi = document.querySelector('#propBody [data-p="lb"]'); if(pi && pi!==document.activeElement) pi.value = v; }
     repaginateSoon(); save(); return;
   }
   const f = findBlock(t.dataset.id); if(!f) return;
@@ -7454,25 +7495,35 @@ function mdHeadFire(t, e){
   if(!t || (e && e.isComposing)) return false;
   if(e && e.data!=null && e.data!==' ' && e.data!=='　') return false;
   if(tsrcOf(t)) return false;
-  const f = findBlock(t.dataset.id); if(!mdTypable(f)) return false;
+  const f = findBlock(t.dataset.btext || t.dataset.id); if(!mdTypable(f)) return false;
   if(kidsOwnerOf(f.list)) return false;              // 処理の中には見出しを置かない（#### は小見出しになる）
   const txt = t.innerText.replace(/\n$/,''), off = caretOffset(t);
   const m = txt.slice(0, off).match(/^[#＃]{1,3}[ 　\u00a0]$/); if(!m) return false;
-  mdToHead(f, m[0].length-1, txt.slice(off));
+  mdToHead(f, m[0].length-1, txt.slice(off), mdRoot(t));
   return true;
 }
+/* 紙面（または新規ウィンドウ）の上で打っていたなら、その入れ物。原稿欄なら null */
+function mdRoot(el){ return (el && el.dataset && el.dataset.btext!=null) ? el.closest('#stage,#popBlocks') : null; }
+/* 書式を変えたあとのカーソル。紙面で打っていて、変えた先も紙面で打てる書式なら紙面のまま、そうでなければ原稿欄へ */
+function mdFocus(id, root, atEnd){
+  const el = root && root.isConnected ? root.querySelector('[data-btext="'+id+'"]') : null;
+  if(!el){ focusSrc(id, atEnd); return; }
+  el.focus();
+  const r = document.createRange(); r.selectNodeContents(el); r.collapse(!atEnd);
+  const s0 = getSelection(); s0.removeAllRanges(); s0.addRange(r);
+}
 /* その段落を見出し lv にして、rest を見出しの文字にする */
-function mdToHead(f, lv, rest){
+function mdToHead(f, lv, rest, root){
   kidsRelease(f, 'h'+lv);                            // 見出しは親にしないので、中の段落は外へ出す
   f.b.type = 'h'+lv;
   setBlockText(f.b, rest);
   editingId = f.b.id; sel.clear(); sel.add(f.b.id);
-  render(); focusSrc(f.b.id, false); save();
+  render(); mdFocus(f.b.id, root, false); save();
   setStatus(TYPE_NAME(f.b.type)+'にしました','var(--ok)');
 }
 /* Enter を押したとき、1行目が :::名前・::名前・--- だけなら、その書式にする。
    カーソルより後ろの文字は、::: のときは中身に、それ以外は次の段落に送る */
-function mdLineFire(f, txt, off){
+function mdLineFire(f, txt, off, root){
   if(!mdTypable(f)) return false;
   const head = txt.slice(0, off);
   if(head.indexOf('\n')>=0) return false;
@@ -7505,7 +7556,7 @@ function mdLineFire(f, txt, off){
   f.list.splice(f.i, 1, nb);
   if(inside){
     editingId = nb.id; sel.clear(); sel.add(nb.id);
-    render(); focusSrc(nb.id, false); save();
+    render(); mdFocus(nb.id, root, false); save();
   } else {
     /* 中に書けない書式（罫線・改ページ・表など）は、次の段落を用意して残りの文字をそちらへ送る。
        表や新規ウィンドウのように自分の設定を持つものは、選んだままにして右に設定を出す */
@@ -7516,7 +7567,7 @@ function mdLineFire(f, txt, off){
       render(); save();
     } else {
       editingId = nx.id; sel.clear(); sel.add(nx.id);
-      render(); focusSrc(nx.id, false); save();
+      render(); mdFocus(nx.id, root, false); save();
     }
   }
   setStatus(TYPE_NAME(nb.type)+'にしました','var(--ok)');
@@ -7564,9 +7615,11 @@ const MD_SUGGEST_H = [1,2,3].map(lv=>({lv, k:'h'+lv, lb:'見出し'+lv, gl:'#'.r
   ds:['章の頭のいちばん大きい見出し','中くらいの見出し','小さい見出し'][lv-1]}));
 /* いま候補を出す場面なら、出す候補の並びを返す。q は絞り込みに使った文字 */
 function mdSuggest(fd, before){
-  if(!fd || fd.ta || !fd.el.classList.contains('srctext') || tsrcOf(fd.el)) return null;
+  if(!fd || fd.ta || tsrcOf(fd.el)) return null;
+  const isSrc = fd.el.classList.contains('srctext'), isPaper = fd.el.dataset.btext!=null;
+  if(!isSrc && !isPaper) return null;                 // 原稿欄の段落と、紙面の上で直接打てる段落
   if(before==null || before.indexOf('\n')>=0) return null;
-  const f = findBlock(fd.el.dataset.id); if(!mdTypable(f)) return null;
+  const f = findBlock(fd.el.dataset.btext || fd.el.dataset.id); if(!mdTypable(f)) return null;
   const pop = allBlocks().some(b=>b.type==='popup' && b.pop && b.pop.blocks===f.list);
   const skip = cellOwnerOf(f.list) ? MD_NO_CELL : pop ? POP_SKIP : kidsOwnerOf(f.list) ? KIDS_SKIP : [];
   let m;
@@ -7585,12 +7638,13 @@ function mdSuggest(fd, before){
 }
 /* 候補を選んだ。カーソルより後ろの文字は、Enter で変えたときと同じく中身か次の段落に送る */
 function mdApplySuggest(el, it){
-  const f = findBlock(el.dataset.id); if(!mdTypable(f)) return;
+  const f = findBlock(el.dataset.btext || el.dataset.id); if(!mdTypable(f)) return;
+  const root = mdRoot(el);
   const txt = el.innerText.replace(/\n$/,''), off = caretOffset(el);
   const rest = txt.slice(off).replace(/^\n/,'');
-  if(it.lv){ mdToHead(f, it.lv, rest); return; }
+  if(it.lv){ mdToHead(f, it.lv, rest, root); return; }
   const head = it.cm;
-  mdLineFire(f, head + (rest ? '\n'+rest : ''), head.length);
+  mdLineFire(f, head + (rest ? '\n'+rest : ''), head.length, root);
 }
 /* かな漢字変換の最中に押す Enter は「変換の確定」であって、
    段落を分ける合図ではない。ここを見分けないと、確定した文字と同じ内容の
@@ -7611,7 +7665,7 @@ function caretOffset(el){
   return pre.toString().length;
 }
 function focusSrc(id, atEnd, caretAt){
-  const el = srcQ('.srctext[data-id="'+id+'"]'); if(!el) return;
+  const el = srcQ('.srctext[data-id="'+id+'"]:not([data-tsrc])'); if(!el) return;
   el.focus();
   const r=document.createRange();
   if(caretAt!=null && putCaret(el, r, caretAt)){ /* もとの位置に戻す */ }
@@ -7869,21 +7923,18 @@ srcOn('keydown', e=>{
   /* 表の名前の欄。Enter と Esc は打ち止め（段落を分ける合図ではない） */
   const ts = tsrcOf(t);
   if(ts){
-    if(e.key==='Escape'){
-      e.preventDefault(); e.__escHandled = true; t.blur();
-      editingId=null; sel.clear(); sel.add(ts.b.id); lastPick=ts.b.id;
-      render(); return;
+    if(e.key==='Escape'){ e.preventDefault(); e.__escHandled = true; clearAllSel(); return; }
+    if(e.key==='Enter' && !e.shiftKey){
+      e.preventDefault();
+      if(ts.lb){ render(); focusSrc(ts.b.id, false); }   // 見出しを打ち終えたら、本文の頭へ
+      else t.blur();
     }
-    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); t.blur(); }
     return;
   }
   const f = findBlock(t.dataset.id); if(!f) return;
   if(e.key==='Escape'){
-    /* 1回目のEscは、文字の編集をやめてその段落を選んだ状態にする。
-       選択そのものを外すのは、そのあともう一度Escを押したとき。 */
-    e.preventDefault(); e.__escHandled = true; t.blur();
-    editingId=null; sel.clear(); sel.add(f.b.id); lastPick=f.b.id;
-    render(); return;
+    /* Esc は1回で、打っている場所も段落の選択も文字の選択も、すべて外す */
+    e.preventDefault(); e.__escHandled = true; clearAllSel(); return;
   }
   if(e.key==='Enter' && !e.shiftKey){
     /* Enter で次の段落をすぐ作り、そのまま書き続けられる */
@@ -7959,7 +8010,7 @@ srcOn('keydown', e=>{
     f.list.splice(f.i,1);
     editingId = prev.id; sel.clear(); sel.add(prev.id);
     render();
-    const pel = srcQ('.srctext[data-id="'+prev.id+'"]');
+    const pel = srcQ('.srctext[data-id="'+prev.id+'"]:not([data-tsrc])');
     if(pel){ pel.focus(); try{
       const r=document.createRange(), tn=pel.firstChild||pel;
       r.setStart(tn, Math.min(cut, tn.length!=null?tn.length:0)); r.collapse(true);
@@ -8291,6 +8342,12 @@ stage.addEventListener('pointerdown', e=>{
      .blk しか見ていなかったので、升目の中の段落は押しても選べなかった */
   const blk=e.target.closest('.blk[data-id],.blkpad[data-id]');
   if(blk && blk.dataset.id){
+    /* 紙面で打てない段落を押したら、前の段落で打っていたカーソルを外す。
+       （押した拍子にカーソルが動かないよう止めているので、外さないと打った字が前の段落に入る） */
+    const ae = document.activeElement;
+    if(ae && ae.blur && !blk.contains(ae) && (ae.isContentEditable || ae.tagName==='INPUT' || ae.tagName==='TEXTAREA')){
+      ae.blur(); editingId = null;
+    }
     /* 選んでいない段落でも、つかんだ時点で選んで動かせるようにする
        （一度押して選び直してから、という手順を踏まないと動かせなかった） */
     if(!sel.has(blk.dataset.id)){
@@ -8423,17 +8480,23 @@ function doJumpPreview(id){
   el.classList.add('jumped');
   setTimeout(()=>el.classList.remove('jumped'), 700);
 }
-function paintSel(){
-  if(sel.size && pimgSel){ pimgSel = null; paintPimgSel(); }
+/* 選んだ印だけを付け替える（原稿欄と紙面）。組み直しも設定欄の描き直しもしないので、打っている場所は動かない */
+function paintPicks(){
   srcAll('.src').forEach(el=>el.classList.toggle('pick', sel.has(el.dataset.id)));
   /* 選んだ色はブロック本体ではなく外枠に敷く。
-     見出し1のように自前の背景を持つ書式でも、背景と文字を塗りつぶさないため。 */
+     見出し1のように自前の背景を持つ書式でも、背景と文字を塗りつぶさないため。
+     升目や段落の中の段落は、印（data-id）が外枠のほうにしか付いていないので、外枠からも見る */
   stage.querySelectorAll('.blk').forEach(el=>{
-    const on = sel.has(el.dataset.id);
-    el.classList.toggle('pick', on);
     const w = el.parentElement;
+    const id = el.dataset.id || (w && w.dataset.id);
+    const on = !!id && sel.has(id);
+    el.classList.toggle('pick', on);
     if(w && w.classList.contains('blkpad')) w.classList.toggle('pickwrap', on);
   });
+}
+function paintSel(){
+  if(sel.size && pimgSel){ pimgSel = null; paintPimgSel(); }
+  paintPicks();
   syncBlockPanel();
   renderProps();          // 一度のクリックで右の設定欄が出るように
   renderPopWin();         // 新規ウィンドウも、選んだところを塗り直す
@@ -8536,10 +8599,15 @@ srcOn('dblclick', e=>{
   render(); focusSrc(f.b.id,true);
 });
 /* 右のページ側をクリックしたら、そのブロックを選んで左の該当箇所へ移動する */
+/* 押したところの、いちばん内側の段落の印。
+   段落の中の段落や升目の段落は、印（data-id）が外枠（.blkpad）のほうにしか付いていないので、両方から探す */
+function blkIdAt(el){
+  const b = el && el.closest ? el.closest('.blk[data-id],.blkpad[data-id]') : null;
+  return b ? b.dataset.id : null;
+}
 stage.addEventListener('click', e=>{
   if(e.target.closest(NPC_UI_SEL)) return;
-  const blk = e.target.closest('.blk'); if(!blk) return;
-  const id = blk.dataset.id;
+  const id = blkIdAt(e.target); if(!id || !findBlock(id)) return;
   if(e.shiftKey && lastPick){ sel.clear(); idsBetween(lastPick,id).forEach(x=>sel.add(x)); }
   else if(e.metaKey||e.ctrlKey){ sel.has(id)?sel.delete(id):sel.add(id); lastPick=id; }
   else { sel.clear(); sel.add(id); lastPick=id; }
@@ -9673,7 +9741,7 @@ function renderFlowWinText(){
   if(svg) svg.innerHTML = flowCanvasSVG(fl);
 }
 /* 新規ウィンドウの中に足せる書式。よく使うものだけを並べる */
-const POP_ADD = ['desc','dialog','note','proc','info','h2','h3','hr','table','image','popup'];
+const POP_ADD = ['desc','proc','h2','h3','hr','table','image','popup'];
 function setPopMode(p){
   const blk = popIsBlocks(p);
   document.getElementById('popRich').style.display      = blk ? 'none' : 'flex';
@@ -9739,6 +9807,7 @@ npcOn('keydown', e=>{
 npcOn('input', e=>{
   const t = e.target.closest('[data-btext]'); if(!t) return;
   if(slashFire(t, e)) return;
+  if(mdHeadFire(t, e)) return;                       // 紙面でも、段落の頭の # と空白で見出しにする
   const f = findBlock(t.dataset.btext); if(!f) return;
   setBlockText(f.b, t.innerText.replace(/\n$/,''));
   /* 「テキスト」欄に同じ段落が出ていれば、そちらの文字も合わせる */
@@ -9778,7 +9847,8 @@ npcOn('focusin', e=>{
   const id = el.dataset.id;
   if(sel.size===1 && sel.has(id)) return;
   sel.clear(); sel.add(id); lastPick = id;
-  srcAll('.src').forEach(x=>x.classList.toggle('pick', sel.has(x.dataset.id)));
+  if(pimgSel){ pimgSel = null; paintPimgSel(); }
+  paintPicks();                                      // 紙面の印も、カーソルを入れた段落へ移す
   syncBlockPanel(); renderProps();
 });
 /* 窓のタイトル欄で名前を変える。升目の ＠名前 は名前で指しているので、
@@ -9888,6 +9958,8 @@ npcOn('keydown', e=>{
   const f = findBlock(t.dataset.btext); if(!f) return;
   e.preventDefault();
   const off = caretOffset(t), txt = t.innerText.replace(/\n$/,'');
+  /* 紙面でも、1行目に :::名前・::名前・--- だけを書いて Enter を押したら、その書式にする */
+  if(mdLineFire(f, txt, off, t.closest('#stage,#popBlocks'))) return;
   setBlockText(f.b, txt.slice(0,off));
   const nb = newBlock('desc', txt.slice(off)); nb.cols = f.b.cols;
   f.list.splice(f.i+1, 0, nb);
@@ -9924,16 +9996,14 @@ npcOn('keydown', e=>{
 /* 表を広い窓で書く */
 npcOn('click', e=>{
   const btn=e.target.closest('[data-tbig]'); if(!btn) return;
-  const el=e.target.closest('.blk'); if(!el) return;
-  const f=findBlock(el.dataset.id); if(!f || f.b.type!=='table') return;
+  const f=findBlock(blkIdAt(btn)); if(!f || f.b.type!=='table') return;
   e.preventDefault();
   openTblModal(f.b.id);
 });
 /* プレビュー。操作の欄をぜんぶ外した、書き出したときと同じ姿を出す */
 npcOn('click', e=>{
   const btn=e.target.closest('[data-tprev]'); if(!btn) return;
-  const el=e.target.closest('.blk'); if(!el) return;
-  const f=findBlock(el.dataset.id); if(!f) return;
+  const f=findBlock(blkIdAt(btn)); if(!f) return;
   e.preventDefault();
   openBlockPreview(f.b);
 });
@@ -10024,7 +10094,7 @@ function typeBtnsHTML(skip){
    書式が 1 つだけのアイコンは、押せばすぐその書式になる。
    アイコンの顔は最後に使った書式にし、選んでいる段落の書式を含むアイコンは金色にする。 */
 const TOOL_GROUPS = [
-  {n:'本文ブロック',         ks:['desc','dialog','note','proc','info']},
+  {n:'本文ブロック',         ks:['desc','proc']},
   {n:'見出しブロック',       ks:['h1','h2','h3','scene']},
   {n:'区切りブロック',       ks:['hr','vr','break','colbr']},
   {n:'図表ブロック',         ks:['image','table','flow']},
@@ -10577,7 +10647,8 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
         setStatus('テンプレを消しました','var(--ok)'); return;
       }
       if(k==='bxln'){ x.ln=v; propId=null; re(); return; }
-      if(k==='bxbarv'){ x.bar = v!=='none'; x.thin = v==='thin'; propId=null; re(); return; }
+      if(k==='bxbarv'){ x.bar = v!=='none'; x.thin = v==='thin'; x.mid = v==='mid'; propId=null; re(); return; }
+      if(k==='bxcopy'){ x.copy=!x.copy; propId=null; re(); return; }
       if(k==='bxsz'){ x.sm = v==='sm'; x.xs = v==='xs'; propId=null; re(); return; }
       if(k==='bxfill'){ x.fill=!x.fill; propId=null; re(); return; }
       if(k==='bxink'){ x.ink=!x.ink; propId=null; re(); return; }
@@ -10622,7 +10693,7 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
       soft(); return;
     }
     const k=el.dataset.p, v=el.value;
-    if(k==='lb'){ b.lb=v; soft(); return; }
+    if(k==='lb'){ b.lb=v; if(b.type==='proc') mirrorSrcText(b.id, v, 'lb'); soft(); return; }   // 原稿欄の見出しの欄にも
     if(t){
       if(k==='tname'){ t.name=v; soft(); return; }
       if(k==='dice'){ t.dice=v; soft(); return; }
@@ -10654,6 +10725,10 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
     if(k==='tocown'){ b.tl = v; soft(); return; }
     if(k==='btext'){ b.text=v; soft(); return; }
     if(k==='dsp'){ b.sp=v; soft(); return; }
+    if(k==='sjump'){
+      if(String(v).trim()) b.jump = v; else delete b.jump;
+      const hn = document.getElementById('sjumpHint'); if(hn) hn.innerHTML = sceneJumpHint(b);
+      soft(); return; }
     if(b.type==='image'){
       if(k==='iw'||k==='iwn'){ imgSetW(b, v, body, 'data-p', el); soft(); return; }
       if(k==='icap'){ b.cap=v; soft(); return; }
@@ -10735,15 +10810,23 @@ function propsHTML(b){
     : '';
   return h + propsTocItem(b) + propsCellOwner(b);
 }
-/* シーン移行ブロックの設定。行き先の見出しが見つかったかを見せる */
-function propsScene(b){
-  const h = sceneTargetOf(b), names = sceneNames(b.text);
+/* シーン移行ブロックの設定。ジャンプする見出しを自由に書け、見つかったかを見せる */
+function sceneJumpHint(b){
+  const h = sceneTargetOf(b), own = String(b.jump||'').trim();
+  const names = own ? headNames(own) : sceneNames(b.text);
   const pg = h ? pageOfBlockOrNull(h.id) : null;
-  return pRow('つながる見出し',
-    h ? '<div class="hint" style="color:var(--text)">「'+esc(rubyPlain(h.text))+'」'+(pg?'（P.'+pg+'）':'')+'</div>'
-      : '<div class="hint">見つかりません'+(names.length?'（「'+esc(names[names.length-1])+'」という見出しを作るとつながります）':'')+'</div>',
-    '行き先の名前が見出し1・2・3とぴったり同じなら、出力したHTMLとPDFでその見出しへのリンクになります。'
-    + '「書斎へ」「→ 書斎へ移行」「シーン3『書斎』へ」のように書けます。');
+  return h ? '<span style="color:var(--text)">→「'+esc(rubyPlain(h.text))+'」'+(pg?'（P.'+pg+'）':'')+'</span>'
+           : '見つかりません'+(names.length?'（「'+esc(names[0])+'」という見出し1〜3を作るとジャンプできます）':'');
+}
+function propsScene(b){
+  const heads = [];
+  S.blocks.forEach(x=>{ if(SCENE_HEAD_TYPES.includes(x.type)){ const t = rubyPlain(String(x.text||'')).trim(); if(t && !heads.includes(t)) heads.push(t); } });
+  return pRow('ジャンプする見出し',
+      '<input type="text" data-p="sjump" list="dl-sjump" value="'+esc(b.jump||'')+'" placeholder="空なら本文の行き先の名前から探します">'
+    + '<datalist id="dl-sjump">'+heads.map(t=>'<option value="'+esc(t)+'">').join('')+'</datalist>'
+    + '<div class="hint" id="sjumpHint" style="margin-top:4px">'+sceneJumpHint(b)+'</div>',
+    '見出し1・2・3の名前を書くと、出力したHTMLとPDFでその見出しへのリンクになります（候補から選べます）。'
+    + '空のときは、本文の行き先の名前（「書斎へ」「→ 書斎へ移行」「シーン3『書斎』へ」など）が見出しとぴったり同じものへジャンプします。');
 }
 /* 目次ブロックの設定。何を載せるか、見出し、体裁 */
 function propsToc(b){
@@ -10847,14 +10930,15 @@ function pSeg(name, cur, opts){
 }
 function propsProc(b){
   const x = ensureProc(b), kids = b.kids.length;
-  const same = t => t && t.ln===x.ln && !!t.bar===x.bar && !!t.thin===x.thin && t.fill===x.fill && !!t.sm===x.sm
+  const same = t => t && t.ln===x.ln && !!t.bar===x.bar && !!t.thin===x.thin && !!t.mid===x.mid && t.fill===x.fill && !!t.sm===x.sm
                     && !!t.xs===x.xs && !!t.ink===x.ink && t.col===x.col;
   const mine = userTpls();
   return pRow('テンプレ',
       '<div class="grid2"><button data-p="tpl" data-v="skill"'+(same(BX_TPL.skill)?' class="on"':'')+'>技能判定</button>'
     + '<button data-p="tpl" data-v="rule"'+(same(BX_TPL.rule)?' class="on"':'')+'>特殊ルール</button>'
     + '<button data-p="tpl" data-v="dialog"'+(same(BX_TPL.dialog)?' class="on"':'')+'>会話</button>'
-    + '<button data-p="tpl" data-v="note"'+(same(BX_TPL.note)?' class="on"':'')+'>注釈</button></div>'
+    + '<button data-p="tpl" data-v="note"'+(same(BX_TPL.note)?' class="on"':'')+'>注釈</button>'
+    + '<button data-p="tpl" data-v="info"'+(same(BX_TPL.info)?' class="on"':'')+'>情報</button></div>'
     + (mine.length ? '<div class="tpllist">' + mine.map(t=>
         '<div class="tplrow"><button data-p="tpl" data-v="'+esc(t.id)+'"'+(same(t)?' class="on"':'')
         + ' title="'+esc((t.lb||'見出しなし')+'／この形にします')+'">'+esc(t.n)+'</button>'
@@ -10869,11 +10953,13 @@ function propsProc(b){
       '<input type="text" data-p="lb" list="dl-lb" value="'+esc(blockLabel(b))+'" placeholder="見出し（会話なら話し手）">',
       '空にすると見出しが出ません。会話では、ここが話し手になります。')
     + pRow('枠線', pSeg('bxln', x.ln, [['solid','実線'],['dash','破線'],['none','なし']]))
-    + pRow('左の罫', pSeg('bxbarv', x.bar ? (x.thin?'thin':'thick') : 'none', [['none','なし'],['thin','細い'],['thick','太い']]))
+    + pRow('左の罫', pSeg('bxbarv', x.bar ? (x.thin?'thin':x.mid?'mid':'thick') : 'none', [['none','なし'],['thin','細い'],['mid','ふつう'],['thick','太い']]))
     + pRow('字の大きさ', pSeg('bxsz', x.xs ? 'xs' : x.sm ? 'sm' : 'n', [['n','ふつう'],['sm','小さめ'],['xs','もっと小さく']]))
     + '<div class="row" style="margin-top:6px">'
       + '<button data-p="bxfill"'+(x.fill?' class="on"':'')+'>地色</button>'
       + '<button data-p="bxink"'+(x.ink?' class="on"':'')+'>文字にも色</button></div>'
+    + pRow('コピー', '<div class="row"><button data-p="bxcopy"'+(x.copy?' class="on"':'')+'>押すと本文をコピー</button></div>',
+        '書き出したHTMLでこの枠を押すと、本文（中の段落も）が写ります。セッション中にチャットへ貼るときに。')
     + pRow('色', '<div class="bxcols">'
       + BX_COLS.map(c=>'<button data-p="bxcol" data-v="'+c.k+'"'+(x.col===c.k?' class="on"':'')
           + ' title="'+c.n+'" style="--sw:'+c.c+'"><i></i>'+c.n+'</button>').join('')
@@ -11065,6 +11151,10 @@ function syncBlockPanel(){
     : '見出し3の下などを1段内側に寄せられます。';
   document.getElementById('mTop').value = first && first.b.mt!=null ? first.b.mt : '';
   document.getElementById('mBot').value = first && first.b.mb!=null ? first.b.mb : '';
+  /* 決めていないときは、書式ごとの既定の余白を薄く出す */
+  const sp0 = first ? SP(spKey(first.b)) : null;
+  document.getElementById('mTop').placeholder = sp0 ? '既定 '+sp0.t : '既定';
+  document.getElementById('mBot').placeholder = sp0 ? '既定 '+sp0.b : '既定';
   syncPopSideBtns();
 }
 ['mTop','mBot'].forEach(id=>document.getElementById(id).addEventListener('change',e=>{
@@ -11385,7 +11475,36 @@ addEventListener('keyup', e=>{
   if(e.code==='Space'){ spaceHeld=false; cw.classList.remove('panready'); }
 });
 addEventListener('blur', ()=>{ spaceHeld=false; cw.classList.remove('panready'); });
-document.getElementById('btnSave').onclick=saveToFile;
+/* 「保存」を押すと、保存先を選ぶ小さな一覧を出す。
+   ブラウザに保存：いまの姿に名前を付けて、シナリオの「過去の版」に残す（通信はしない。このブラウザの中だけ）
+   JSONファイルに保存：これまでの保存（Ctrl+S と同じ） */
+function saveMenuClose(){ const m=document.getElementById('saveMenu'); if(m) m.remove(); }
+document.getElementById('btnSave').onclick=e=>{
+  e.stopPropagation();
+  if(document.getElementById('saveMenu')){ saveMenuClose(); return; }
+  const r = e.currentTarget.getBoundingClientRect();
+  const m = document.createElement('div'); m.id='saveMenu';
+  m.innerHTML = '<button data-sv="gen"'+(prjKV&&prjId?'':' disabled')+'><b>ブラウザに保存</b><small>いまの姿に名前を付けて「過去の版」に残します</small></button>'
+    + '<button data-sv="file"><b>JSONファイルに保存</b><small>手元にファイルとして残します（Ctrl+S）</small></button>';
+  m.style.top = (r.bottom+4)+'px'; m.style.right = Math.max(8, innerWidth - r.right)+'px';
+  document.body.appendChild(m);
+  m.addEventListener('click', ev=>{ const b=ev.target.closest('[data-sv]'); if(!b || b.disabled) return;
+    saveMenuClose(); if(b.dataset.sv==='file') saveToFile(); else saveToBrowser(); });
+};
+addEventListener('pointerdown', e=>{ if(!e.target.closest('#saveMenu,#btnSave')) saveMenuClose(); }, true);
+addEventListener('keydown', e=>{ if(e.key==='Escape' && document.getElementById('saveMenu')){ e.__escHandled = true; saveMenuClose(); } }, true);
+async function saveToBrowser(){
+  if(!prjKV || !prjId){ setStatus('このブラウザでは、シナリオの置き場が使えません。JSONファイルに保存してください','#ff9b83'); return; }
+  const d = new Date(), z = n=>String(n).padStart(2,'0');
+  const def = '手動保存 '+d.getFullYear()+'/'+z(d.getMonth()+1)+'/'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());
+  const nm = prompt('この版の名前（シナリオの「過去の版」に★として残ります）', def);
+  if(nm===null) return;
+  try{
+    await saveNow();                                  // 打ちかけの分も置き場へ書いてから写す
+    await genSnap(prjId, null, nm.trim() || def);
+    setStatus('ブラウザに「'+(nm.trim()||def)+'」として残しました（シナリオ → 過去の版 から戻せます）','var(--ok)');
+  }catch(err){ setStatus('ブラウザに保存できませんでした。JSONファイルに保存してください','#ff9b83'); }
+}
 
 /* ---- 画像の挿入と設定 ---- */
 /* いま選んでいる画像を選び直す（無ければ新しく足す）。
@@ -11683,15 +11802,22 @@ addEventListener('keydown', e=>{
 });
 document.getElementById('blkCopy').onclick=blkCopyDo;
 document.getElementById('blkPaste').onclick=blkPasteDo;
-/* Esc：文字を打っている最中なら段落の選択へ、選んでいるだけならその選択も外す */
+/* すべての選択を外す。打っている場所（原稿欄・紙面・設定欄の欄）、段落の選択、文字の選択、自由配置の画像の選択 */
+function clearAllSel(){
+  deselectAll(true);
+  const s0 = getSelection(); if(s0 && s0.rangeCount) s0.removeAllRanges();
+  document.getElementById('cmtRail').classList.remove('on');
+  setStatus('選択を外しました');
+}
+/* Esc：1回で、すべての選択を外す。窓や候補の一覧が開いていれば、まずそれを閉じる（そちらの受け口が先に使う） */
 addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
   if(npcModalId || popId) return;
-  if(document.querySelector('#prjDlg[style*="flex"],#helpDlg[style*="flex"],#ccfDlg[style*="flex"],#tblDlg[style*="flex"],#ccfInDlg[style*="flex"],#ytDlg[style*="flex"]')) return;
-  if(e.__escHandled) return;                       // 編集の解除で使われた分は数えない
-  const a=document.activeElement;
-  if(a && (a.isContentEditable||a.tagName==='INPUT'||a.tagName==='TEXTAREA')) return;
-  if(sel.size || pimgSel){ e.preventDefault(); deselectAll(); }
+  if(document.querySelector('#prjDlg[style*="flex"],#helpDlg[style*="flex"],#ccfDlg[style*="flex"],#tblDlg[style*="flex"],#ccfInDlg[style*="flex"],#ytDlg[style*="flex"],#flowDlg[style*="flex"],#prevDlg[style*="flex"]')) return;
+  if(e.__escHandled) return;                       // 候補の一覧を閉じるなどで使われた分は数えない
+  const a=document.activeElement, s0=getSelection();
+  const typing = a && a!==document.body && (a.isContentEditable||a.tagName==='INPUT'||a.tagName==='TEXTAREA');
+  if(sel.size || pimgSel || typing || (s0 && !s0.isCollapsed)){ e.preventDefault(); clearAllSel(); }
 });
 const TEXT_COLORS = [
   ['既定','' ],['朱','#a8331f'],['藍','#1c3f6e'],['深緑','#2f5d40'],
@@ -11833,14 +11959,38 @@ function stepTextPt(d){
   if(nx==null){ setStatus(d>0 ? 'これ以上は大きくできません（'+PT_MAX+'ptまで）' : 'これ以上は小さくできません（'+PT_LIST[0]+'ptまで）','#ff9b83'); return; }
   setTextPt(nx);
 }
-/* 設定欄の「いまの大きさ」。選んだ段落の大きさを pt で出し、同じ大きさのボタンを光らせる */
+/* その段落の a〜z 文字目に出ている大きさの組。文字ごとに変えたところ（飾りの pt）と、段落の大きさ */
+function ptsIn(b, a, z){
+  const base = +curPt(b).toFixed(1), out = new Set();
+  const ms = blockMarks(b).filter(c=>+c.pt>0 && c.b>a && c.a<z);
+  let at = a;
+  ms.slice().sort((x,y)=>x.a-y.a).forEach(c=>{ if(c.a>at) out.add(base); out.add(+(+c.pt).toFixed(1)); at = Math.max(at, c.b); });
+  if(at<z) out.add(base);
+  return out;
+}
+/* 設定欄の「いまの大きさ」。文字を選んでいればその範囲、選んでいなければ選んだ段落の大きさを pt で出し、
+   同じ大きさのボタンを光らせる。大きさが混ざっているときは、どれとも言えないので「—」にして光らせない */
 function syncFsNow(){
   const inp = document.getElementById('ptIn'); if(!inp) return;
-  const f = sel.size ? findBlock([...sel][0]) : null;
-  const v = f ? +curPt(f.b).toFixed(1) : null;
+  let vals = new Set();
+  const rg = selectedTextRange();
+  if(rg) vals = ptsIn(rg.b, rg.a, rg.z);
+  else [...sel].map(findBlock).filter(Boolean).forEach(f=>{
+    const n = String(f.b.text||'').length;
+    ptsIn(f.b, 0, Math.max(1,n)).forEach(v=>vals.add(v));
+  });
+  const v = vals.size===1 ? [...vals][0] : null;
+  inp.placeholder = vals.size>1 ? '—' : '';
   if(document.activeElement!==inp) inp.value = v==null ? '' : v;
+  inp.title = vals.size>1 ? '大きさが混ざっています。ボタンか欄で決めると、そろえられます' : '好きな大きさ（5〜72pt）。Ctrl+Shift+> / < でもひとつずつ変えられます';
   document.querySelectorAll('#ptBtns [data-pt]').forEach(x=>x.classList.toggle('on', v!=null && Math.abs(+x.dataset.pt - v) < .01));
 }
+/* 文字の選び方が変わったら、出している大きさを見直す */
+let fsNowRaf = 0;
+document.addEventListener('selectionchange', ()=>{
+  if(fsNowRaf) return;
+  fsNowRaf = requestAnimationFrame(()=>{ fsNowRaf = 0; syncFsNow(); });
+});
 function setIndent(d, quiet){
   if(!sel.size){ if(!quiet) setStatus('字下げしたい段落を選んでください','#ff9b83'); return; }
   sel.forEach(id=>{const f=findBlock(id); if(!f) return;
@@ -12167,7 +12317,8 @@ function sceneNames(text){
 function sceneTargetOf(b){
   if(!b || b.type!=='scene') return null;
   const at = S.blocks.indexOf(b); if(at<0) return null;
-  const want = sceneNames(b.text); if(!want.length) return null;
+  /* 「ジャンプする見出し」を書いていれば、その名前の見出しへ。なければ行き先の名前（本文）から探す */
+  const want = String(b.jump||'').trim() ? headNames(b.jump) : sceneNames(b.text); if(!want.length) return null;
   const hit = (h)=> SCENE_HEAD_TYPES.includes(h.type) && headNames(h.text).some(n=>want.includes(n));
   for(let i=at+1;i<S.blocks.length;i++) if(hit(S.blocks[i])) return S.blocks[i];
   for(let i=at-1;i>=0;i--) if(hit(S.blocks[i])) return S.blocks[i];
@@ -12331,7 +12482,7 @@ function blockStaticHTML0(b, cols, pull, top, anchor, edit){
     if(b.type==='popup')return ow+'<div class="'+cl+'" style="'+st2+'">'+popupInnerHTML(b)+'</div></div>';
     if(b.type==='proc'){
       const lb=blockLabel(b).trim();
-      return ow+'<div'+anchor+' class="'+cl+procClass(b)+'" style="'+procStyle(b)+st2+'">'
+      return ow+'<div'+anchor+' class="'+cl+procClass(b)+'" style="'+procStyle(b)+st2+'"'+(ensureProc(b).copy?' title="クリックで本文をコピー"':'')+'>'
         + (lb?'<div class="t-lb">'+esc(lb)+'</div>':'') + richBlockHTML(b) + '</div></div>';
     }
     if(b.type==='info'||b.type==='handout'){
@@ -12517,6 +12668,9 @@ function doExport(a,b,flow){
   const dataBits = allBlocks().map(x=>{
     if(x.type==='info' || x.type==='handout')
       return '<script type="text/plain" class="outdata" id="cp'+x.id+'">'+sesc(blockCopyText(x))+'<\/script>';
+    /* 「押すと本文をコピー」の特殊ブロック。中の段落の文字も写す */
+    if(x.type==='proc' && ensureProc(x).copy)
+      return '<script type="text/plain" class="outdata" id="cp'+x.id+'">'+sesc(rubyPlain(blockPlainText(x)).replace(/\n+$/,''))+'<\/script>';
     if(x.type==='table'){
       const t=x.tbl||newTable();
       const txt = String(t.out||'').trim() || rollTableText(t);
@@ -12579,8 +12733,8 @@ body.notoc #tocBtn{left:10px}
 .copybtn:hover{opacity:1;background:#a8331f}
 .blkpad.p-table,.blkpad.p-npc{position:relative}
 /* 情報・ハンドアウトは、枠をクリックすると本文が写る。合わせたときだけ合図を出す */
-.t-info,.t-handout{cursor:copy;transition:box-shadow .12s}
-.t-info:hover,.t-handout:hover{box-shadow:0 0 0 2px rgba(211,165,52,.55)}
+.t-info,.t-handout,.t-proc.bx-copy{cursor:copy;transition:box-shadow .12s}
+.t-info:hover,.t-handout:hover,.t-proc.bx-copy:hover{box-shadow:0 0 0 2px rgba(211,165,52,.55)}
 #cpToast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:60;background:#23201c;color:#f7f3ea;
   border-radius:999px;padding:7px 16px;font:13px system-ui,sans-serif;opacity:0;pointer-events:none;transition:opacity .2s}
 #cpToast.on{opacity:1}
@@ -12854,7 +13008,7 @@ body.fx.notoc #doc{margin-left:0}
       return; }
     if(t.className==='cmt-x'){ document.getElementById('cmtRail').classList.remove('on'); return; }
     /* 情報・ハンドアウトの枠をクリックすると本文を写す（文字を選んでいるとき・中のボタンやリンクは除く） */
-    var cp=t.closest&&t.closest('.t-info,.t-handout');
+    var cp=t.closest&&t.closest('.t-info,.t-handout,.t-proc.bx-copy');
     if(cp && !t.closest('a,button,input') && !String(getSelection()).trim()){
       var pad=cp.closest('.blkpad'), src=pad&&document.getElementById('cp'+pad.getAttribute('data-id'));
       if(src){ copyText(window.varText ? window.varText(src.textContent) : src.textContent);
@@ -13062,7 +13216,7 @@ const HELP = [
 <ul>
 <li>編集内容はこのブラウザに自動保存されます。打ち終えて0.7秒、打ち続けていても3秒ごとに保存します。</li>
 <li>タブを閉じたり再読み込みしたりしても、打った字は残ります。保存しきれなかった分は控えておき、次に開いたときに戻します。</li>
-<li>ツールバーの<b>保存</b>（<code>Ctrl</code>+<code>S</code>）で、ファイルに残せます。大切な原稿はこちらでも残してください。</li>
+<li>ツールバーの<b>保存 ▾</b>を押すと、保存先を選べます。<b>ブラウザに保存</b>は、いまの姿に名前を付けてシナリオの「過去の版」に★として残します（自動の版に押し出されて消えません。通信はせず、このブラウザの中だけです）。<b>JSONファイルに保存</b>（<code>Ctrl</code>+<code>S</code>）は、ファイルに残します。大切な原稿はファイルでも残してください。</li>
 <li>Chrome・Edge では、はじめの<b>保存</b>でファイルの置き場所を選ぶと、以後は自動保存のたびにそのファイルにも書きます。ブラウザのデータが消えても、そのファイルを<b>シナリオ</b>の画面の<b>JSONを読み込む</b>で戻せます。書く許可が切れたときは、上に帯が出るので<b>再開する</b>を押してください。</li>
 <li>保存に失敗すると、上に赤い帯が出て、直るまで消えません。</li>
 <li>ファイルに保存していない変更があると、ステータスに「未保存の変更あり」と出ます。</li>
@@ -13086,7 +13240,7 @@ const HELP = [
 <tr><th><code>Backspace</code>/<code>Delete</code></th><td>段落を選んでいる状態（文字を打っていない状態）で押すと、その段落を削除します。</td></tr>
 <tr><th><code>Shift</code>+<code>Enter</code></th><td><b>段落の中で改行します。</b>段落は分かれません。</td></tr>
 <tr><th><code>Backspace</code></th><td>段落の先頭で押すと、前の段落と繋がります。</td></tr>
-<tr><th><code>Esc</code></th><td>1回押すと文字の編集をやめてその段落を選んだ状態に、もう1回押すと<b>選択も外れます</b>。ウィンドウを閉じるときにも使えます。</td></tr>
+<tr><th><code>Esc</code></th><td>1回押すと<b>すべての選択が外れます</b>（段落の選択・文字の選択・打っている場所・自由配置の画像の選択）。候補の一覧やウィンドウが開いているときは、まずそれを閉じます。</td></tr>
 <tr><th><code>Tab</code> / <code>Shift</code>+<code>Tab</code></th><td>左の原稿欄で、その段落を<b>すぐ上の段落の中へ入れます</b>／中から<b>外へ出します</b>。何段でも入れ子にできます（くわしくは「書式と段落」の<b>段落の中の段落</b>）。すぐ上が見出し・タイトル・画像・表など中に段落を持てない書式のときは、今までどおり<b>字下げ</b>になります。</td></tr>
 <tr><th><code>↑</code> / <code>↓</code></th><td>左の原稿欄で、段落の<b>いちばん上の行で↑</b>・<b>いちばん下の行で↓</b>を押すと、前・次の段落へ移ります（横の位置はできるだけそのまま）。画像・表・NPCシートなど文字を打てない段落は<b>選んだ状態</b>にして通り、もう一度押すとさらに先へ進みます。段落を選んでいるだけのときも、↑↓で前・次の段落へ移れます。</td></tr>
 <tr><th><code>Enter</code>（段落を選んでいるとき）</th><td>画像・表など文字を打てない段落なら、<b>すぐ下に空の描写を足して</b>そこで書き始めます。文字の段落なら、その末尾にカーソルが入ります。</td></tr>
@@ -13098,7 +13252,7 @@ const HELP = [
 <tr><th><code>Tab</code> / <code>Shift</code>+<code>Tab</code></th><td>字下げを1段ずつ増減します（<code>Ctrl</code>+<code>Shift</code>+<code>]</code> / <code>[</code>も同じ）。打っている途中でも使えます。</td></tr>
 <tr><th><code>Ctrl</code>+<code>0</code> / <code>+</code> / <code>-</code></th><td>ページの表示倍率。<code>0</code>で幅に合わせます。<code>Ctrl</code>+<code>Shift</code>+<code>↑</code> / <code>↓</code> でも拡大縮小できます。</td></tr>
 <tr><th>書式のショートカット</th><td>すべて <code>Ctrl</code>+<code>Shift</code>+キー です（<code>Ctrl</code>+<code>Alt</code>+キー も今までどおり使えます。ブラウザに取られる組み合わせがあったときの逃げ道です）。<br>
-<code>0</code>描写、<code>1</code>〜<code>3</code>見出し1〜3、<code>4</code>会話、<code>5</code>注釈、<code>6</code>特殊、<code>8</code>シーン移行、<code>9</code>NPCシート、<br>
+<code>0</code>描写、<code>1</code>〜<code>3</code>見出し1〜3、<code>6</code>特殊、<code>8</code>シーン移行、<code>9</code>NPCシート、<br>
 <code>C</code>表紙、<code>T</code>タイトル、<code>S</code>サブタイトル、<code>K</code>奥付、<code>G</code>画像、<code>M</code>目次、<code>H</code>罫線、<code>V</code>縦線、<code>B</code>改ページ、<code>D</code>改段、<code>X</code>表、<code>W</code>新規ウィンドウ、<code>F</code>フローチャート<br>
 段落を<b>選んでいれば</b>その書式に変わり、<b>選んでいなければ</b>いちばん後ろに新しく足されます。<br>
 ブラウザで開いているときは、<code>Ctrl</code>+<code>Shift</code>+<code>T</code>（タブを開き直す）などブラウザ側が先に取る組み合わせがあります。その場合は <code>Ctrl</code>+<code>Alt</code>+キー を使ってください。exe版ではどちらも使えます。</td></tr>
@@ -13138,9 +13292,9 @@ const HELP = [
 
  ['blocks','書式と段落', `
 <h3>書式と段落</h3>
-<p>書式は左の<b>書式ツールバー</b>で選びます。関連の近いものを8つのアイコンにまとめてあります：<b>本文ブロック</b>（描写・会話・注釈・特殊・情報。会話と注釈は特殊ブロックのテンプレを作ります）、<b>見出しブロック</b>（見出し1〜3・シーン移行）、<b>区切りブロック</b>（罫線・縦線・改ページ・改段）、<b>図表ブロック</b>（画像・表・フローチャート）、<b>シートブロック</b>（NPCシート・ハンドアウト）、<b>新規ウィンドウの追加</b>（新規ウィンドウ）、<b>装丁ブロック</b>（表紙・目次・奥付）、<b>表題ブロック</b>（タイトル・サブタイトル）。アイコンを押すと内容が開き、選ぶとその書式になります。段落を<b>選んでいれば</b>その書式に変わり、<b>何も選んでいなければ</b>いちばん後ろに新しく足されます。いま選んでいる段落の書式を含むアイコンは金色になります。</p>
-<h4>情報ブロック</h4>
-<p>プレイヤーに渡す情報をまとめる枠です（<code>Ctrl</code>+<code>Alt</code>+<code>L</code>）。見出し（例：「情報：古い日記」）と本文を持ち、本文には入れ子の書式も使えます。出力したHTMLでは、枠にカーソルを合わせると縁が光り、<b>クリックするだけで本文だけ</b>をクリップボードに写せます（「本文をコピーしました」と出ます）。セッション中にチャットへそのまま貼れます。文字をドラッグで選んだときは、ふつうの文字選択になります。編集画面ではクリックは段落を選ぶ操作なので、写したいときは<b>文章をコピー</b>を使ってください。</p>
+<p>書式は左の<b>書式ツールバー</b>で選びます。関連の近いものを8つのアイコンにまとめてあります：<b>本文ブロック</b>（描写・特殊。会話・注釈・情報は特殊ブロックのテンプレです）、<b>見出しブロック</b>（見出し1〜3・シーン移行）、<b>区切りブロック</b>（罫線・縦線・改ページ・改段）、<b>図表ブロック</b>（画像・表・フローチャート）、<b>シートブロック</b>（NPCシート・ハンドアウト）、<b>新規ウィンドウの追加</b>（新規ウィンドウ）、<b>装丁ブロック</b>（表紙・目次・奥付）、<b>表題ブロック</b>（タイトル・サブタイトル）。アイコンを押すと内容が開き、選ぶとその書式になります。段落を<b>選んでいれば</b>その書式に変わり、<b>何も選んでいなければ</b>いちばん後ろに新しく足されます。いま選んでいる段落の書式を含むアイコンは金色になります。</p>
+<h4>情報（特殊ブロックのテンプレ）</h4>
+<p>プレイヤーに渡す情報をまとめる枠です。特殊ブロックを作って「情報」のテンプレを押すか、<code>:::info[見出し]</code> と書いて作ります。見出し（例：「情報：古い日記」）と本文を持ち、本文には入れ子の書式も使えます。<b>押すと本文をコピー</b>がはじめから ON なので、出力したHTMLでは、枠にカーソルを合わせると縁が光り、<b>クリックするだけで本文</b>をクリップボードに写せます（「本文をコピーしました」と出ます）。ほかの特殊ブロックでも、設定欄でこれを ON にできます。</p>
 <h4>ハンドアウト</h4>
 <p>ハンドアウト番号（HO1）・ハンドアウト名・本文を持つ枠です（<code>Ctrl</code>+<code>Alt</code>+<code>Y</code>）。ハンドアウト番号は自動で HO1、HO2… と振られ、右のプロパティでハンドアウト番号とハンドアウト名を変えられます。左の原稿では、書式名の欄に「ハンドアウト」とハンドアウト番号が縦に並びます。出力したHTMLでは、情報ブロックと同じく<b>クリックで本文だけ</b>を写せます。ハンドアウト番号はそのまま変数 <code>{HO1}</code>（そのハンドアウトのPC名）になります。</p>
 <h4>変数（{HO1} など）</h4>
@@ -13190,7 +13344,7 @@ const HELP = [
 <h4>入れ子の書式（行の頭の印）</h4>
 <p>箇条書きは独立した書式ではなく、<b>本文の中に置く入れ子の書式</b>です。行の頭に印を入れると、その行だけ別の書式になります。<b>描写・特殊ブロック・新規ウィンドウの内容・キャラシのメモ／タブ</b>で使えます。<br>
 印は左の原稿欄で、行の頭に打って入れます（右の設定欄にはボタンを置いていません）。</p>
-<p>打ちながら入れるときは、行の頭で <code>/</code> を打ちます。<b>候補の一覧</b>が出るので、<code>↑</code><code>↓</code>で選んで <code>Enter</code> か <code>Tab</code> で入れます（マウスで押しても入ります）。続けて打つと絞り込めます。手がかりは、合図の名前（<code>/ko</code> → 小見出し）、ひらがなの読み（<code>/みだし</code> → 見出し・小見出し）、表示名です。<code>Esc</code> で閉じると、打った文字はそのまま残ります。日本語入力のままなら全角の <code>／</code> でも出ます（日本語キーボードの <code>/</code> キーは、日本語入力がオンだと「・」になるためです）。<code>/komidashi</code> のように最後まで打って空白を押しても、これまでどおり入ります。</p>
+<p>打ちながら入れるときは、行の頭で <code>/</code> を打ちます（左の原稿欄でも、紙面の上で直接打っているときでも出ます）。<b>候補の一覧</b>が出るので、<code>↑</code><code>↓</code>で選んで <code>Enter</code> か <code>Tab</code> で入れます（マウスで押しても入ります）。続けて打つと絞り込めます。手がかりは、合図の名前（<code>/ko</code> → 小見出し）、ひらがなの読み（<code>/みだし</code> → 見出し・小見出し）、表示名です。<code>Esc</code> で閉じると、打った文字はそのまま残ります。日本語入力のままなら全角の <code>／</code> でも出ます（日本語キーボードの <code>/</code> キーは、日本語入力がオンだと「・」になるためです）。<code>/komidashi</code> のように最後まで打って空白を押しても、これまでどおり入ります。</p>
 <table>
 <tr><th><code>- </code>で始まる行</th><td><b>箇条書き（中黒）</b>。markdown と同じ書き方です（<code>*</code> <code>+</code> も同じ）。うしろに空白が要ります（<code>-5度</code> のような文はそのままです）。</td></tr>
 <tr><th><code>1.</code> <code>2.</code> で始まる行</th><td><b>箇条書き（番号）</b>。書いた番号がそのまま出ます。markdown と同じです。</td></tr>
@@ -13204,10 +13358,12 @@ const HELP = [
 <p><b>印は markdown と同じ書き方にそろえてあります。</b>これまでの <code>・</code> <code>□</code> <code>＞</code> もそのまま読めます。古い原稿は、開いたときに一度だけ新しい印へ書き換えます（見た目と注の位置は変わりません）。</p>
 <p>もとの「箇条書き」の書式で書いた原稿は、開いたときに<b>描写に直し、各行の頭に印を付け直します</b>。見た目はそのままです。</p>
 <h4>特殊ブロック</h4>
-<p><b>特殊ブロック</b>（前の名前は「処理」）は、「技能判定」「特殊ルール」「会話」「注釈」を1つにまとめた書式です。内容の書き方は同じで、<b>見た目だけを設定欄で選びます</b>。テンプレを押せばその見た目になり、そのうえで枠線の形（実線・破線・なし）、左の罫（なし・細い・太い）、字の大きさ（ふつう・小さめ・もっと小さく）、地色、文字にも色をつけるか、色（朱・墨・紺・藍・苔・金茶・灰）を個別に変えられます。</p>
+<p><b>特殊ブロック</b>（前の名前は「処理」）は、「技能判定」「特殊ルール」「会話」「注釈」「情報」を1つにまとめた書式です。内容の書き方は同じで、<b>見た目だけを設定欄で選びます</b>。テンプレを押せばその見た目になり、そのうえで枠線の形（実線・破線・なし）、左の罫（なし・細い・ふつう・太い）、字の大きさ（ふつう・小さめ・もっと小さく）、地色、文字にも色をつけるか、色（朱・墨・紺・納戸・藍・苔・金茶・灰）を個別に変えられます。</p>
 <ul>
+<li>見出し（会話なら話し手）は、左の原稿欄の本文の上の欄でも打てます。Enter で本文の頭へ移ります。</li>
 <li><b>会話</b>のテンプレは、枠も罫も地色もない紺の文字です。<b>見出しの欄が話し手</b>になります。<b>注釈</b>のテンプレは、細い罫と地色のある、小さな灰色の文字です。</li>
-<li>書式ツールバーの「会話」「注釈」（<code>Ctrl</code>+<code>Shift</code>+<code>4</code> / <code>5</code>）を押すと、そのテンプレの特殊ブロックができます。原稿欄の左の札には、見た目がテンプレのままなら「会話」「注釈」と出ます。</li>
+<li>会話・注釈・情報は、特殊ブロックを作ってからテンプレを押すか、<code>:::dialog</code> <code>:::note</code> <code>:::info</code> と書いて作ります（書式ツールバーとキーには出しません）。原稿欄の左の札には、見た目がテンプレのままなら「会話」「注釈」「情報」と出ます。</li>
+<li><b>押すと本文をコピー</b>を ON にすると、書き出したHTMLでその枠を押したときに本文（中の段落も）が写ります。情報のテンプレは、はじめから ON です。前の版の情報は、見た目と見出しを写して特殊ブロック（コピー ON）へ読み替えます。</li>
 <li>枠を「なし」にしても、地色か左の罫があるときは、文字との間に左右の余白（2.5mm、左の罫のあとは 3.5mm）をとります。枠も罫も地色もないときは、会話と同じく余白も上下の間隔もふつうの段落と同じです。</li>
 <li>前の版の「会話」「注釈」は、開いたときに一度だけ、見た目を写して特殊ブロックへ読み替えます（会話の話し手は見出しへ）。特殊ブロックは、紙面の上では直接打てません（左の原稿欄で打ちます）。</li>
 </ul>
@@ -13240,7 +13396,7 @@ const HELP = [
 <table>
 <tr><th>罫線</th><td>横に一本線を引きます。文字を入れると、線の中ほどに小さな見出しとして入ります。</td></tr>
 <tr><th>縦線</th><td>左端に縦の線を立て、その右に文章を置きます。囲み記事や補足に。</td></tr>
-<tr><th>シーン移行</th><td>右に寄せ、本文より少し小さく、太字と下線がつきます。場面の切り替わりを示すのに使います。行き先の名前が見出し1・2・3と<b>ぴったり同じ</b>なら、書き出したHTMLとPDFでその見出しへのリンクになります（「書斎へ」「→ 書斎へ移行」「シーン3『書斎』へ」のように書けます）。つながったかどうかは右の設定欄の<b>つながる見出し</b>で確かめられます。</td></tr>
+<tr><th>シーン移行</th><td>右に寄せ、本文より少し小さく、太字と下線がつきます。場面の切り替わりを示すのに使います。行き先の名前が見出し1・2・3と<b>ぴったり同じ</b>なら、書き出したHTMLとPDFでその見出しへのリンクになります（「書斎へ」「→ 書斎へ移行」「シーン3『書斎』へ」のように書けます）。右の設定欄の<b>ジャンプする見出し</b>に見出しの名前を書けば、本文の書き方にかかわらずその見出しへジャンプします（候補から選べます）。ジャンプ先が見つかったかも、そこに出ます。</td></tr>
 <tr><th>改ページ</th><td>そこでページを区切ります。<code>Ctrl</code>+<code>Alt</code>+<code>B</code>でも入ります。改ページを入れると、次のページに書き始められるよう<b>空の描写がひとつ添えられます</b>。</td></tr>
 <tr><th>改段</th><td>2段組のページで、そこから<b>次の段へ送ります</b>。左の段を途中で切り上げて右の段へ移りたいときに使います。1段組のページでは何も起こりません。<code>Ctrl</code>+<code>Alt</code>+<code>D</code>。</td></tr>
 </table>
@@ -13262,7 +13418,7 @@ const HELP = [
 <ul>
 <li><b>選択を結合</b>：選んだ段落をひとつにまとめます。書式は先頭のものを引き継ぎます。</li>
 <li><b>複製・削除・上下移動</b>：選択中の段落に対して働きます。</li>
-<li><b>この段落だけの余白</b>：上下の余白をmmで指定できます。</li>
+<li><b>この段落の上下の余白</b>：文字の大きさのすぐ下の欄で、上下の余白をmmで指定できます。空のときは書式ごとの既定（薄く出ている値）です。</li>
 </ul>
 <h4>本文のコピー</h4>
 <ul>
@@ -13975,9 +14131,9 @@ async function prjDlgPaint(){
     const m=(await prjAll()).find(x=>x.id===prjGenOf);
     const gens=((m&&m.gens)||[]).slice().reverse();
     if(!gens.some(g=>String(g.t)===String(prjPick))) prjPick = gens.length ? String(gens[0].t) : null;
-    note.textContent='シナリオ「'+((m&&m.title)||'無題のシナリオ')+'」の過去の版です。戻すと新しいシナリオになり、いまのシナリオはそのまま残ります。';
+    note.textContent='シナリオ「'+((m&&m.title)||'無題のシナリオ')+'」の過去の版です。★は「保存」で名前を付けて残した版で、自動の版に押し出されて消えることはありません。戻すと新しいシナリオになり、いまのシナリオはそのまま残ります。';
     box.innerHTML = gens.map(g=>prjRowHTML(String(g.t), String(g.t)===String(prjPick),
-      '<span class="t">'+prjWhen(g.t)+'</span><span class="z">'+prjSize(g.z)+'</span>')).join('');
+      '<span class="t">'+prjWhen(g.t)+(g.n?'　<b class="gn">★ '+esc(g.n)+'</b>':'')+'</span><span class="z">'+prjSize(g.z)+'</span>')).join('');
   } else if(prjView==='trash'){
     const list=(await prjTrash()).sort((x,y)=>y.del-x.del);
     if(!list.some(x=>x.id===prjPick)) prjPick=(list[0]||{}).id||null;
