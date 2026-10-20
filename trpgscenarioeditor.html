@@ -109,6 +109,11 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 #srcHead .sp{flex:1}
 #srcHead kbd{margin:0 1px}
 #srcViewSw{flex:0 0 auto}
+.ptbtns{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.ptbtns button{padding:2px 0;line-height:1.05;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:38px}
+.ptbtns button small{font-size:9px;color:var(--muted)}
+.ptbtns button.on{background:var(--brass);border-color:var(--brass);color:#1a1405}
+.ptbtns button.on small{color:#1a1405}
 #srcViewSw button{padding:3px 10px;font-size:11px}
 /* ページ単位の表示で挟む見出し */
 .srcpage{position:sticky;top:-10px;z-index:2;display:flex;align-items:center;gap:8px;
@@ -606,7 +611,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.20.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.21.0</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -820,13 +825,14 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
           <button id="colClear" style="flex:1">既定に戻す</button>
         </div>
         <label class="f">文字の大きさ</label>
-        <div class="row" style="align-items:center;gap:6px">
-          <button id="fsDown" title="ひとつ小さくします（Ctrl+Shift+&lt;）">A−</button>
-          <span id="fsNow" style="flex:0 0 46px;text-align:center;font-size:11px;color:var(--muted)">100%</span>
-          <button id="fsUp" title="ひとつ大きくします（Ctrl+Shift+&gt;）">A＋</button>
+        <div class="ptbtns" id="ptBtns"></div>
+        <div class="row" style="margin-top:6px;align-items:center;gap:6px">
+          <input type="number" id="ptIn" min="5" max="72" step="0.5" style="width:64px;flex:0 0 auto"
+                 title="好きな大きさ（5〜72pt）。Ctrl+Shift+&gt; / &lt; でもひとつずつ変えられます">
+          <span style="font-size:11px;color:var(--muted)">pt</span>
           <button id="fsClear" style="flex:1" title="段落を選んでいるときは、その段落の中で文字ごとに変えた大きさも戻します">既定に戻す</button>
         </div>
-        <div class="hint">文字を選んでいればその文字だけ、選んでいなければ段落ぜんたいの大きさを変えます（75%〜300%）。</div>
+        <div class="hint">文字を選んでいればその文字だけ、選んでいなければ選んだ段落の大きさを変えます（5〜72pt）。段落の中の段落は、それぞれ別に決めます。</div>
         <label class="f">字下げ</label>
         <div class="row">
           <button id="indOut" title="ひとつ戻す（Ctrl+Shift+[）">&#8592; 戻す</button>
@@ -2231,22 +2237,23 @@ function blockComments(b){
   return Array.isArray(b.cm) ? b.cm.filter(c=>c && c.b>c.a) : [];
 }
 /* 文字の飾り。注と同じく「何文字目から何文字目まで」で持つ。
-   col は色、sz は大きさ（段落の書式の大きさに掛ける倍率。1 のときは持たない）。
+   col は色、pt は大きさ（pt そのもの）。sz は前の版の大きさ（倍率）で、開いたときに pt に読み替える。
    色と大きさは別々に付け外しするので、範囲が重なってもよい */
-const markOn = c => c && c.b>c.a && (c.col || c.bold || (+c.sz>0 && +c.sz!==1));
+const markOn = c => c && c.b>c.a && (c.col || c.bold || +c.pt>0 || (+c.sz>0 && +c.sz!==1));
 function blockMarks(b){
   return Array.isArray(b.mk) ? b.mk.filter(markOn) : [];
 }
 /* 同じ飾りの重なりをならして、きれいな並びに直す */
 function tidyMarks(list){
   const a = list.filter(markOn).sort((x,y)=>x.a-y.a || x.b-y.b);
-  const same = (p,c)=>(p.col||'')===(c.col||'') && !!p.bold===!!c.bold && (+p.sz||1)===(+c.sz||1);
+  const same = (p,c)=>(p.col||'')===(c.col||'') && !!p.bold===!!c.bold && (+p.sz||1)===(+c.sz||1) && (+p.pt||0)===(+c.pt||0);
   const out=[];
   a.forEach(c=>{
     const p = out[out.length-1];
     if(p && same(p,c) && c.a<=p.b){ p.b = Math.max(p.b, c.b); return; }
     const o = {a:c.a, b:c.b, col:c.col||'', bold:!!c.bold};
     if(+c.sz>0 && +c.sz!==1) o.sz = +c.sz;
+    if(+c.pt>0) o.pt = +c.pt;
     out.push(o);
   });
   return out;
@@ -2261,25 +2268,61 @@ function clearMarkRange(b, a, z, prop){
     if(c.b > z) out.push(Object.assign({}, c, {a:z}));
     if(prop){
       const mid = Object.assign({}, c, {a:Math.max(a,c.a), b:Math.min(z,c.b)});
-      if(prop==='col') mid.col = ''; else delete mid[prop];
+      if(prop==='col') mid.col = ''; else { delete mid[prop]; if(prop==='pt') delete mid.sz; }
       out.push(mid);
     }
   });
   b.mk = tidyMarks(out);
 }
-/* 文字の大きさの段。CSS Fonts Level 4 の文字の大きさの決まり
-   （x-small 3/4・small 8/9・medium 1・large 6/5・x-large 3/2・xx-large 2・xxx-large 3）にそろえた */
-const FS_STEPS = [3/4, 8/9, 1, 6/5, 3/2, 2, 3];
-/* いまの倍率から d 段ずらした倍率。段のあいだの値は、いちばん近い段から数える */
-function fsStep(cur, d){
-  cur = +cur>0 ? +cur : 1;
-  let i = 0;
-  FS_STEPS.forEach((v,k)=>{ if(Math.abs(v-cur) < Math.abs(FS_STEPS[i]-cur)) i = k; });
-  return FS_STEPS[Math.max(0, Math.min(FS_STEPS.length-1, i+d))];
+/* ================= 文字の大きさ（pt） =================
+   段落（b.pt）も、選んだ文字（飾りの pt）も、pt そのもので持つ。基準の文字の大きさを変えても動かない。
+   書式ごとの本来の大きさは「基準 × 書式の倍率」。倍率は紙面の CSS（DOC_CSS の .t-◯◯ の font-size）と同じ値にしておく */
+const PT_MIN = 5, PT_MAX = 72;
+/* Ctrl+Shift+> / < で動かす並び。Word の文字の大きさの一覧と同じ */
+const PT_LIST = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
+/* 設定欄のボタンに並べる大きさ */
+const PT_BTNS = [8, 10, 12, 14, 18, 24, 36];
+const TYPE_EM = {title:2.6, subtitle:1.15, h1:1.6, h2:1.3, h3:1.08, note:.86, scene:.88};
+function typeEm(b){ return b.type==='proc' && (b.bx||{}).sm ? .95 : (TYPE_EM[b.type] || 1); }
+const ptRound = v => Math.round(Math.max(PT_MIN, Math.min(PT_MAX, +v||0))*2)/2;
+const ptTxt = v => (+(+v).toFixed(1))+'pt';
+/* 表の升目の中の文字の倍率。格子の表（table.tbl .92em）と、カードの見出しの列（.cd-t .92em）は少し小さい */
+function cellEm(t, key){
+  const look = (t||{}).look || 'grid';
+  if(look==='grid') return .92;
+  if(look==='card') return String(key||'').split(',')[1]==='0' ? .92 : 1;
+  return 1;
 }
-const fsPct = v => Math.round((+v||1)*100)+'%';
-/* 段落ぜんたいの大きさ。外側の箱に掛けるので、書式ごとの大きさ（em）にそのまま掛け算になる */
-function fsStyle(b){ return (+b.fs>0 && +b.fs!==1) ? 'font-size:'+(+(+b.fs).toFixed(4))+'em;' : ''; }
+/* その段落が置かれている場所の文字の大きさ（pt）。紙面・新規ウィンドウなら基準、
+   段落の中なら親の本来の大きさ、表の升目なら表の大きさ × 升目の倍率 */
+function ctxPt(b){
+  const f = findBlock(b.id); if(!f) return +S.base||10;
+  const own = kidsOwnerOf(f.list); if(own) return natPt(own);
+  const cell = cellOwnerOf(f.list);
+  if(cell){ const t = findBlock(cell.id); if(t) return curPt(t.b) * cellEm(t.b.tbl, cell.k); }
+  return +S.base||10;
+}
+/* その段落の本来の大きさ（pt を指定していないときの大きさ） */
+function natPt(b){ return ctxPt(b) * typeEm(b); }
+/* いま出ている大きさ */
+function curPt(b){ return +b.pt>0 ? +b.pt : natPt(b); }
+/* 段落の箱に当てる大きさ */
+function ptStyle(b){ return +b.pt>0 ? 'font-size:'+(+b.pt)+'pt;' : ''; }
+/* pt を指定した親の中の段落は、親の大きさを受け継がず、本来の大きさ（親の本来の大きさ）に戻す */
+function kidsPtStyle(b){ return +b.pt>0 ? ' style="font-size:'+(+natPt(b).toFixed(3))+'pt"' : ''; }
+/* 前の版の大きさ（倍率 fs・sz）を、その時の pt に読み替える（一度だけ）。
+   ctx はその並びの場所の大きさ。段落の中の段落は、親の倍率を受け継がない本来の大きさになる */
+const FS_VER = 1;
+function ptMigrate(list, ctx, base){
+  list.forEach(b=>{
+    const nat = ctx * typeEm(b), eff = nat * (+b.fs>0 ? +b.fs : 1);
+    if(b.fs!=null){ if(+b.fs>0 && +b.fs!==1) b.pt = ptRound(eff); delete b.fs; }
+    if(Array.isArray(b.mk)) b.mk.forEach(c=>{ if(+c.sz>0){ if(+c.sz!==1) c.pt = ptRound(eff * +c.sz); delete c.sz; } });
+    if(Array.isArray(b.kids)) ptMigrate(b.kids, nat, base);
+    if(b.type==='popup' && b.pop && Array.isArray(b.pop.blocks)) ptMigrate(b.pop.blocks, base, base);
+    if(b.type==='table' && b.tbl && b.tbl.cb) Object.keys(b.tbl.cb).forEach(k=>{ if(Array.isArray(b.tbl.cb[k])) ptMigrate(b.tbl.cb[k], eff * cellEm(b.tbl, k), base); });
+  });
+}
 /* 本文の一部（a〜z文字目）を、ルビとコメントつきで描く。
    入れ子の書式で本文を切り分けても、コメントの位置と番号が狂わないように、
    もとの文字位置のまま範囲を指定して描く。 */
@@ -2302,9 +2345,10 @@ function rubyRange(b, a, z){
     /* 色と大きさは別々の飾りとして重なりうるので、その区間にかかるものを合わせる */
     const on = ms.filter(c=>c.a<=s0 && c.b>=e0);
     if(on.length){
-      const col = (on.find(c=>c.col)||{}).col, bold = on.some(c=>c.bold), sz = +(on.find(c=>+c.sz>0)||{}).sz||1;
+      const col = (on.find(c=>c.col)||{}).col, bold = on.some(c=>c.bold);
+      const pt = +(on.find(c=>+c.pt>0)||{}).pt||0, sz = +(on.find(c=>+c.sz>0)||{}).sz||1;
       const st = (col?'color:'+col+';':'') + (bold?'font-weight:700;':'')
-               + (sz!==1?'font-size:'+(+sz.toFixed(4))+'em;':'');
+               + (pt ? 'font-size:'+pt+'pt;' : sz!==1 ? 'font-size:'+(+sz.toFixed(4))+'em;' : '');
       if(st) h = '<span style="'+st+'">'+h+'</span>';
     }
     const ci = cs.findIndex(c=>c.a<=s0 && c.b>=e0);
@@ -4341,9 +4385,8 @@ function fixBlock(nb){
   if(nb.type==='handout') ensureHo(nb);
   nb.ind = Math.max(0, Math.min(4, parseInt(nb.ind,10)||0));
   if(Array.isArray(nb.mk)) nb.mk = tidyMarks(nb.mk); else if(nb.mk!=null) delete nb.mk;
-  /* 段落ぜんたいの文字の大きさ。段の範囲（75%〜300%）に収め、100% のときは持たない */
-  if(nb.fs!=null){ const v = Math.max(FS_STEPS[0], Math.min(FS_STEPS[FS_STEPS.length-1], +nb.fs||1));
-    if(v===1) delete nb.fs; else nb.fs = v; }
+  /* 段落ぜんたいの文字の大きさ（pt）。範囲（5〜72pt）に収める */
+  if(nb.pt!=null){ if(+nb.pt>0) nb.pt = ptRound(nb.pt); else delete nb.pt; }
   if(nb.type==='flow') nb.cols=1;
   /* 旧データ: 箇条書きは書式ではなくなったので、描写にして行の頭に印を付ける */
   if(nb.type==='list'){
@@ -4484,6 +4527,9 @@ function normalize(d){
   if(out.mdv < MD_VER){ mdMigrate(out.blocks); out.mdv = MD_VER; }
   out.pkv = +d.pkv || 0;
   if(out.pkv < PK_VER){ procMigrate(out.blocks); out.pkv = PK_VER; }
+  /* 前の版の文字の大きさ（倍率）は、その時の pt に読み替える */
+  out.fsv = +d.fsv || 0;
+  if(out.fsv < FS_VER){ ptMigrate(out.blocks, out.base, out.base); out.fsv = FS_VER; }
   return out;
 }
 /* ブロックの置き場は、紙面（S.blocks）と、ブロックで内容を持つ新規ウィンドウの中。
@@ -5298,6 +5344,7 @@ function blockEl(b, pageCols, prevType){
   el.dataset.id = b.id;
   if(b.mb!=null) el.style.marginBottom = b.mb+'mm';
   if(b.col) el.style.color = b.col;
+  if(+b.pt>0) el.style.fontSize = b.pt+'pt';
   /* 紙面には操作の欄を出さない。書き出したときと同じ姿を見せ、
      いじるのは左の「この段落の内容」でおこなう。 */
   /* キャラシは紙面の上で直接直せるようにする。
@@ -5355,7 +5402,6 @@ function blockEl(b, pageCols, prevType){
     + (b.type==='image' && (b.fl==='l'||b.fl==='r') ? ' fl-'+b.fl : '')
     + (b.clr ? ' clearfl' : '')
     + (b.ind ? ' i'+Math.min(4,b.ind) : '');
-  if(fsStyle(b)) w.style.fontSize = (+(+b.fs).toFixed(4))+'em';
   const pull = gapPull(prevType, b.type);
   if(b.type==='image' && (b.fl==='l'||b.fl==='r')){
     w.style.width = fnum(imgWmm(b))+'mm';
@@ -5499,7 +5545,7 @@ function kidsHTML(b, edit){
   const l = Array.isArray(b.kids) ? b.kids : []; if(!l.length || !KIDS_PARENT.includes(b.type)) return '';
   let prevType=null, first=true;
   const ind = (KIDS_FRAMED.includes(b.type) || isSecBlock(b)) ? '' : ' kids-ind';
-  return '<div class="cellblk bx-kids'+ind+'">'+l.map(k=>{
+  return '<div class="cellblk bx-kids'+ind+'"'+kidsPtStyle(b)+'>'+l.map(k=>{
     const pull = gapPull(prevType, k.type); prevType = k.type;
     const top = first ? ' pagetop' : ''; first=false;
     return blockStaticHTML(k, 1, pull, top, '', edit);
@@ -10172,7 +10218,7 @@ document.addEventListener('keydown',e=>{
   if(e.altKey && e.shiftKey && k==='V'){ e.preventDefault(); blkPasteDo(); return; }
   /* 文字の大きさ。Word と同じく Ctrl+Shift+>（.）で大きく、Ctrl+Shift+<（,）で小さく */
   if(e.shiftKey && !e.altKey && (code==='Period' || code==='Comma')){
-    e.preventDefault(); setTextSize(code==='Period' ? 1 : -1); return; }
+    e.preventDefault(); stepTextPt(code==='Period' ? 1 : -1); return; }
   const t=TYPES.find(x=>x.s===k);
   if(t){ e.preventDefault(); setType(t.k); return; }
   if(k==='P'){ e.preventDefault(); togglePages(); return; }
@@ -10506,8 +10552,8 @@ function openBlockPreview(b){
   document.getElementById('prevBody').innerHTML =
     '<div class="page" style="width:auto;height:auto;box-shadow:none;min-height:0">'
     + '<div class="page-body" style="height:auto;padding:'+S.padH+'mm;font-size:'+S.base+'pt">'
-    + '<div class="blkpad p-'+b.type+'" style="'+fsStyle(b)+'"><div class="blk t-'+b.type
-    + (b.type==='proc'?procClass(b)+'" style="'+procStyle(b):'')+'">'+inner+kids+'</div></div>'
+    + '<div class="blkpad p-'+b.type+'"><div class="blk t-'+b.type+(b.type==='proc'?procClass(b):'')
+    + '" style="'+(b.type==='proc'?procStyle(b):'')+ptStyle(b)+'">'+inner+kids+'</div></div>'
     + '</div></div>';
   document.getElementById('prevDlg').style.display='flex';
 }
@@ -11489,9 +11535,15 @@ document.getElementById('colBtns').onclick=e=>{
 };
 document.getElementById('colPick').addEventListener('input',e=>setTextColor(e.target.value));
 document.getElementById('colClear').onclick=()=>setTextColor('');
-document.getElementById('fsUp').onclick=()=>setTextSize(1);
-document.getElementById('fsDown').onclick=()=>setTextSize(-1);
-document.getElementById('fsClear').onclick=()=>setTextSize(0);
+/* 文字の大きさのボタン。文字の色と同じく、押すとその大きさになる */
+document.getElementById('ptBtns').innerHTML = PT_BTNS.map(v=>
+  '<button data-pt="'+v+'" title="'+v+'pt にします"><b style="font-size:'+Math.min(19, 7+v*0.38).toFixed(1)+'px">A</b><small>'+v+'</small></button>').join('');
+document.getElementById('ptBtns').onclick=e=>{ const b=e.target.closest('[data-pt]'); if(b) setTextPt(+b.dataset.pt); };
+document.getElementById('ptIn').addEventListener('change', e=>{
+  const v = parseFloat(e.target.value);
+  if(isFinite(v) && v>0) setTextPt(ptRound(v)); else syncFsNow();
+});
+document.getElementById('fsClear').onclick=()=>setTextPt(null);
 /* 左の本文で選んだ範囲に注を付ける */
 document.getElementById('cmtAdd').onclick=()=>{
   const s0=getSelection();
@@ -11574,42 +11626,51 @@ function setTextColor(c){
   render(); save();
   setStatus(c?'段落の色を変えました':'段落の色を戻しました','var(--ok)');
 }
-/* 文字を選んでいればその範囲だけ、選んでいなければ選んだ段落ぜんたいの大きさを d 段ずらす。
-   d が 0 なら既定（100%）に戻す。段落を戻すときは、その段落の中で文字ごとに変えた大きさも戻す */
-function setTextSize(d){
+/* 文字を選んでいればその範囲だけ、選んでいなければ選んだ段落の大きさを v pt にする（文字の色と同じ決まり）。
+   v が null なら既定（その書式の本来の大きさ）に戻す。段落を戻すときは、その段落の中で文字ごとに変えた大きさも戻す。
+   中の段落は親と別に持つので、親を変えても中の段落の大きさは変わらない */
+function setTextPt(v){
   if(tsrcFocus()){
     setStatus('表の升目の中は、一部の文字だけ大きさを変えることはできません','#ff9b83');
     return;
   }
   const rg = selectedTextRange();
   if(rg){
-    const at = blockMarks(rg.b).find(c=>+c.sz>0 && c.a<=rg.a && c.b>rg.a);
-    const cur = at ? +at.sz : 1, nv = d ? fsStep(cur, d) : 1;
-    if(d && nv===cur){ setStatus(d>0 ? 'これ以上は大きくできません（'+fsPct(nv)+'まで）' : 'これ以上は小さくできません（'+fsPct(nv)+'まで）','#ff9b83'); return; }
-    clearMarkRange(rg.b, rg.a, rg.z, 'sz');           // 色は残して、大きさだけを付け替える
-    if(nv!==1) rg.b.mk = tidyMarks(blockMarks(rg.b).concat([{a:rg.a, b:rg.z, sz:nv}]));
+    clearMarkRange(rg.b, rg.a, rg.z, 'pt');           // 色は残して、大きさだけを付け替える
+    if(v!=null) rg.b.mk = tidyMarks(blockMarks(rg.b).concat([{a:rg.a, b:rg.z, pt:v}]));
     const id=rg.b.id, a=rg.a, z=rg.z;
     render(); save(); selectSrcRange(id, a, z);
-    setStatus('選んだ文字を'+fsPct(nv)+'にしました','var(--ok)');
+    setStatus(v!=null ? '選んだ文字を'+ptTxt(v)+'にしました' : '選んだ文字の大きさを戻しました','var(--ok)');
     return;
   }
-  if(!sel.size){ setStatus('大きさを変えたい文字か段落を選んでください','#ff9b83'); return; }
-  const fs = [...sel].map(findBlock).filter(Boolean);
-  const cur = +fs[0].b.fs||1, nv = d ? fsStep(cur, d) : 1;
-  if(d && nv===cur){ setStatus(d>0 ? 'これ以上は大きくできません（'+fsPct(nv)+'まで）' : 'これ以上は小さくできません（'+fsPct(nv)+'まで）','#ff9b83'); return; }
+  if(!sel.size){ setStatus('大きさを変えたい文字か段落を選んでください','#ff9b83'); syncFsNow(); return; }
   noteEditSpot();
-  fs.forEach(f=>{
-    if(nv===1) delete f.b.fs; else f.b.fs = nv;
-    if(!d) clearMarkRange(f.b, 0, String(f.b.text||'').length, 'sz');
+  [...sel].map(findBlock).filter(Boolean).forEach(f=>{
+    if(v==null){ delete f.b.pt; clearMarkRange(f.b, 0, String(f.b.text||'').length, 'pt'); }
+    else if(Math.abs(v - natPt(f.b)) < .01) delete f.b.pt;   // 本来の大きさと同じなら持たない
+    else f.b.pt = v;
   });
   render(); save(); restoreEditSpot();
-  setStatus(d ? '段落の文字を'+fsPct(nv)+'にしました' : '段落の文字の大きさを既定に戻しました','var(--ok)');
+  setStatus(v!=null ? '段落の文字を'+ptTxt(v)+'にしました' : '段落の文字の大きさを既定に戻しました','var(--ok)');
 }
-/* 設定欄の「いまの大きさ」。選んだ段落の倍率を出す */
+/* Ctrl+Shift+> / < 。いまの大きさから、Word と同じ並び（PT_LIST）でひとつ大きく・小さくする */
+function stepTextPt(d){
+  const rg = selectedTextRange();
+  let cur;
+  if(rg){ const at = blockMarks(rg.b).find(c=>+c.pt>0 && c.a<=rg.a && c.b>rg.a); cur = at ? +at.pt : curPt(rg.b); }
+  else if(sel.size){ const f = findBlock([...sel][0]); if(f) cur = curPt(f.b); }
+  if(cur==null){ setStatus('大きさを変えたい文字か段落を選んでください','#ff9b83'); return; }
+  const nx = d>0 ? PT_LIST.find(x=>x > cur+.01) : [...PT_LIST].reverse().find(x=>x < cur-.01);
+  if(nx==null){ setStatus(d>0 ? 'これ以上は大きくできません（'+PT_MAX+'ptまで）' : 'これ以上は小さくできません（'+PT_LIST[0]+'ptまで）','#ff9b83'); return; }
+  setTextPt(nx);
+}
+/* 設定欄の「いまの大きさ」。選んだ段落の大きさを pt で出し、同じ大きさのボタンを光らせる */
 function syncFsNow(){
-  const el = document.getElementById('fsNow'); if(!el) return;
+  const inp = document.getElementById('ptIn'); if(!inp) return;
   const f = sel.size ? findBlock([...sel][0]) : null;
-  el.textContent = f ? fsPct(f.b.fs) : '—';
+  const v = f ? +curPt(f.b).toFixed(1) : null;
+  if(document.activeElement!==inp) inp.value = v==null ? '' : v;
+  document.querySelectorAll('#ptBtns [data-pt]').forEach(x=>x.classList.toggle('on', v!=null && Math.abs(+x.dataset.pt - v) < .01));
 }
 function setIndent(d, quiet){
   if(!sel.size){ if(!quiet) setStatus('字下げしたい段落を選んでください','#ff9b83'); return; }
@@ -12069,13 +12130,13 @@ function blockStaticHTML0(b, cols, pull, top, anchor, edit){
   if(edit && plainEditable(b)){
     const ow0='<div class="blkpad p-'+b.type+(isSecBlock(b)?' sec':'')+((b.cols===1 && cols===2)?' span':'')+top
            + (b.clr?' clearfl':'') + (b.ind?' i'+Math.min(4,b.ind):'')+'" data-id="'+b.id+'"'
-           + ((b.mt!=null||pull||fsStyle(b)) ? ' style="'+(b.mt!=null?'padding-top:'+b.mt+'mm;':'')
-                                  +(pull?'margin-top:-'+pull+'mm;':'')+fsStyle(b)+'"' : '')+'>';
-    const st0=(b.mb!=null?'margin-bottom:'+b.mb+'mm;':'')+(b.col?'color:'+b.col+';':'');
+           + ((b.mt!=null||pull) ? ' style="'+(b.mt!=null?'padding-top:'+b.mt+'mm;':'')
+                                  +(pull?'margin-top:-'+pull+'mm;':'')+'"' : '')+'>';
+    const st0=(b.mb!=null?'margin-bottom:'+b.mb+'mm;':'')+(b.col?'color:'+b.col+';':'')+ptStyle(b);
     return ow0+'<div class="blk t-'+b.type+'" style="'+st0+'" data-btext="'+b.id+'"'
          + ' contenteditable="true" spellcheck="false" data-ph="（空の段落）">'+esc(b.text)+'</div></div>';
   }
-    const st2=(b.mb!=null?'margin-bottom:'+b.mb+'mm;':'')+(b.col?'color:'+b.col+';':'');
+    const st2=(b.mb!=null?'margin-bottom:'+b.mb+'mm;':'')+(b.col?'color:'+b.col+';':'')+ptStyle(b);
     const cl='blk t-'+b.type;
     const flc = (b.type==='image' && (b.fl==='l'||b.fl==='r')) ? ' fl-'+b.fl : '';
     const ost = flc
@@ -12085,7 +12146,7 @@ function blockStaticHTML0(b, cols, pull, top, anchor, edit){
             + (pull?'margin-top:-'+pull+'mm;':'');
     const ow='<div class="blkpad p-'+b.type+(isSecBlock(b)?' sec':'')+((b.cols===1 && cols===2)?' span':'')+top+flc+(b.clr?' clearfl':'')
            + (b.ind?' i'+Math.min(4,b.ind):'')+'" data-id="'+b.id+'"'
-           + ((ost||fsStyle(b))?' style="'+ost+fsStyle(b)+'"':'')+'>';
+           + (ost?' style="'+ost+'"':'')+'>';
     if(b.type==='break') return '';
     if(b.type==='colbr')  return ow+'<div class="'+cl+'"></div></div>';
     if(b.type==='npc')  return ow+'<div class="'+cl+'" style="'+st2+'">'
@@ -12862,7 +12923,7 @@ const HELP = [
 <tr><th><code>Ctrl</code>+<code>Z</code></th><td>元に戻します。文字の入力だけでなく、削除・書式変更・並べ替え・ページ設定も戻せます。</td></tr>
 <tr><th><code>Ctrl</code>+<code>Y</code></th><td>やり直します（<code>Ctrl</code>+<code>Shift</code>+<code>Z</code>も同じ）。</td></tr>
 <tr><th><code>Ctrl</code>+<code>Shift</code>+<code>R</code></th><td>選んだ文字にルビを振ります。</td></tr>
-<tr><th><code>Ctrl</code>+<code>Shift</code>+<code>&gt;</code> / <code>&lt;</code></th><td>文字を<b>ひとつ大きく／小さく</b>します（75%・89%・100%・120%・150%・200%・300% の段）。文字を選んでいればその文字だけ、選んでいなければ選んだ段落ぜんたいです。右の設定欄の<b>文字の大きさ</b>（<code>A−</code> <code>A＋</code>）でも同じです。紙面・印刷・書き出したHTMLのどれにも出ます。</td></tr>
+<tr><th><code>Ctrl</code>+<code>Shift</code>+<code>&gt;</code> / <code>&lt;</code></th><td>文字を<b>ひとつ大きく／小さく</b>します（Word と同じ 8・9・10・10.5・11・12・14・16・18・20・22・24・26・28・36・48・72pt の並び）。文字を選んでいればその文字だけ、選んでいなければ選んだ段落です。<br>右の設定欄の<b>文字の大きさ</b>では、文字の色と同じく、ボタン（8〜36pt）を押すか、欄に<b>好きな pt</b>（5〜72pt、0.5pt きざみ）を書いて決めます。欄には選んだ段落のいまの大きさが出ます。<br>大きさは pt のまま持つので、ドキュメント設定の基準の文字の大きさを変えても動きません。<b>段落の中の段落は、親と別に</b>大きさを決めます（親を大きくしても中はそのまま）。紙面・印刷・書き出したHTMLのどれにも出ます。</td></tr>
 <tr><th><code>Tab</code> / <code>Shift</code>+<code>Tab</code></th><td>字下げを1段ずつ増減します（<code>Ctrl</code>+<code>Shift</code>+<code>]</code> / <code>[</code>も同じ）。打っている途中でも使えます。</td></tr>
 <tr><th><code>Ctrl</code>+<code>0</code> / <code>+</code> / <code>-</code></th><td>ページの表示倍率。<code>0</code>で幅に合わせます。<code>Ctrl</code>+<code>Shift</code>+<code>↑</code> / <code>↓</code> でも拡大縮小できます。</td></tr>
 <tr><th>書式のショートカット</th><td>すべて <code>Ctrl</code>+<code>Shift</code>+キー です（<code>Ctrl</code>+<code>Alt</code>+キー も今までどおり使えます。ブラウザに取られる組み合わせがあったときの逃げ道です）。<br>
