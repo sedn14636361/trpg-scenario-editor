@@ -605,7 +605,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.16.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.16.1</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -5605,6 +5605,15 @@ function slashBefore(fd){
 function slashCheck(fd){
   const before = fd ? slashBefore(fd) : null;
   if(before==null){ closeSlash(); return; }
+  /* 描写の段落の頭の :: と # には、markdown の書き方の候補を出す */
+  const md = mdSuggest(fd, before);
+  if(md){
+    const was = (slashMenu && slashMenu.el===fd.el && slashMenu.md) ? slashMenu.list[slashMenu.i] : null;
+    slashMenu = {el:fd.el, ta:false, md:true, list:md.list,
+      shown:md.list.map(x=>(md.q && x.names && x.names.find(a=>a.startsWith(md.q))) ? x.gl+x.names.find(a=>a.startsWith(md.q)) : x.cm),
+      i:Math.max(0, was ? md.list.indexOf(was) : 0)};
+    drawSlash(); return;
+  }
   const line = before.slice(before.lastIndexOf('\n')+1);
   const m = line.match(/^[ 　\t]*[\/／]([^\s　\/／]{0,16})$/);
   if(!m){ closeSlash(); return; }
@@ -5613,7 +5622,7 @@ function slashCheck(fd){
   const list = SLASH_ITEMS.filter(x=>!q || x.cmds.some(k=>k.startsWith(q)) || x.words.some(k=>slashNorm(k).includes(q)));
   if(!list.length){ closeSlash(); return; }
   /* 絞り込んでも、選んでいたものが残っていればそのまま選んでおく */
-  const was = (slashMenu && slashMenu.el===fd.el) ? slashMenu.list[slashMenu.i] : null;
+  const was = (slashMenu && slashMenu.el===fd.el && !slashMenu.md) ? slashMenu.list[slashMenu.i] : null;
   /* 別名で合ったときは、その別名を見せる（/ch で「選択」が出るのは /check に合ったから、とわかるように） */
   const shown = list.map(x=>(q && x.cmds.find(k=>k.startsWith(q))) || x.cmd);
   slashMenu = {el:fd.el, ta:fd.ta, back:m[1].length+1, list, shown, i:Math.max(0, was ? list.indexOf(was) : 0)};
@@ -5635,12 +5644,14 @@ function drawSlash(){
       if(it && slashMenu && +it.dataset.i!==slashMenu.i){ slashMenu.i=+it.dataset.i; paintSlash(); }
     });
   }
-  m.innerHTML = '<div class="sh">書式</div>'
+  const md = !!slashMenu.md;
+  m.innerHTML = '<div class="sh">'+(md ? '段落の書式（markdown）' : '書式')+'</div>'
     + slashMenu.list.map((x,i)=>'<div class="it" role="option" data-i="'+i+'">'
-        + '<span class="gl">'+esc(x.mk.trim())+'</span>'
+        + '<span class="gl">'+esc(md ? x.gl : x.mk.trim())+'</span>'
         + '<span class="tx">'+esc(x.lb)+'<small>'+esc(x.ds)+'</small></span>'
-        + '<span class="cm">/'+esc(slashMenu.shown[i])+'</span></div>').join('')
-    + '<div class="ft">↑↓ 選ぶ　Enter 入れる　Esc 閉じる<br>続けて打つと絞り込めます（ko・みだし など）</div>';
+        + '<span class="cm">'+(md ? '' : '/')+esc(slashMenu.shown[i])+'</span></div>').join('')
+    + (md ? '<div class="ft">↑↓ 選ぶ　Enter その書式にする　Esc 閉じる<br>続けて打つと絞り込めます（pa・かいぺーじ など）</div>'
+          : '<div class="ft">↑↓ 選ぶ　Enter 入れる　Esc 閉じる<br>続けて打つと絞り込めます（ko・みだし など）</div>');
   m.style.display='block';
   paintSlash();
   placeSlash();
@@ -5695,6 +5706,7 @@ function applySlash(i){
   const it = sm.list[i==null ? sm.i : i];
   closeSlash();
   if(!it || !sm.el.isConnected) return;
+  if(sm.md){ mdApplySuggest(sm.el, it); return; }
   const inside = it.mk==='「」';
   if(sm.ta){
     const ta = sm.el, c = ta.selectionStart;
@@ -7090,12 +7102,16 @@ function mdHeadFire(t, e){
   const f = findBlock(t.dataset.id); if(!mdTypable(f)) return false;
   const txt = t.innerText.replace(/\n$/,''), off = caretOffset(t);
   const m = txt.slice(0, off).match(/^[#＃]{1,3}[ 　\u00a0]$/); if(!m) return false;
-  f.b.type = 'h'+(m[0].length-1);
-  setBlockText(f.b, txt.slice(off));
+  mdToHead(f, m[0].length-1, txt.slice(off));
+  return true;
+}
+/* その段落を見出し lv にして、rest を見出しの文字にする */
+function mdToHead(f, lv, rest){
+  f.b.type = 'h'+lv;
+  setBlockText(f.b, rest);
   editingId = f.b.id; sel.clear(); sel.add(f.b.id);
   render(); focusSrc(f.b.id, false); save();
   setStatus(TYPE_NAME(f.b.type)+'にしました','var(--ok)');
-  return true;
 }
 /* Enter を押したとき、1行目が :::名前・::名前・--- だけなら、その書式にする。
    カーソルより後ろの文字は、::: のときは中身に、それ以外は次の段落に送る */
@@ -7142,6 +7158,75 @@ function mdLineFire(f, txt, off){
   }
   setStatus(TYPE_NAME(nb.type)+'にしました','var(--ok)');
   return true;
+}
+/* ================= markdown の書き方の候補 =================
+   描写の段落の1行目の頭で :: （日本語入力のままなら ：：）か # を打つと、
+   / の候補と同じ一覧に、::: で書ける書式と見出しを出す。
+   選ぶと、その行を書いて Enter を押したときと同じように、段落がすぐその書式になる。
+   : が1つ（「：」で始まる文）や、# のうしろに文字が続いたとき（#タグ）は出さない。
+   絞り込みの手がかりは、英字の名前の頭（pa → pagebreak）と、読み・表示名（かい → 改ページ・改段・会話）。
+   並びは、よく使うものから。 */
+const MD_SUGGEST = [
+  ['proc',     'proc',       '処理',             '判定やルールをくくる囲み',       'しょり はんてい'],
+  ['skill',    'proc:skill', '処理（技能判定）', '技能判定の見た目の囲み',         'ぎのうはんてい'],
+  ['rule',     'proc:rule',  '処理（特殊ルール）','特殊ルールの見た目の囲み',       'とくしゅるーる'],
+  ['info',     'info',       '情報',             '押すと本文をコピーできる枠',     'じょうほう'],
+  ['handout',  'handout',    'ハンドアウト',     '番号と題のついた枠',             'はんどあうと'],
+  ['note',     'note',       '注釈',             '小さめの補足',                   'ちゅうしゃく'],
+  ['dialog',   'dialog',     '会話',             '話し手つきの台詞',               'かいわ'],
+  ['scene',    'scene',      'シーン移行',       '場面の切り替わり',               'しーん'],
+  ['popup',    'popup',      '新規ウィンドウ',   'ボタンから開く補足のページ',     'しんきうぃんどう べつまど'],
+  ['npc',      'npc',        'NPCシート',        '能力値や技能をまとめた囲み',     'えぬぴーしー'],
+  ['flow',     'flow',       'フローチャート',   '箱を線でつなぐ図',               'ふろーちゃーと'],
+  ['table',    'table',      '表',               '行と列の表',                     'ひょう'],
+  ['pagebreak','break',      '改ページ',         'ここでページを区切る',           'かいぺーじ'],
+  ['colbreak', 'colbr',      '改段',             '2段組の次の段へ送る',            'かいだん'],
+  ['hr',       'hr',         '罫線',             '横に一本線を引く（--- でも）',   'けいせん'],
+  ['vr',       'vr',         '縦線',             '左に縦の線を立てて文章を置く',   'たてせん'],
+  ['toc',      'toc',        '目次',             '見出しの一覧',                   'もくじ'],
+  ['title',    'title',      'タイトル',         'シナリオの題',                   'たいとる'],
+  ['subtitle', 'subtitle',   'サブタイトル',     '題の下に添える文',               'さぶたいとる'],
+  ['cover',    'cover',      '表紙',             '表紙のページ',                   'ひょうし'],
+  ['colophon', 'colophon',   '奥付',             '奥付のページ',                   'おくづけ']
+].map(([nm, key, lb, ds, rd])=>{
+  const k = key.split(':')[0];
+  /* 中身を持たない書式は :: の1行の形、ほかは ::: の囲みの形で見せる。
+     （どちらで入れても、文字を書く書式ならカーソルは中に、そうでなければ次の段落に進む） */
+  const leaf = ['hr','vr','break','colbr','toc'].includes(k);
+  const alias = Object.keys(MD_NAMES).filter(a=>MD_NAMES[a]===key && /^[a-z]+$/.test(a));
+  return {nm, k, lb, ds, gl:(leaf?'::':':::'), cm:(leaf?'::':':::')+nm, leaf,
+          names:alias.length ? alias : [nm], words:rd.split(' ').concat([lb])};
+});
+const MD_SUGGEST_H = [1,2,3].map(lv=>({lv, k:'h'+lv, lb:'見出し'+lv, gl:'#'.repeat(lv), cm:'#'.repeat(lv)+' ',
+  ds:['章の頭のいちばん大きい見出し','中くらいの見出し','小さい見出し'][lv-1]}));
+/* いま候補を出す場面なら、出す候補の並びを返す。q は絞り込みに使った文字 */
+function mdSuggest(fd, before){
+  if(!fd || fd.ta || !fd.el.classList.contains('srctext') || tsrcOf(fd.el)) return null;
+  if(before==null || before.indexOf('\n')>=0) return null;
+  const f = findBlock(fd.el.dataset.id); if(!mdTypable(f)) return null;
+  const pop = allBlocks().some(b=>b.type==='popup' && b.pop && b.pop.blocks===f.list);
+  const skip = cellOwnerOf(f.list) ? MD_NO_CELL : pop ? POP_SKIP : [];
+  let m;
+  if((m = before.match(/^[#＃]{1,3}$/)))
+    return {list:MD_SUGGEST_H.filter(x=>x.lv>=m[0].length), q:''};
+  if(!(m = before.match(/^ {0,3}[:：]{2,3}([^\s:：\[\]［］{}｛｝]{0,16})$/))) return null;
+  const q = slashNorm(m[1]);
+  /* 合い方の強いものから並べる。正式な名前の頭 → 別名の頭 → 読み・表示名
+     （::ta で、別名 talk の会話より table の表を先に出すため） */
+  const rank = x=>!q ? 0 : x.nm.startsWith(q) ? 1 : x.names.some(a=>a.startsWith(q)) ? 2
+                : x.words.some(w=>slashNorm(w).includes(q)) ? 3 : 0;
+  const list = MD_SUGGEST.filter(x=>!skip.includes(x.k) && (!q || rank(x)))
+    .map((x,i)=>[rank(x), i, x]).sort((a,b)=>a[0]-b[0] || a[1]-b[1]).map(r=>r[2]);
+  return list.length ? {list, q} : null;
+}
+/* 候補を選んだ。カーソルより後ろの文字は、Enter で変えたときと同じく中身か次の段落に送る */
+function mdApplySuggest(el, it){
+  const f = findBlock(el.dataset.id); if(!mdTypable(f)) return;
+  const txt = el.innerText.replace(/\n$/,''), off = caretOffset(el);
+  const rest = txt.slice(off).replace(/^\n/,'');
+  if(it.lv){ mdToHead(f, it.lv, rest); return; }
+  const head = it.cm;
+  mdLineFire(f, head + (rest ? '\n'+rest : ''), head.length);
 }
 /* かな漢字変換の最中に押す Enter は「変換の確定」であって、
    段落を分ける合図ではない。ここを見分けないと、確定した文字と同じ内容の
@@ -12540,6 +12625,7 @@ markdown の書き方が何もなく1段落だけの文章は、いつもどお�
 <tr><th><code>:::名前[ラベル]{属性}</code><br>…中身…<br><code>:::</code></th><td><b>囲み</b>。中身ごとその書式になります。閉じの <code>:::</code> がなければ最後までが中身です。外側を <code>::::</code> にすれば、新規ウィンドウの中に処理を入れるような入れ子もできます。打つときは1行目を書いて Enter を押すと、その書式になってカーソルが中に入ります。</td></tr>
 <tr><th><code>::名前[ラベル]</code></th><td><b>中身のない1行の書式</b>（改ページなど）。打つときは Enter で変わり、次の段落へ進みます。</td></tr>
 </table>
+<p><b>候補の一覧</b>：描写の段落の頭で <code>::</code>（<code>：：</code>）か <code>#</code> を打つと、<code>/</code> の候補と同じ一覧が出ます。続けて打つと絞り込めます（<code>::pa</code> → 改ページ、<code>：：かい</code> → 会話・改ページ・改段）。<code>↑</code><code>↓</code> で選んで <code>Enter</code> か <code>Tab</code> を押すと、段落がすぐその書式になります。見出しの文字（<code>[ ]</code>）を入れたいときは、最後まで打って <code>Enter</code> を押すか、あとで右の設定欄で書きます。升目や新規ウィンドウの中では、そこに置けない書式は出ません。</p>
 <p>名前は英字が正式で、日本語の別名でも通ります。日本語入力のままの <code>：：：</code> <code>［］</code> <code>｛｝</code> も通ります。知らない名前は、書いたとおりの文字で描写に残ります。</p>
 <table>
 <tr><th><code>:::proc[見出し]{tpl=rule}</code></th><td><b>処理</b>（処理・判定・特殊ルール）。<code>[ ]</code> が見出し、<code>tpl</code> は見た目のテンプレ（<code>skill</code>・<code>rule</code>・自分で作ったテンプレの名前）。<code>:::skill</code> <code>:::rule</code> とも書けます</td></tr>
