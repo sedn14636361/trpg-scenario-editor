@@ -161,9 +161,10 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
   border-radius:3px}
 .st-cell{color:#d8cfa8}
 .st-cellname{color:#c8b6ff;font-style:italic}
-.srccellblk{margin:0 0 3px 30px}
-/* 升目の呼び名。その下にその升目の段落が並ぶ */
-.srccellhd{font-size:10px;color:var(--muted);letter-spacing:.06em;padding:3px 0 0 22px;
+/* 升目の段落は「表の内容」の金の縦線の内側に、処理の中や新規ウィンドウの中と同じ深さで並べる */
+.srcpop.srccellblk{margin:0 0 3px 0;border-left:0;padding-left:0}
+/* 升目の呼び名。その下にその升目の段落が並ぶ（新規ウィンドウの「〜の内容」と同じ見た目） */
+.srccellhd{font-size:10px;color:var(--brass);letter-spacing:.08em;padding:3px 0 0 0;
   user-select:none;-webkit-user-select:none}
 .st-image{color:#9fd8e0;display:flex;align-items:center;gap:8px}
 .srcthumb{width:56px;height:40px;object-fit:cover;border-radius:3px;border:1px solid var(--line);flex:0 0 auto}
@@ -605,7 +606,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.19.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.20.0</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -1196,11 +1197,13 @@ const DOC_CSS = `
 .cmt:hover,.cmt:focus{background:rgba(168,51,31,.10)}
 .cmt-n{font-size:.6em;color:#a8331f;vertical-align:super;line-height:0;margin-left:.1em;font-weight:700}
 @media print{ .cmt{border-bottom:0} .cmt-n{display:none} }
-/* 処理の中の段落。■成功 のように小見出しで始まる段落は、左に罫線をつけたかたまりにする（罫線は枠の色） */
+/* 段落の中の段落。枠のない親（描写・会話・シーン移行）の中では一段（字下げ1つと同じ 4mm）下げる */
 .bx-kids{margin-top:1.2mm}
-.bx-kids>.blkpad.sec>.blk{border-left:2px solid var(--bxl,rgba(35,32,28,.45));padding-left:3mm}
+.bx-kids.kids-ind{margin-left:4mm}
+/* ■成功 のように小見出しで始まる段落は、どこでも左に罫線をつけたかたまりにする（処理の中では罫線は枠の色） */
+.blkpad.sec>.blk{border-left:2px solid var(--bxl,rgba(168,51,31,.6));padding-left:3mm}
 /* かたまりの頭の小見出しは、左の罫線と二重にならないよう自分の縦線を外す */
-.bx-kids>.blkpad.sec>.blk>.bx-h:first-child{border-left:0;padding-left:0;margin-top:0}
+.blkpad.sec>.blk>.bx-h:first-child{border-left:0;padding-left:0;margin-top:0}
 /* 囲みの中の小見出しと入れ子 */
 .bx-p{white-space:pre-wrap;margin:0 0 1.2mm}
 .bx-p:last-child{margin-bottom:0}
@@ -4456,12 +4459,13 @@ function normalize(d){
       b.type='proc'; b.lb=null; applyBxTpl(b, key); b.lb=lb;
     }
     if(b.type==='npc'){ b.cols=1; ensureNpc(b); }
-    if(b.type==='proc'){
-      ensureProc(b);
+    if(b.type==='proc'){ ensureProc(b); }
+    if(Array.isArray(b.kids)){
       b.kids = b.kids.filter(x=>x && typeof x==='object')
         .map(x=>fixBlock(Object.assign(newBlock(), x, {id:x.id||uid(), cols:2})));
       fixList(b.kids);
-    }
+      if(!b.kids.length && b.type!=='proc') delete b.kids;
+    } else if(b.kids!=null) delete b.kids;
     if(b.type==='table'){ ensureTable(b); }
     if(b.type==='toc'){ b.cols=1; ensureToc(b); }
     if(b.type==='flow'){ b.cols=1; ensureFlow(b); }
@@ -4491,20 +4495,50 @@ function subLists(b){
   if(b.type==='table' && b.tbl && b.tbl.cb) Object.keys(b.tbl.cb).forEach(k=>{
     if(Array.isArray(b.tbl.cb[k]) && b.tbl.cb[k].length) out.push(b.tbl.cb[k]);
   });
-  if(b.type==='proc' && Array.isArray(b.kids) && b.kids.length) out.push(b.kids);
+  if(Array.isArray(b.kids) && b.kids.length) out.push(b.kids);   // 段落の中の段落
   return out;
 }
-/* その並びを中に持っている処理（処理の中でなければ null） */
-function procOwnerOf(list){
-  return allBlocks().find(b=>b.type==='proc' && b.kids===list) || null;
+/* ================= 段落の中の段落 =================
+   どの段落も、中に段落の並び（kids）を持てる。新規ウィンドウ・表の升目と同じくブロックで持つ。
+   原稿欄では Tab で「すぐ上の段落の中」へ入れ、Shift+Tab で外へ出す。
+   紙面では親の中に並べる。枠のある書式（処理・情報・ハンドアウト・注釈）は枠の中、
+   ■ のかたまりは左の罫線の内側、ほか（描写・会話・シーン移行）は一段（4mm）下げる。
+   見出しやタイトルは親にしない（章ぜんたいがひとかたまりになり、ページをまたげなくなるため） */
+const KIDS_PARENT = ['desc','dialog','note','proc','info','handout','scene'];
+const KIDS_FRAMED = ['proc','info','handout','note'];
+/* その並びを中に持っている段落（段落の中でなければ null） */
+function kidsOwnerOf(list){
+  return allBlocks().find(b=>b.kids===list) || null;
 }
-/* 処理の中には置けない書式。紙面の組み（改ページ・改段）や目次・表紙を崩すもの、
+/* 段落の中には置けない書式。紙面の組み（改ページ・改段）や目次・表紙を崩すもの、
    大きな差し込み（NPCシート・新規ウィンドウ・フローチャート・ハンドアウト）は外に置く */
-const PROC_SKIP = ['break','colbr','toc','cover','colophon','title','subtitle','h1','h2','h3',
+const KIDS_SKIP = ['break','colbr','toc','cover','colophon','title','subtitle','h1','h2','h3',
                    'handout','npc','popup','flow'];
-/* ■成功 のように、小見出しの行で始まる描写か。処理の中では左に罫線をつけたかたまりにする */
+/* ■成功 のように、小見出しの行で始まる描写か。左に罫線をつけたかたまりにする */
 function isSecBlock(b){
   return !!b && b.type==='desc' && /^[ 　]*(?:[■◆]|#{4,6}[ \t])/.test(String(b.text||''));
+}
+/* Tab（d=1）でその段落を、すぐ上の段落の中のいちばん後ろへ入れる。
+   Shift+Tab（d=-1）で中から外へ出し、親のすぐ下に並べる。できなければ false（字下げに回す） */
+function kidsMove(id, d){
+  const f = findBlock(id); if(!f) return false;
+  if(d>0){
+    const p = f.list[f.i-1];
+    if(!p || !KIDS_PARENT.includes(p.type) || KIDS_SKIP.includes(f.b.type)) return false;
+    if(!Array.isArray(p.kids)) p.kids = [];
+    f.list.splice(f.i,1); p.kids.push(f.b);
+    return true;
+  }
+  const own = kidsOwnerOf(f.list); if(!own) return false;
+  f.list.splice(f.i,1);
+  const of = findBlock(own.id); of.list.splice(of.i+1, 0, f.b);
+  if(!own.kids.length && own.type!=='proc') delete own.kids;
+  return true;
+}
+/* 親になれない書式に変えるとき、中の段落を外（すぐ下）へ出す。消えたように見えないように */
+function kidsRelease(f, k){
+  if(!f || !Array.isArray(f.b.kids) || !f.b.kids.length || KIDS_PARENT.includes(k)) return;
+  f.list.splice(f.list.indexOf(f.b)+1, 0, ...f.b.kids); f.b.kids = [];
 }
 /* 処理の文章を「説明」と「中の段落」に分ける。前の版の原稿の読み替えと、::: の読み取りで使う。
      ■…（#### …）の行   その行から次の印の手前までを、小見出しつきの段落（中の段落）にする
@@ -4532,7 +4566,7 @@ function procSplit(text, ctx){
         if(c && c[1].length>=stack[stack.length-1]){ stack.pop(); if(!stack.length) break; }
         else { const dd = mdDirective(ls[i]); if(dd && dd.n>=3) stack.push(dd.n); }
       }
-      kids.push(...mdParse(body.join('\n'), Object.assign({}, ctx, {skip:ctx.skip.concat(PROC_SKIP)})).blocks);
+      kids.push(...mdParse(body.join('\n'), Object.assign({}, ctx, {skip:ctx.skip.concat(KIDS_SKIP)})).blocks);
       continue;
     }
     if(/^[ 　]*(?:[■◆]|#{4,6}[ \t])/.test(ln)){ close(); cur = {b:newBlock('desc',''), lines:[ln.replace(/^[ 　]+/,'')]}; continue; }
@@ -5290,7 +5324,7 @@ function blockEl(b, pageCols, prevType){
     const lb=blockLabel(b).trim();
     el.className += procClass(b);
     el.style.cssText += procStyle(b);
-    el.innerHTML = (lb?'<div class="t-lb">'+esc(lb)+'</div>':'') + richBlockHTML(b) + procKidsHTML(b, true);
+    el.innerHTML = (lb?'<div class="t-lb">'+esc(lb)+'</div>':'') + richBlockHTML(b);
   }
   else if(b.type==='info'){
     const lb=blockLabel(b).trim();
@@ -5313,9 +5347,11 @@ function blockEl(b, pageCols, prevType){
     el.innerHTML = tx ? '<span class="hrtx">'+rubyHTMLwithComments(b)+'</span>' : '';
   }
   else { el.textContent = b.text; }
+  /* 中の段落は、親の箱の中のいちばん後ろに並べる */
+  if(Array.isArray(b.kids) && b.kids.length) el.insertAdjacentHTML('beforeend', kidsHTML(b, true));
   const w = document.createElement('div');
   w.dataset.id = b.id;
-  w.className = 'blkpad p-'+b.type + ((b.cols===1 && pageCols===2)?' span':'')
+  w.className = 'blkpad p-'+b.type + (isSecBlock(b)?' sec':'') + ((b.cols===1 && pageCols===2)?' span':'')
     + (b.type==='image' && (b.fl==='l'||b.fl==='r') ? ' fl-'+b.fl : '')
     + (b.clr ? ' clearfl' : '')
     + (b.ind ? ' i'+Math.min(4,b.ind) : '');
@@ -5457,11 +5493,13 @@ function cellBlkHTML(t, ri, ci, edit){
     return blockStaticHTML(b, 1, pull, top, '', edit);
   }).join('')+'</div>';
 }
-/* 処理の中の段落。升目と同じく、紙面の段落と同じ組み方で枠の中に並べる */
-function procKidsHTML(b, edit){
-  const l = ensureProc(b) && b.kids; if(!l.length) return '';
+/* 段落の中の段落。升目と同じく、紙面の段落と同じ組み方で親の中に並べる。
+   枠のある書式と ■ のかたまりは枠・罫線の内側に、ほかは一段下げる */
+function kidsHTML(b, edit){
+  const l = Array.isArray(b.kids) ? b.kids : []; if(!l.length || !KIDS_PARENT.includes(b.type)) return '';
   let prevType=null, first=true;
-  return '<div class="cellblk bx-kids">'+l.map(k=>{
+  const ind = (KIDS_FRAMED.includes(b.type) || isSecBlock(b)) ? '' : ' kids-ind';
+  return '<div class="cellblk bx-kids'+ind+'">'+l.map(k=>{
     const pull = gapPull(prevType, k.type); prevType = k.type;
     const top = first ? ' pagetop' : ''; first=false;
     return blockStaticHTML(k, 1, pull, top, '', edit);
@@ -6736,7 +6774,8 @@ function srcRowsHTML(list){
       + (sub.length ? srcRowsHTML(sub) : '<div class="srcpopempty">（まだ何も入っていません）</div>')
       + '</div>';
     if(b.type==='table') h += srcTableRowsHTML(b);
-    if(b.type==='proc' && ensureProc(b) && b.kids.length) h += '<div class="srcpop srcprockids">'+srcRowsHTML(b.kids)+'</div>';
+    /* 中の段落は、金の縦線の内側に並べる。同じ線の内側が同じ深さの範囲 */
+    if(Array.isArray(b.kids) && b.kids.length) h += '<div class="srcpop srckids">'+srcRowsHTML(b.kids)+'</div>';
     return h;
   }).join('');
 }
@@ -7031,7 +7070,7 @@ srcOn('paste', e=>{
   /* 処理の文章に貼ったときは、分けた段落を処理の中へ入れる */
   const intoProc = f.b.type==='proc';
   const md = mdParse(raw, mdCtx(cellOwnerOf(f.list) ? MD_NO_CELL : inPop ? POP_SKIP
-                              : (intoProc || procOwnerOf(f.list)) ? PROC_SKIP : []));
+                              : (intoProc || kidsOwnerOf(f.list)) ? KIDS_SKIP : []));
   if(!md.marked && md.blocks.length<=1){ document.execCommand('insertText', false, raw); return; }
   const made = md.blocks; if(!made.length) return;
   if(intoProc){ ensureProc(f.b).kids; f.b.kids.unshift(...made); }
@@ -7239,7 +7278,7 @@ function mdHeadFire(t, e){
   if(e && e.data!=null && e.data!==' ' && e.data!=='　') return false;
   if(tsrcOf(t)) return false;
   const f = findBlock(t.dataset.id); if(!mdTypable(f)) return false;
-  if(procOwnerOf(f.list)) return false;              // 処理の中には見出しを置かない（#### は小見出しになる）
+  if(kidsOwnerOf(f.list)) return false;              // 処理の中には見出しを置かない（#### は小見出しになる）
   const txt = t.innerText.replace(/\n$/,''), off = caretOffset(t);
   const m = txt.slice(0, off).match(/^[#＃]{1,3}[ 　\u00a0]$/); if(!m) return false;
   mdToHead(f, m[0].length-1, txt.slice(off));
@@ -7247,6 +7286,7 @@ function mdHeadFire(t, e){
 }
 /* その段落を見出し lv にして、rest を見出しの文字にする */
 function mdToHead(f, lv, rest){
+  kidsRelease(f, 'h'+lv);                            // 見出しは親にしないので、中の段落は外へ出す
   f.b.type = 'h'+lv;
   setBlockText(f.b, rest);
   editingId = f.b.id; sel.clear(); sel.add(f.b.id);
@@ -7275,11 +7315,16 @@ function mdLineFire(f, txt, off){
   }
   const pop = allBlocks().some(b=>b.type==='popup' && b.pop && b.pop.blocks===f.list);
   if((cellOwnerOf(f.list) && MD_NO_CELL.includes(nb.type)) || (pop && POP_SKIP.includes(nb.type))
-     || (procOwnerOf(f.list) && PROC_SKIP.includes(nb.type))){
+     || (kidsOwnerOf(f.list) && KIDS_SKIP.includes(nb.type))){
     setStatus(TYPE_NAME(nb.type)+'はここには入れられません','#ff9b83'); return true; }
   /* 同じ段落を作り変えたことにする（並びの中の位置と選択を保つ）。
      1行目の書き方は消えるので、その文字に付けていたコメントや色は持ち越さない */
   nb.id = f.b.id;
+  /* 中に段落を持っていたら、親になれる書式なら引き継ぎ、なれなければ外（すぐ下）へ出す */
+  if(Array.isArray(f.b.kids) && f.b.kids.length){
+    if(KIDS_PARENT.includes(nb.type)) nb.kids = (nb.kids||[]).concat(f.b.kids);
+    else f.list.splice(f.i+1, 0, ...f.b.kids);
+  }
   f.list.splice(f.i, 1, nb);
   if(inside){
     editingId = nb.id; sel.clear(); sel.add(nb.id);
@@ -7346,7 +7391,7 @@ function mdSuggest(fd, before){
   if(before==null || before.indexOf('\n')>=0) return null;
   const f = findBlock(fd.el.dataset.id); if(!mdTypable(f)) return null;
   const pop = allBlocks().some(b=>b.type==='popup' && b.pop && b.pop.blocks===f.list);
-  const skip = cellOwnerOf(f.list) ? MD_NO_CELL : pop ? POP_SKIP : procOwnerOf(f.list) ? PROC_SKIP : [];
+  const skip = cellOwnerOf(f.list) ? MD_NO_CELL : pop ? POP_SKIP : kidsOwnerOf(f.list) ? KIDS_SKIP : [];
   let m;
   if(skip.includes('h1') && /^[#＃]/.test(before)) return null;
   if((m = before.match(/^[#＃]{1,3}$/)))
@@ -7489,6 +7534,14 @@ srcOn('keydown', e=>{
   const keep = document.activeElement && document.activeElement.dataset
              ? document.activeElement.dataset.id : null;
   const off = keepCaret();
+  /* 段落を1つだけ選んでいれば、すぐ上の段落の中へ入れる（Shift+Tab で外へ出す）。
+     入れられないとき（すぐ上が見出しや画像など）は、今までどおり字下げにする */
+  if(sel.size===1 && kidsMove([...sel][0], e.shiftKey ? -1 : 1)){
+    editingId = keep; render(); save();
+    if(keep) focusSrc(keep, false, off);
+    setStatus(e.shiftKey ? '段落を外へ出しました' : 'すぐ上の段落の中へ入れました','var(--ok)');
+    return;
+  }
   setIndent(e.shiftKey?-1:1, true);
   if(keep) focusSrc(keep, false, off);
 }, true);
@@ -7602,6 +7655,17 @@ function navIdle(e){
   if(document.querySelector('#prjDlg[style*="flex"],#helpDlg[style*="flex"],#npcDlg[style*="flex"],#ccfDlg[style*="flex"],#tblDlg[style*="flex"],#ccfInDlg[style*="flex"],#ytDlg[style*="flex"],#flowDlg[style*="flex"],#prevDlg[style*="flex"],#outDlg[style*="flex"],#fontDlg[style*="flex"]')) return false;
   return true;
 }
+/* 段落を選んでいるだけのときの Tab / Shift+Tab。文字を打っているときと同じく、中へ入れる・外へ出す */
+addEventListener('keydown', e=>{
+  if(e.key!=='Tab' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if(!navIdle({shiftKey:false, ctrlKey:false, metaKey:false, altKey:false, isComposing:e.isComposing, keyCode:e.keyCode})) return;
+  e.preventDefault();
+  const id = [...sel][0];
+  if(kidsMove(id, e.shiftKey ? -1 : 1)){
+    render(); save();
+    setStatus(e.shiftKey ? '段落を外へ出しました' : 'すぐ上の段落の中へ入れました','var(--ok)');
+  } else setIndent(e.shiftKey ? -1 : 1);
+});
 addEventListener('keydown', e=>{
   if(e.key!=='ArrowUp' && e.key!=='ArrowDown' && e.key!=='Enter') return;
   if(e.__navDone || !navIdle(e)) return;
@@ -7658,15 +7722,21 @@ srcOn('keydown', e=>{
       editingId = nb.id; sel.clear(); sel.add(nb.id);
       render(); focusSrc(nb.id,false); save(); return;
     }
-    const pown = procOwnerOf(f.list);
-    if(pown && f.b.type==='desc'){
-      /* 中のいちばん後ろの空の段落で Enter → 処理の外（すぐ下）へ出る */
-      if(!txt.trim() && f.i===f.list.length-1){
-        f.list.splice(f.i,1);
-        const of = findBlock(pown.id); of.list.splice(of.i+1, 0, f.b);
-        editingId = f.b.id; sel.clear(); sel.add(f.b.id);
-        render(); focusSrc(f.b.id,false); save(); return;
-      }
+    /* 中に段落を持っている親の文章の末尾で Enter → 中の先頭に段落を作る（原稿欄ではすぐ下に中が見えているため） */
+    if(Array.isArray(f.b.kids) && f.b.kids.length && off===txt.length){
+      const nb = newBlock('desc',''); nb.cols = 2;
+      f.b.kids.unshift(nb);
+      editingId = nb.id; sel.clear(); sel.add(nb.id);
+      render(); focusSrc(nb.id,false); save(); return;
+    }
+    const pown = kidsOwnerOf(f.list);
+    /* 中のいちばん後ろの空の段落で Enter → 外（親のすぐ下）へ出る */
+    if(pown && f.b.type==='desc' && !txt.trim() && f.i===f.list.length-1 && !(f.b.kids && f.b.kids.length)){
+      kidsMove(f.b.id, -1);
+      editingId = f.b.id; sel.clear(); sel.add(f.b.id);
+      render(); focusSrc(f.b.id,false); save(); return;
+    }
+    if(f.b.type==='desc'){
       /* ■成功 のような小見出しの行の末尾で Enter → 段落を分けずに、同じ段落の中で改行する。
          Shift+Enter と同じ改行をブラウザに入れさせる（末尾の改行は、自分で書き足しても次の行ができず、
          打った字が改行の手前に入ってしまうため）。原稿への書き戻しは input で受ける */
@@ -7692,7 +7762,7 @@ srcOn('keydown', e=>{
       if(f.list.length<=1 && f.list===S.blocks){
         setStatus('最後の段落は消せません','#ff9b83'); return; }
       e.preventDefault();
-      const own = cellOwnerOf(f.list), pown = procOwnerOf(f.list);
+      const own = cellOwnerOf(f.list), pown = kidsOwnerOf(f.list);
       const nb = f.list[f.i-1] || f.list[f.i+1] || pown;   // 処理の中の最後の段落なら、処理の文章へ戻る
       f.list.splice(f.i,1);
       sel.clear(); if(nb) sel.add(nb.id);
@@ -9976,9 +10046,9 @@ function setType(k){
   const spot = cellTarget();
   if(spot && k!=='table'){ if(addToCell(spot, k)) return; }
   if(!sel.size){ addTyped(k); return; }
-  /* 処理の中の段落を選んでいるときは、処理の中に置けない書式を受けつけない */
-  if(PROC_SKIP.includes(k) && [...sel].some(id=>{ const f=findBlock(id); return f && procOwnerOf(f.list); })){
-    setStatus(TYPE_NAME(k)+'は処理の中には入れられません','#ff9b83'); return;
+  /* 段落の中の段落を選んでいるときは、中に置けない書式を受けつけない */
+  if(KIDS_SKIP.includes(k) && [...sel].some(id=>{ const f=findBlock(id); return f && kidsOwnerOf(f.list); })){
+    setStatus(TYPE_NAME(k)+'は段落の中には入れられません','#ff9b83'); return;
   }
   /* 文字を使わない書式は、文字の書いてある段落を作り変えずに、そのすぐ下へ新しく足す。
      書きかけの段落を選んだまま罫線や表を選んでも、書いた文字が消えないように。
@@ -9996,6 +10066,7 @@ function setType(k){
     return;
   }
   sel.forEach(id=>{const f=findBlock(id); if(!f) return;
+    kidsRelease(f, k);
     f.b.type=k;
     if(k==='npc'){ f.b.cols=1; ensureNpc(f.b); }
     if(k==='proc'){ if(!f.b.bx) applyBxTpl(f.b,'skill'); else ensureProc(f.b); }
@@ -10426,16 +10497,17 @@ function openBlockPreview(b){
   const inner = b.type==='npc'   ? npcInnerHTML(b,false,'static')
               : b.type==='table' ? tableInnerHTML(b)
               : b.type==='popup' ? popupViewHTML(b.pop)
-              : b.type==='proc'  ? (lbp?'<div class="t-lb">'+esc(lbp)+'</div>':'')+richBlockHTML(b)+procKidsHTML(b, false)
+              : b.type==='proc'  ? (lbp?'<div class="t-lb">'+esc(lbp)+'</div>':'')+richBlockHTML(b)
               : b.type==='info'  ? (blockLabel(b).trim()?'<div class="t-lb">'+esc(blockLabel(b).trim())+'</div>':'')+richBlockHTML(b)
               : b.type==='handout' ? hoHeadHTML(b)+richBlockHTML(b)
               : rubyHTML(b.text);
+  const kids = kidsHTML(b, false);
   document.getElementById('prevTitle').textContent = TYPE_NAME(b.type)+'の出来上がり';
   document.getElementById('prevBody').innerHTML =
     '<div class="page" style="width:auto;height:auto;box-shadow:none;min-height:0">'
     + '<div class="page-body" style="height:auto;padding:'+S.padH+'mm;font-size:'+S.base+'pt">'
     + '<div class="blkpad p-'+b.type+'" style="'+fsStyle(b)+'"><div class="blk t-'+b.type
-    + (b.type==='proc'?procClass(b)+'" style="'+procStyle(b):'')+'">'+inner+'</div></div>'
+    + (b.type==='proc'?procClass(b)+'" style="'+procStyle(b):'')+'">'+inner+kids+'</div></div>'
     + '</div></div>';
   document.getElementById('prevDlg').style.display='flex';
 }
@@ -11979,13 +12051,21 @@ function plainEditable(b){
   if(!PLAIN_EDIT_TYPES.includes(b.type)) return false;
   if(b.type==='dialog' && String(b.sp||'').trim()) return false;
   if(blockComments(b).length || blockMarks(b).length) return false;
+  if(Array.isArray(b.kids) && b.kids.length) return false;   // 中の段落ごと打てる欄にしてしまわないように
   if(hasRuby(b.text)) return false;
   if((b.type==='desc'||b.type==='note') && hasRich(b.text)) return false;
   /* 変数を含む段落は、紙面では出力と同じく値（既定値）で見せるので、直すのは左の原稿欄で */
   if(hasVarRef(b.text)) return false;
   return true;
 }
+/* 書き出し・印刷・升目の中の段落の描き方。中の段落があれば、段落の箱を閉じる手前に並べる
+   （どの書式も最後は「段落の箱」と「外側の箱」を閉じる </div></div> で終わる） */
 function blockStaticHTML(b, cols, pull, top, anchor, edit){
+  const h = blockStaticHTML0(b, cols, pull, top, anchor, edit);
+  if(!Array.isArray(b.kids) || !b.kids.length || !h.endsWith('</div></div>')) return h;
+  return h.slice(0, -12) + kidsHTML(b, edit) + '</div></div>';
+}
+function blockStaticHTML0(b, cols, pull, top, anchor, edit){
   if(edit && plainEditable(b)){
     const ow0='<div class="blkpad p-'+b.type+(isSecBlock(b)?' sec':'')+((b.cols===1 && cols===2)?' span':'')+top
            + (b.clr?' clearfl':'') + (b.ind?' i'+Math.min(4,b.ind):'')+'" data-id="'+b.id+'"'
@@ -12020,7 +12100,7 @@ function blockStaticHTML(b, cols, pull, top, anchor, edit){
     if(b.type==='proc'){
       const lb=blockLabel(b).trim();
       return ow+'<div'+anchor+' class="'+cl+procClass(b)+'" style="'+procStyle(b)+st2+'">'
-        + (lb?'<div class="t-lb">'+esc(lb)+'</div>':'') + richBlockHTML(b) + procKidsHTML(b, edit) + '</div></div>';
+        + (lb?'<div class="t-lb">'+esc(lb)+'</div>':'') + richBlockHTML(b) + '</div></div>';
     }
     if(b.type==='info'||b.type==='handout'){
       const lb = b.type==='info' ? blockLabel(b).trim() : '';
@@ -12775,6 +12855,7 @@ const HELP = [
 <tr><th><code>Shift</code>+<code>Enter</code></th><td><b>段落の中で改行します。</b>段落は分かれません。</td></tr>
 <tr><th><code>Backspace</code></th><td>段落の先頭で押すと、前の段落と繋がります。</td></tr>
 <tr><th><code>Esc</code></th><td>1回押すと文字の編集をやめてその段落を選んだ状態に、もう1回押すと<b>選択も外れます</b>。ウィンドウを閉じるときにも使えます。</td></tr>
+<tr><th><code>Tab</code> / <code>Shift</code>+<code>Tab</code></th><td>左の原稿欄で、その段落を<b>すぐ上の段落の中へ入れます</b>／中から<b>外へ出します</b>。何段でも入れ子にできます（くわしくは「書式と段落」の<b>段落の中の段落</b>）。すぐ上が見出し・タイトル・画像・表など中に段落を持てない書式のときは、今までどおり<b>字下げ</b>になります。</td></tr>
 <tr><th><code>↑</code> / <code>↓</code></th><td>左の原稿欄で、段落の<b>いちばん上の行で↑</b>・<b>いちばん下の行で↓</b>を押すと、前・次の段落へ移ります（横の位置はできるだけそのまま）。画像・表・NPCシートなど文字を打てない段落は<b>選んだ状態</b>にして通り、もう一度押すとさらに先へ進みます。段落を選んでいるだけのときも、↑↓で前・次の段落へ移れます。</td></tr>
 <tr><th><code>Enter</code>（段落を選んでいるとき）</th><td>画像・表など文字を打てない段落なら、<b>すぐ下に空の描写を足して</b>そこで書き始めます。文字の段落なら、その末尾にカーソルが入ります。</td></tr>
 <tr><th><code>Ctrl</code>+<code>S</code></th><td>ファイルに保存します。</td></tr>
@@ -12892,13 +12973,21 @@ const HELP = [
 <p>もとの「箇条書き」の書式で書いた原稿は、開いたときに<b>描写に直し、各行の頭に印を付け直します</b>。見た目はそのままです。</p>
 <h4>処理（囲み）</h4>
 <p><b>処理</b>は、もとの「技能判定」と「特殊ルール」を1つにまとめた書式です。内容の書き方は同じで、<b>見た目だけを設定欄で選びます</b>。「技能判定」「特殊ルール」のテンプレを押せば元どおりの見た目になり、そのうえで枠線の形（実線・破線・なし）、左の太い罫、地色、字の大きさ、色（朱・墨・藍・苔・金茶・灰）を個別に変えられます。古い原稿を開いたときは、自動でこの書式に読み替えます。</p>
-<p><b>処理の中には段落を入れられます</b>（新規ウィンドウや表の升目と同じく、中にブロックを持ちます）。</p>
+<h4>段落の中の段落</h4>
+<p><b>どの段落も、中に段落を入れられます</b>（新規ウィンドウや表の升目と同じく、中にブロックを持ちます）。左の原稿欄で <code>Tab</code> を押すと、その段落が<b>すぐ上の段落の中</b>（いちばん後ろ）へ入り、<code>Shift</code>+<code>Tab</code> で外へ出ます。原稿欄では、中の段落の範囲を<b>金の縦線</b>で示します（同じ線の内側が同じ深さです）。</p>
+<ul>
+<li>中に段落を持てるのは、<b>描写・会話・注釈・処理・情報・ハンドアウト・シーン移行</b>です。紙面では、枠のある書式（処理・情報・ハンドアウト・注釈）は<b>枠の中</b>に、<code>■</code> のかたまりは<b>左の罫線の内側</b>に、ほか（描写・会話・シーン移行）は<b>一段（4mm）下げて</b>並べます。</li>
+<li>見出し1〜3・タイトル・画像・表などは中に段落を持ちません（章ぜんたいがひとかたまりになり、ページをまたげなくなるため）。中に段落を持つ段落をこれらの書式に変えると、中の段落は外（すぐ下）へ出ます。</li>
+<li>中に段落を持っている段落の文章の末尾で <code>Enter</code> を押すと、中の先頭に段落ができます。中のいちばん後ろの空の段落で <code>Enter</code> を押すと、外へ出ます。</li>
+<li>中には、改ページ・改段・目次・表紙・奥付・タイトル・サブタイトル・見出し1〜3・ハンドアウト・NPCシート・新規ウィンドウ・フローチャートは置けません。</li>
+<li><b>親の段落を消すと、中の段落もいっしょに消えます。</b>中に段落を持つ段落は、ひとかたまりでページをまたげないので、長くなりすぎたら外へ出してください。</li>
+<li><code>■成功</code> のように小見出しで始まる段落は、どこに置いても<b>左に罫線のついたかたまり</b>になります。小見出しの行の末尾の <code>Enter</code> は、段落を分けずに同じ段落の中で改行します。</li>
+</ul>
+<p><b>処理の中</b>も同じしくみです。処理の文章の末尾で <code>Enter</code> を押すと、中の先頭に段落ができます。</p>
 <ul>
 <li>左の原稿欄で、処理の文章の末尾で <code>Enter</code> を押すと、処理の<b>中</b>の先頭に段落ができます。中の段落で <code>Enter</code> を押すと、中にもう1つ段落ができます。</li>
-<li><code>■成功</code> のように小見出しで始めると、その段落は<b>左に罫線のついたかたまり</b>になります（罫線は枠の色）。小見出しの行の末尾で <code>Enter</code> を押すと、段落を分けずに同じ段落の中で改行するので、続けて「天板の裏に…」と本文を書けます。本文の末尾で <code>Enter</code> を押すと、次のかたまり（<code>■失敗</code> など）へ進みます。</li>
-<li>中の<b>いちばん後ろの空の段落</b>で <code>Enter</code> を押すと、処理の外（すぐ下）へ出ます。</li>
+<li><code>■成功</code> のように小見出しで始めると、その段落は<b>左に罫線のついたかたまり</b>になります（処理の中では罫線は枠の色）。かたまりの中にも、<code>Tab</code> で判定などを入れられます。小見出しの行の末尾で <code>Enter</code> を押すと、段落を分けずに同じ段落の中で改行するので、続けて「天板の裏に…」と本文を書けます。本文の末尾で <code>Enter</code> を押すと、次のかたまり（<code>■失敗</code> など）へ進みます。</li>
 <li>中の段落を選んで「処理」を選ぶと、<b>判定の入れ子</b>（枠の中の枠）になります。</li>
-<li>中には、改ページ・改段・目次・表紙・奥付・タイトル・サブタイトル・見出し1〜3・ハンドアウト・NPCシート・新規ウィンドウ・フローチャートは置けません。</li>
 <li>処理の文章に貼り付けた文章も、段落に分けて中に入ります。<code>:::proc</code> の中に書いた <code>■成功</code> や <code>＞目星：</code> も、中の段落になります。</li>
 <li>前の版で、処理の文章の中に書いた <code>■成功</code> や <code>＞目星：…</code> は、開いたときに一度だけ中の段落へ分け直します（その部分に付けていたコメントや文字の色は外れます）。</li>
 </ul>
@@ -13334,8 +13423,8 @@ function blockPlainText(b){
       return [String(np.name||'').trim(), String(np.role||'').trim(), String(np.memo||'').trim()]
         .filter(Boolean).join('\n');
     }
-    if(b.type==='proc')
-      return [String(b.text||'')].concat(ensureProc(b) && b.kids.map(blockPlainText)).filter(x=>String(x).trim()!=='').join('\n');
+    if(Array.isArray(b.kids) && b.kids.length)
+      return [String(b.text||'')].concat(b.kids.map(blockPlainText)).filter(x=>String(x).trim()!=='').join('\n');
     return String(b.text||'');
   }
 }
