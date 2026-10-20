@@ -605,7 +605,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.14.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.15.0</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -1279,6 +1279,16 @@ ul.ls .tx{flex:1;min-width:0;white-space:pre-wrap}
 .t-vr{border-left:2px solid rgba(35,32,28,.55);padding-left:3mm;margin:0 0;line-height:1.9;min-height:8mm}
 .t-scene{text-align:right;font-size:.88em;font-weight:700;text-decoration:underline;
   text-underline-offset:.28em;line-height:1.8;margin:0 0 3mm;letter-spacing:.06em;break-after:avoid}
+/* シーン移行の行き先の見出しへのリンク。見た目はシーン移行の文字のまま */
+.t-scene a.scene-link{color:inherit;text-decoration:inherit;text-underline-offset:inherit}
+/* 印刷（PDF）用のリンク。画面では出さず、印刷では新規ウィンドウのボタンの代わりに出す */
+.pop-plink,.ap-backs{display:none}
+@media print{
+  .pop-btn.has-plink{display:none !important}   /* リンクを付けたボタンだけ隠す（中身のない窓などはボタンの文字のまま） */
+  .pop-plink{display:inline;color:#a8331f;text-decoration:underline;text-underline-offset:.2em;font-weight:700}
+  .ap-backs{display:flex;flex-wrap:wrap;gap:1mm 5mm;margin:-1mm 0 3mm;font-size:.85em}
+  .ap-back{color:#a8331f;text-decoration:underline;text-underline-offset:.2em}
+}
 
 /* NPCシート */
 .t-npc{white-space:normal;border:1.3px solid rgba(35,32,28,.55);background:rgba(35,32,28,.03);padding:3mm 4mm 3.5mm;margin:0 0;font-size:1em}
@@ -6420,6 +6430,7 @@ function firstOverflow(body){
 function paginate(){
   const scrollY = document.getElementById('canvasWrap').scrollTop;
   stage.innerHTML='';
+  delete stage.dataset.plk;                      // 印刷用のリンクは組み直すと消えるので、印も外す
   pageMap = [];
   let pi = 0;
   sections().forEach((secBlocks, si)=>{
@@ -9830,8 +9841,19 @@ function propsHTML(b){
     : b.type==='image'  ? propsImage(b)
     : b.type==='flow'   ? propsFlow(b)
     : b.type==='toc'    ? propsToc(b)
+    : b.type==='scene'  ? propsScene(b)
     : '';
   return h + propsTocItem(b) + propsCellOwner(b);
+}
+/* シーン移行ブロックの設定。行き先の見出しが見つかったかを見せる */
+function propsScene(b){
+  const h = sceneTargetOf(b), names = sceneNames(b.text);
+  const pg = h ? pageOfBlockOrNull(h.id) : null;
+  return pRow('つながる見出し',
+    h ? '<div class="hint" style="color:var(--text)">「'+esc(rubyPlain(h.text))+'」'+(pg?'（P.'+pg+'）':'')+'</div>'
+      : '<div class="hint">見つかりません'+(names.length?'（「'+esc(names[names.length-1])+'」という見出しを作るとつながります）':'')+'</div>',
+    '行き先の名前が見出し1・2・3とぴったり同じなら、出力したHTMLとPDFでその見出しへのリンクになります。'
+    + '「書斎へ」「→ 書斎へ移行」「シーン3『書斎』へ」のように書けます。');
 }
 /* 目次ブロックの設定。何を載せるか、見出し、体裁 */
 function propsToc(b){
@@ -11166,6 +11188,117 @@ function popupBlocks(){
 }
 function allBlocks(){ const o=[]; blockLists().forEach(l=>o.push.apply(o,l)); return o; }
 function popupViewHTML(pop){ return popInnerViewHTML(pop); }
+/* ================= シーン移行のリンク =================
+   シーン移行ブロックに書いた行き先の名前が、見出し（見出し1・2・3）とぴったり同じなら、その見出しへのリンクにする。
+   「書斎へ」「→ 書斎へ移行」「シーン3『書斎』へ」のような書き方から、行き先の名前を取り出して照らし合わせる。
+   取り出し方を段階に分けて候補をいくつか作り、どれかが見出しの名前とまったく同じときだけつなぐ
+   （文字を含むだけではつながない。短い見出しに間違ってつながるのを防ぐため） */
+const SCENE_HEAD_TYPES = ['h1','h2','h3'];
+function stripBrackets(s){
+  const m = String(s).trim().match(/^[「『【〈《（(\[“"]\s*(.*?)\s*[」』】〉》）)\]”"]$/);   // 前後がそろっているときだけ外す
+  return (m ? m[1] : String(s)).trim();
+}
+function stripSceneNo(s){ return String(s).replace(/^(シーン|場面|scene)\s*[0-9０-９]+\s*[:：.．、\s]?\s*/i, '').trim(); }
+function headNames(text){
+  const p = rubyPlain(String(text||'')).replace(/\s+/g,' ').trim();
+  const out = [p, stripBrackets(p), stripBrackets(stripSceneNo(p))];
+  return out.filter((x,i)=>x && out.indexOf(x)===i);
+}
+function sceneNames(text){
+  let s = rubyPlain(String(text||'')).replace(/\s+/g,' ').trim();
+  s = s.replace(/^[→⇒➡▶►＞>]+\s*/, '').replace(/^(シーン移行|場面移行|シーン移動)\s*[:：]?\s*/, '');
+  s = s.replace(/[。．.！!]+$/, '');
+  s = s.replace(/\s*(へ|に)\s*(の)?\s*(移行|移動|続く|進む|進行|向かう)(する)?$/, '').replace(/\s*(へ|に)$/, '').trim();
+  const out = [s, stripBrackets(s), stripBrackets(stripSceneNo(s))];
+  return out.filter((x,i)=>x && out.indexOf(x)===i);
+}
+/* シーン移行ブロックの行き先の見出し（なければ null）。
+   同じ名前の見出しがいくつかあるときは、そのブロックより後ろでいちばん近いもの、なければ前でいちばん近いもの */
+function sceneTargetOf(b){
+  if(!b || b.type!=='scene') return null;
+  const at = S.blocks.indexOf(b); if(at<0) return null;
+  const want = sceneNames(b.text); if(!want.length) return null;
+  const hit = (h)=> SCENE_HEAD_TYPES.includes(h.type) && headNames(h.text).some(n=>want.includes(n));
+  for(let i=at+1;i<S.blocks.length;i++) if(hit(S.blocks[i])) return S.blocks[i];
+  for(let i=at-1;i>=0;i--) if(hit(S.blocks[i])) return S.blocks[i];
+  return null;
+}
+/* 紙面に出ているシーン移行ブロックと、行き先の見出しの組。ok(id) が偽の見出し（出力の範囲の外など）は除く */
+function sceneLinks(ok){
+  const out = [];
+  S.blocks.forEach(b=>{ if(b.type!=='scene') return;
+    const h = sceneTargetOf(b); if(h && (!ok || ok(h.id))) out.push([b.id, h.id]); });
+  return out;
+}
+/* 印刷（PDF）に出すページ番号。ページ番号を出しているときは紙面の番号、出していなければ1からの番号 */
+function printPageNo(i){
+  const f = S.foot||{};
+  return 'P.'+(f.num!==false ? i + (+f.from||1) : i+1);
+}
+/* 印刷（PDF）用のリンクのもとになるもの */
+function printLinkData(ok){
+  const pops = {};
+  popupBlocks().forEach(b=>{ pops[b.id] = String((b.pop||{}).label||'くわしく').trim()||'くわしく'; });
+  return { scenes: sceneLinks(ok), pops: pops, pno: pageMap.map((_,i)=>printPageNo(i)) };
+}
+/* 印刷（PDF）用のリンクを、組み上がった紙面に付ける。編集画面の印刷と、書き出したHTMLの両方で同じものを使う
+   （書き出したHTMLには、この関数の文字をそのまま埋め込むので、外の変数や新しい書き方は使わない）。
+   ・新規ウィンドウのボタンのうしろに「→ 追記「名前」」のリンクを入れる。紙ではボタンが押せないので、印刷ではこちらを出す
+   ・追記の各節に「↩ P.3 へ戻る」を付ける。同じ窓を何か所から呼んでいれば、その数だけ並べる
+   ・シーン移行ブロックの文字を、行き先の見出しへのリンクで包む（画面でも効く）
+   ブラウザで「PDFに保存」すると、ページ内リンク（#の付いたリンク）は PDF の中のリンクになる */
+function printLinks(roots, L){
+  var d = document, refs = {}, cnt = {}, i, j;
+  function blkOf(id){
+    for(var r=0;r<roots.length;r++){
+      var x = roots[r].querySelector('.blk[data-id="'+id+'"]') || roots[r].querySelector('[data-id="'+id+'"]');
+      if(x) return x.classList.contains('blk') ? x : (x.querySelector('.blk') || x);
+    }
+    return null;
+  }
+  for(i=0;i<L.scenes.length;i++){
+    var sc = blkOf(L.scenes[i][0]), hd = blkOf(L.scenes[i][1]);
+    if(!sc || !hd || sc.querySelector('a.scene-link')) continue;
+    if(!hd.id) hd.id = 'b'+L.scenes[i][1];
+    var a = d.createElement('a'); a.className = 'scene-link'; a.href = '#'+hd.id;
+    while(sc.firstChild) a.appendChild(sc.firstChild);
+    sc.appendChild(a);
+  }
+  for(i=0;i<roots.length;i++){
+    var bs = roots[i].querySelectorAll('[data-popopen]');
+    for(j=0;j<bs.length;j++){
+      var b = bs[j], pid = b.getAttribute('data-popopen'), lb = L.pops[pid];
+      if(!lb || b.closest('.popbody,.fwin') || (b.nextSibling && b.nextSibling.className==='pop-plink')) continue;
+      var list = refs[pid] || (refs[pid] = []);
+      var pl = d.createElement('a'); pl.className = 'pop-plink'; pl.href = '#apx'+pid;
+      cnt[pid] = (cnt[pid]||0) + 1; pl.id = 'pr'+pid+'-'+cnt[pid];
+      pl.textContent = '→ 追記「'+lb+'」';
+      b.parentNode.insertBefore(pl, b.nextSibling); b.classList.add('has-plink');
+      if(b.closest('.appx,#printAppendix,.fx-appx')) continue;   // 追記の中から呼んでいるものは、戻り先にしない
+      var pg = b.closest('[data-pi]'), n = pg ? L.pno[+pg.getAttribute('data-pi')] : '';
+      list.push({id: pl.id, pg: n || ''});
+    }
+  }
+  for(var pid2 in refs){
+    var h = d.getElementById('apx'+pid2); if(!h || !refs[pid2].length) continue;
+    var pad = h.closest('.blkpad') || h;
+    if(pad.nextSibling && pad.nextSibling.className==='ap-backs') continue;
+    var box = d.createElement('div'); box.className = 'ap-backs';
+    for(j=0;j<refs[pid2].length;j++){
+      var r2 = refs[pid2][j], ab = d.createElement('a'); ab.className = 'ap-back'; ab.href = '#'+r2.id;
+      ab.textContent = '↩ ' + (r2.pg ? r2.pg+' へ戻る' : '本文へ戻る');
+      box.appendChild(ab);
+    }
+    pad.parentNode.insertBefore(box, pad.nextSibling);
+  }
+}
+/* 編集画面から印刷するとき（印刷ボタンでも Ctrl+P でも）、印刷の直前にリンクを付け、終わったら組み直して外す */
+function printPrep(){
+  if(stage.dataset.plk) return;                    // 印刷ボタンと beforeprint の両方から呼ばれても1回だけ
+  try{ buildAppendix(); printLinks([stage, document.getElementById('printAppendix')], printLinkData()); stage.dataset.plk='1'; }catch(e){}
+}
+addEventListener('beforeprint', printPrep);
+addEventListener('afterprint', ()=>{ if(!stage.dataset.plk) return; delete stage.dataset.plk; try{ render(); }catch(e){} });
 function appendixHTML(){
   const list = popupBlocks();
   if(!list.length) return '';
@@ -11174,7 +11307,7 @@ function appendixHTML(){
   const body = '<div class="blkpad p-h1 pagetop span"><div class="blk t-h1">追記</div></div>'
     + list.map(b=>{
         const p=b.pop||{};
-        return '<div class="blkpad p-h2"><div class="blk t-h2">'+esc(p.label||'くわしく')+'</div></div>'
+        return '<div class="blkpad p-h2"><div class="blk t-h2" id="apx'+b.id+'">'+esc(p.label||'くわしく')+'</div></div>'
              + (popIsBlocks(p)
                  ? popBlocksHTML(p.blocks)
                  : '<div class="blkpad p-desc"><div class="blk t-desc" style="white-space:normal">'
@@ -11282,7 +11415,7 @@ function pageStaticHTML(i, withAnchor){
   const onPg = pimgsOn(i, pageMap.length);
   const freeShape = pimgShapes(onPg, st.cols);
   const freeHTML = onPg.map(o=>pimgHTML(o, false)).join('');
-  return '<div class="page '+cls+'" id="p'+(i+1)+'" style="'+padVars()+paperVar(st)+'">'
+  return '<div class="page '+cls+'" id="p'+(i+1)+'" data-pi="'+i+'" style="'+padVars()+paperVar(st)+'">'
     + '<div class="page-bg '+cls+'"></div>'+img
     + '<div class="page-body'+(st.cols===2?' cols2':'')+'" style="padding:'+S.padV+'mm '+S.padH+'mm;font-size:'+S.base+'pt">'+freeShape+body+freeHTML+'</div>'
     + footHTML(i) + '</div>';
@@ -11336,7 +11469,7 @@ function doPrint(a,b){
   boxes.forEach((el,i)=>el.classList.toggle('pgskip', i<a || i>b));
   const after=()=>{ boxes.forEach(el=>el.classList.remove('pgskip')); removeEventListener('afterprint',after); };
   addEventListener('afterprint', after);
-  setTimeout(()=>window.print(), 30);
+  setTimeout(()=>{ printPrep(); window.print(); }, 30);
   setTimeout(after, 4000);
 }
 
@@ -11374,7 +11507,7 @@ function flowAppendixHTML(){
   return '<section class="fx-appx"><div class="blkpad p-h1 span"><div class="blk t-h1" id="appx">追記</div></div>'
     + list.map(b=>{
         const p=b.pop||{};
-        return '<div class="fx-pop" id="pop'+b.id+'"><div class="blkpad p-h2"><div class="blk t-h2">'+esc(p.label||'くわしく')
+        return '<div class="fx-pop" id="pop'+b.id+'"><div class="blkpad p-h2"><div class="blk t-h2" id="apx'+b.id+'">'+esc(p.label||'くわしく')
           + '<a class="fx-back" href="#" data-back="'+b.id+'">↩ 本文へ戻る</a></div></div>'
           + (popIsBlocks(p) ? popBlocksHTML(p.blocks)
              : '<div class="blkpad p-desc"><div class="blk t-desc" style="white-space:normal">'+popupBodyHTML(p.body)+'</div></div>')
@@ -11411,8 +11544,13 @@ function doExport(a,b,flow){
       + pops.map(pb=>{ const lb=(pb.pop||{}).label||'くわしく';
           return '<a class="nv l2" href="#pop'+pb.id+'"><span class="nvt" data-t="'+esc(lb)+'">'+esc(lb)+'</span></a>'; }).join('')
     : '';
-  const popData = flow ? '' : pops.map(pb=>'<div class="popbody" id="pop'+pb.id+'" hidden>'
-      + '<h3>'+esc((pb.pop||{}).label||'くわしく')+'</h3>'+popupViewHTML(pb.pop)+'</div>').join('');
+  /* 新規ウィンドウの内容。押したときに、ここから写して浮かぶ窓に出す（ページごと・区切りなしの両方） */
+  const popData = pops.map(pb=>'<div class="popbody" id="pw'+pb.id+'" hidden data-title="'+esc((pb.pop||{}).label||'くわしく')+'">'
+      + popupViewHTML(pb.pop)+'</div>').join('');
+  /* 印刷（PDF）用のリンク。出力した範囲の外の見出しにはつながない */
+  const outIds = new Set(); idx.forEach(i=>(pageMap[i]||[]).forEach(id=>outIds.add(id)));
+  const plJs = '<script>(function(){var L='+JSON.stringify(printLinkData(id=>outIds.has(id))).replace(/</g,'\\u003c')+';('
+    + printLinks.toString() + ')([document.getElementById("doc")], L);})();<\/script>';
   /* 表の出力文と、NPCシートのccfoliaコマを、押したときに使えるよう仕込んでおく */
   /* <script type="text/plain"> の内容は HTML として読まれないので、
      ふつうのエスケープをかけると &quot; がそのまま文字として残ってしまう。
@@ -11436,18 +11574,24 @@ function doExport(a,b,flow){
   const cmtData = allBlocks().flatMap(x=>blockComments(x).map((c,i)=>
     '<script type="text/plain" class="outdata" id="cm'+x.id+'-'+i+'">'+sesc(c.t)+'<\/script>')).join('');
   const extraCss = `
-#popOv{position:fixed;inset:0;background:rgba(0,0,0,.66);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
-#popOv.on{display:flex}
-/* 新規ウィンドウ。閉じるボタンは内容の枠の外（右上）に置く。
-   中に置くと本文に重なって、長い文を読むときに邪魔になる */
-#popWrap{position:relative;display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:min(820px,94vw)}
-#popBox{background:#fbf7ef;color:#23201c;border-radius:8px;width:min(820px,94vw);max-height:80vh;overflow:auto;padding:22px 26px;
-  box-shadow:0 8px 40px rgba(0,0,0,.5);line-height:1.9;font-size:14px}
-#popBox h3{margin:0 0 12px;color:#a8331f;font-size:16px;letter-spacing:.08em}
-#popBox p{margin:0 0 10px;white-space:pre-wrap}
-#popX{flex:0 0 auto;border:0;background:#23201c;color:#f7f3ea;border-radius:4px;
-  padding:5px 14px;cursor:pointer;font:inherit;font-size:12px;opacity:.9}
-#popX:hover{opacity:1;background:#a8331f}
+/* 新規ウィンドウ。本文の上に浮かぶ窓で、背景は暗くしない（開いたまま本文を読める）。
+   上の帯をつかんで動かし、右下の角で大きさを変える。いくつでも開け、押した窓が手前に来る */
+.fwin{position:fixed;z-index:50;display:flex;flex-direction:column;background:#fbf7ef;color:#23201c;border-radius:8px;
+  box-shadow:0 10px 36px rgba(0,0,0,.42),0 0 0 1px rgba(35,32,28,.28);overflow:hidden;resize:both;
+  min-width:240px;min-height:140px;max-width:96vw;max-height:94vh}
+.fw-h{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:5px 5px 5px 14px;background:#23201c;color:#f7f3ea;
+  cursor:move;touch-action:none;user-select:none;-webkit-user-select:none}
+.fw-t{flex:1;min-width:0;font-size:13px;font-weight:700;letter-spacing:.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fw-x{flex:0 0 auto;border:0;background:transparent;color:#f7f3ea;font-size:19px;line-height:1;width:32px;height:28px;border-radius:4px;cursor:pointer}
+.fw-x:hover,.fw-x:focus-visible{background:#a8331f;outline:none}
+.fw-b{flex:1;min-height:0;overflow:auto;padding:16px 20px 20px;line-height:1.9;font-size:14px}
+.fw-b p{margin:0 0 10px;white-space:pre-wrap}
+/* 狭い画面では、画面の下半分に出す（指で動かすより、そのまま読めるほうが楽） */
+@media (max-width:700px){
+  .fwin{left:0 !important;right:0;top:auto !important;bottom:0;width:auto !important;height:56vh !important;max-width:none;
+    resize:none;border-radius:12px 12px 0 0}
+  .fw-h{cursor:default}
+}
 .popbody{display:none}
 .appx{display:none}
 #cmtRail{position:fixed;right:14px;top:80px;width:250px;display:none;z-index:40}
@@ -11484,7 +11628,7 @@ body.notoc #tocBtn{left:10px}
 #cpToast.on{opacity:1}
 .pg-hit{animation:pghit 1.6s ease}
 @keyframes pghit{0%{background:rgba(211,165,52,.45)}100%{background:transparent}}
-@media print{ #popOv,#tocBtn,.copybtn,#cmtRail{display:none !important} .appx{display:block} #nav{display:none}
+@media print{ .fwin,#tocBtn,.copybtn,#cmtRail{display:none !important} .appx{display:block} #nav{display:none}
   .cmt{border-bottom:0} .cmt-n{display:none} }`;
   /* 区切りなしの1枚。画面ぜんたいを1枚の紙にして、目次もその紙の左に罫線で区切って置く */
   const bgCount = {};
@@ -11671,8 +11815,7 @@ body.fx.notoc #doc{margin-left:0}
     var bk=t.closest&&t.closest('[data-back]');
     if(bk){ e.preventDefault(); back(bk.getAttribute('data-back')); return; }
     if(t.closest&&t.closest('#fxBack')){ back(); return; }
-    var p=t.closest&&t.closest('[data-popopen]');
-    if(p){ e.preventDefault(); jump('pop'+p.getAttribute('data-popopen')); return; }
+    if(t.closest&&t.closest('[data-popopen],.fwin')) return;      // 新規ウィンドウは浮かぶ窓で開く
     var a=t.closest&&t.closest('a[href^="#"]');
     if(a && a.getAttribute('href').length>1){ e.preventDefault(); jump(a.getAttribute('href').slice(1)); }
   });
@@ -11681,7 +11824,45 @@ body.fx.notoc #doc{margin-left:0}
   const js = `
 <script>
 (function(){
-  var ov=document.getElementById('popOv'), inn=document.getElementById('popIn');
+  /* 新規ウィンドウ（浮かぶ窓）。同じ窓をもう一度押したときは、開いている窓を手前に出す */
+  var wins={}, zTop=50, drag=null;
+  function front(w){ w.style.zIndex=++zTop; }
+  function openWin(id, opener){
+    var w=wins[id];
+    if(w){ front(w); w.querySelector('.fw-x').focus(); return; }
+    var src=document.getElementById('pw'+id), ttl=src ? src.getAttribute('data-title') : 'くわしく';
+    w=document.createElement('section'); w.className='fwin';
+    w.setAttribute('role','dialog'); w.setAttribute('aria-modal','false'); w.setAttribute('aria-labelledby','fwt'+id);
+    w.innerHTML='<div class="fw-h"><b class="fw-t" id="fwt'+id+'"></b>'
+      + '<button type="button" class="fw-x" aria-label="閉じる" title="閉じる（Esc）">&#215;</button></div><div class="fw-b"></div>';
+    w.querySelector('.fw-t').textContent = window.varText ? window.varText(ttl) : ttl;
+    w.querySelector('.fw-b').innerHTML = src ? src.innerHTML : '（内容がありません）';
+    /* 開くたびに少しずつずらして、右上から重ねる */
+    var k=Object.keys(wins).length, W=Math.min(480, innerWidth-24), H=Math.min(Math.round(innerHeight*0.7), 600);
+    w.style.width=W+'px'; w.style.height=H+'px';
+    w.style.left=Math.max(12, innerWidth-W-24-k*28)+'px'; w.style.top=Math.max(12, Math.min(innerHeight-160, 60+k*28))+'px';
+    w._id=id; w._op=opener; wins[id]=w; document.body.appendChild(w); front(w);
+    w.querySelector('.fw-x').focus();
+  }
+  function closeWin(w){
+    delete wins[w._id]; w.remove();
+    if(w._op && document.contains(w._op)) w._op.focus();
+  }
+  /* 窓を押したら手前へ。上の帯をつかんだら動かす（帯が画面の外へ出ないようにする） */
+  document.addEventListener('pointerdown', function(e){
+    var w=e.target.closest&&e.target.closest('.fwin'); if(!w) return;
+    front(w);
+    var h=e.target.closest('.fw-h'); if(!h || e.target.closest('.fw-x') || innerWidth<=700) return;
+    drag={w:w, x:e.clientX-w.offsetLeft, y:e.clientY-w.offsetTop}; h.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  document.addEventListener('pointermove', function(e){
+    if(!drag) return;
+    var w=drag.w, L=e.clientX-drag.x, T=e.clientY-drag.y;
+    w.style.left=Math.max(80-w.offsetWidth, Math.min(innerWidth-80, L))+'px';
+    w.style.top=Math.max(0, Math.min(innerHeight-40, T))+'px';
+  });
+  document.addEventListener('pointerup', function(){ drag=null; });
+  document.addEventListener('pointercancel', function(){ drag=null; });
   function copyText(s){
     if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(s);
     var ta=document.createElement('textarea'); ta.value=s; ta.style.position='fixed'; ta.style.opacity='0';
@@ -11691,9 +11872,9 @@ body.fx.notoc #doc{margin-left:0}
   document.addEventListener('click',function(e){
     var t=e.target;
     var pb=t.closest&&t.closest('[data-popopen]');
-    if(pb && ov){ var src=document.getElementById('pop'+pb.getAttribute('data-popopen'));
-      inn.innerHTML = src ? src.innerHTML : '（内容がありません）'; ov.classList.add('on'); return; }
-    if(t.id==='popOv'||t.id==='popX'){ ov.classList.remove('on'); return; }
+    if(pb){ e.preventDefault(); e.stopImmediatePropagation(); openWin(pb.getAttribute('data-popopen'), pb); return; }
+    var fx=t.closest&&t.closest('.fw-x');
+    if(fx){ closeWin(fx.closest('.fwin')); return; }
     if(t.id==='tocMask'){ setTocMask(!document.body.classList.contains('tocmask')); return; }
     var tbtn = t.closest && t.closest('#tocBtn');
     if(tbtn){
@@ -11731,7 +11912,13 @@ body.fx.notoc #doc{margin-left:0}
         setTimeout(function(){cb.textContent=o;},1400); }
       return; }
   });
-  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&ov) ov.classList.remove('on'); });
+  /* Esc は、いま操作している窓（なければいちばん手前の窓）を閉じる */
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Escape') return;
+    var a=document.activeElement, w=a&&a.closest&&a.closest('.fwin');
+    if(!w){ var top=null; for(var k in wins){ if(!top || +wins[k].style.zIndex > +top.style.zIndex) top=wins[k]; } w=top; }
+    if(w){ e.preventDefault(); closeWin(w); }
+  });
   /* ページごとの書き出しで、目次から見出しへ飛ぶとき。見出しを画面の上端に合わせると
      ページの途中から表示されてしまうので、見出しのあるページの頭を画面の上に合わせる。
      見出しが画面の下のほうに隠れるときだけ、見出しが見える位置まで送る */
@@ -11801,11 +11988,9 @@ body.tocmask .nv .nvt{color:#5b6478;letter-spacing:.05em}
 + (flow
     ? '<main id="doc"><div class="page-body fx-body" style="font-size:'+S.base+'pt;max-width:'+fnum(pageBodyWmm())+'mm">'+flowBodyHTML(idx)+flowAppendixHTML()+'</div></main></div>'
       + '<button id="fxBack" type="button">↩ 戻る<small></small></button>'
-    : '<main id="doc">'+pages+appx+'</main>'
-      + '<div id="popOv"><div id="popWrap"><button id="popX" type="button">閉じる</button>'
-      + '<div id="popBox"><div id="popIn"></div></div></div></div>')
+    : '<main id="doc">'+pages+appx+'</main>')
 + '<div id="cmtRail"></div>'
-+ popData + dataBits + cmtData + js + varJs + (flow ? flowJs : '') + '</body></html>';
++ popData + dataBits + cmtData + js + plJs + varJs + (flow ? flowJs : '') + '</body></html>';
   dl(new Blob([html],{type:'text/html'}), (S.title||'scenario').replace(/[\\/:*?"<>|]/g,'_')+'.html');
   setStatus('閲覧HTMLを書き出しました（'+(flow?'区切りなしの1枚・':'')+'P.'+(a+1)+'〜'+(b+1)+'）','var(--ok)');
 }
@@ -11894,7 +12079,8 @@ const HELP = [
 改ページ・改段・表紙・奥付・目次は、ページがあってはじめて働くものなので出しません。</li>
 <li>空行で段落が分かれます。<code>|項目|内容|</code> のように <code>|</code> で区切った行が続くと、そこは<b>表</b>になります（1行目が見出しです）。</li>
 <li>ボタンの文字は、ボタンの右の小さな欄で変えられます。</li>
-<li><b>印刷とPDFでは、内容が巻末に「追記」としてまとめて出ます。</b>本文のページ数は増えません。書き出した閲覧HTMLでは、ボタンを押すと窓が開きます。</li>
+<li><b>印刷とPDFでは、内容が巻末に「追記」としてまとめて出ます。</b>本文のページ数は増えません。ボタンの位置には<b>「→ 追記「名前」」のリンク</b>が入り、追記の各節には<b>「↩ P.3 へ戻る」</b>のリンクが付くので、PDFの中で飛んで戻ってこられます（同じ窓を何か所から呼んでいれば、戻るリンクもその数だけ並びます）。</li>
+<li>書き出した閲覧HTMLでは、ボタンを押すと<b>本文の上に浮かぶ窓</b>が開きます。背景は暗くならないので、窓を開いたまま本文を読めます。上の帯をつかむと動かせ、右下の角で大きさを変えられます。いくつでも開けて、押した窓が手前に来ます。閉じるのは「×」か <code>Esc</code> です。スマホのような狭い画面では、画面の下半分に出ます。</li>
 </ul>
 <h4>字下げ</h4>
 <p>段落を選んで右の設定の<b>字下げ → 下げる</b>（<code>Ctrl</code>+<code>Alt</code>+<code>]</code>）で、左端から1段内側へ寄せます。<b>← 戻す</b>（<code>Ctrl</code>+<code>Alt</code>+<code>[</code>）で戻ります。4段まで下げられます。見出し3の下の本文を寄せると、階層が目で追いやすくなります。</p>
@@ -12068,7 +12254,7 @@ const HELP = [
 <table>
 <tr><th>罫線</th><td>横に一本線を引きます。文字を入れると、線の中ほどに小さな見出しとして入ります。</td></tr>
 <tr><th>縦線</th><td>左端に縦の線を立て、その右に文章を置きます。囲み記事や補足に。</td></tr>
-<tr><th>シーン移行</th><td>右に寄せ、本文より少し小さく、太字と下線がつきます。場面の切り替わりを示すのに使います。</td></tr>
+<tr><th>シーン移行</th><td>右に寄せ、本文より少し小さく、太字と下線がつきます。場面の切り替わりを示すのに使います。行き先の名前が見出し1・2・3と<b>ぴったり同じ</b>なら、書き出したHTMLとPDFでその見出しへのリンクになります（「書斎へ」「→ 書斎へ移行」「シーン3『書斎』へ」のように書けます）。つながったかどうかは右の設定欄の<b>つながる見出し</b>で確かめられます。</td></tr>
 <tr><th>改ページ</th><td>そこでページを区切ります。<code>Ctrl</code>+<code>Alt</code>+<code>B</code>でも入ります。改ページを入れると、次のページに書き始められるよう<b>空の描写がひとつ添えられます</b>。</td></tr>
 <tr><th>改段</th><td>2段組のページで、そこから<b>次の段へ送ります</b>。左の段を途中で切り上げて右の段へ移りたいときに使います。1段組のページでは何も起こりません。<code>Ctrl</code>+<code>Alt</code>+<code>D</code>。</td></tr>
 </table>
@@ -12259,12 +12445,12 @@ const HELP = [
  ['export','印刷と書き出し', `
 <h3>印刷と書き出し</h3>
 <ul>
-<li><b>印刷 / PDF</b>：ページだけが印刷されます。編集用の表示（左のテキスト、ボタン、閉じた区画）は出ません。</li>
+<li><b>印刷 / PDF</b>：ページだけが印刷されます。編集用の表示（左のテキスト、ボタン、閉じた区画）は出ません。新規ウィンドウは巻末の「追記」へ飛ぶリンクと戻るリンクに、シーン移行は見出しへのリンクになります（ブラウザの「PDFに保存」で、PDFの中のリンクになります）。</li>
 <li><b>HTML</b>（閲覧HTMLの出力）：目次つきの1枚のHTMLになります。追加したフォントも埋め込まれます。HTML出力の窓の<b>形式</b>で2通りから選べます。
   <ul>
-  <li><b>ページごと</b>：紙面と同じA4のページを並べます。新規ウィンドウはボタンを押すと窓が開きます。</li>
+  <li><b>ページごと</b>：紙面と同じA4のページを並べます。新規ウィンドウはボタンを押すと、本文の上に浮かぶ窓が開きます。</li>
   <li><b>区切りなしの1枚</b>：ページの区切り（改ページ・改段・ページ番号・2段組）をなくし、画面ぜんたいを1枚の紙にして、スクロールだけで読めるようにします。左の目次も紙の一部です。
-    新規ウィンドウは巻末の「追記」へのリンクになります。目次や新規ウィンドウで飛んだときは、右下の<b>↩ 戻る</b>で飛ぶ前の場所へ戻れます（続けて飛んだときは1つずつさかのぼります）。
+    新規ウィンドウはボタンを押すと浮かぶ窓で開き、巻末の「追記」にもまとめて入ります（左の目次から飛べます）。目次やシーン移行で飛んだときは、右下の<b>↩ 戻る</b>で飛ぶ前の場所へ戻れます（続けて飛んだときは1つずつさかのぼります）。
     目次ブロックに載っている見出しには<b>↑ 目次へ</b>（章の目次なら<b>↑ 章の目次へ</b>）が付き、追記の節には<b>↩ 本文へ戻る</b>が付きます。
     ページに置いた画像は、そのページの本文の始まりを基準に、ページのときと同じ位置関係で入ります。</li>
   </ul>どちらの形式でも、変数（<code>{HO1}</code> など）があれば左の目次の上に<b>登場人物（変数）</b>の欄が出ます。</li>
