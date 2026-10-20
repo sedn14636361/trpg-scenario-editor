@@ -65,6 +65,13 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 #tbar.mini #tbarShow span{writing-mode:vertical-rl;font-size:10px;letter-spacing:.15em;color:var(--muted)}
 .tic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .tic text{fill:currentColor;stroke:none;font:700 11px sans-serif}
+#saveMenu{position:fixed;z-index:70;background:#1b202b;border:1px solid #3a4252;border-radius:6px;padding:4px;
+  box-shadow:0 8px 24px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:2px;min-width:250px}
+#saveMenu button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:0;background:transparent;padding:7px 10px;border-radius:4px}
+#saveMenu button:hover:not([disabled]){background:#2c3342}
+#saveMenu button small{color:var(--muted);font-size:10px}
+#saveMenu button[disabled]{opacity:.45}
+.prjRow .gn{color:var(--brass);font-weight:700}
 #tbFly{position:fixed;z-index:60;display:none;background:#1b202b;border:1px solid #3a4252;border-radius:6px;
   box-shadow:0 8px 24px rgba(0,0,0,.55);padding:4px;min-width:200px}
 #tbFly .fh{font-size:10px;color:var(--muted);padding:3px 8px 4px;letter-spacing:.1em}
@@ -617,7 +624,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.25.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.26.0</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -633,7 +640,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
     <span id="status">&#8212;</span>
     <button id="btnPrj" title="シナリオを選ぶ・新しく作る・複製する・消す">シナリオ</button>
     <!-- 保存したファイルを開くのは、シナリオの画面の「JSONを読み込む」で行う -->
-    <button id="btnSave" title="いまの内容をファイルに保存します（Ctrl+S）">保存</button>
+    <button id="btnSave" title="ブラウザに版を残すか、ファイル（JSON）に保存するかを選びます（Ctrl+S はファイルに保存）">保存 ▾</button>
     <button id="btnPrint" title="ブラウザの印刷からPDFにできます">印刷 / PDF</button>
     <button id="btnExport" title="配布用の閲覧HTMLを出力します">HTML</button>
     <button id="btnHelp" title="使い方">ヘルプ</button>
@@ -4094,20 +4101,26 @@ async function prjRepair(){
 }
 /* ---- 過去の版 ----
    置き場にある本体をそのまま写して残す。前に残した版と同じ内容なら残さない */
-async function genSnap(id, json){
-  if(!prjKV || !id) return;
+/* name を渡すと「手動で残した版」になる（保存ボタンの「ブラウザに保存」）。
+   手動の版は、前の版と同じ内容でも名前を付けて残し、自動の版（GEN_MAX 個まで）の数には入れず、押し出されて消えない */
+async function genSnap(id, json, name){
+  if(!prjKV || !id) return false;
   if(json==null) json=await prjRead(id);
-  if(!json) return;
-  const m=(await prjAll()).find(x=>x.id===id); if(!m) return;
+  if(!json) return false;
+  const m=(await prjAll()).find(x=>x.id===id); if(!m) return false;
   const h=strHash(json);
-  if(m.genHash===h) return;
+  if(name==null && m.genHash===h) return false;
   const t=Math.max(Date.now(), ((m.gens||[]).slice(-1)[0]||{t:0}).t+1);
-  const gens=(m.gens||[]).concat([{t:t, z:json.length}]);
-  const drop=gens.slice(0, Math.max(0, gens.length-GEN_MAX));
+  const g0={t:t, z:json.length}; if(name!=null){ g0.n = String(name).slice(0,60); g0.keep = true; }
+  const all=(m.gens||[]).concat([g0]);
+  const autos=all.filter(g=>!g.keep);
+  const drop=autos.slice(0, Math.max(0, autos.length-GEN_MAX));
+  const gens=all.filter(g=>!drop.includes(g));
   await prjKV.batch([[PRJ_GEN+id+':'+t, json]].concat(drop.map(g=>[PRJ_GEN+id+':'+g.t, undefined])), a=>{
     const mm=metaOf(a,id,false);
-    if(mm){ mm.gens=gens.slice(-GEN_MAX); mm.genHash=h; mm.genAt=t; }
+    if(mm){ mm.gens=gens; mm.genHash=h; mm.genAt=t; }
   });
+  return true;
 }
 async function genRead(id,t){ return prjKV.get(PRJ_GEN+id+':'+t); }
 function prjRemember(id){ try{ localStorage.setItem(PRJ_CUR, id); }catch(e){} }
@@ -11462,7 +11475,36 @@ addEventListener('keyup', e=>{
   if(e.code==='Space'){ spaceHeld=false; cw.classList.remove('panready'); }
 });
 addEventListener('blur', ()=>{ spaceHeld=false; cw.classList.remove('panready'); });
-document.getElementById('btnSave').onclick=saveToFile;
+/* 「保存」を押すと、保存先を選ぶ小さな一覧を出す。
+   ブラウザに保存：いまの姿に名前を付けて、シナリオの「過去の版」に残す（通信はしない。このブラウザの中だけ）
+   JSONファイルに保存：これまでの保存（Ctrl+S と同じ） */
+function saveMenuClose(){ const m=document.getElementById('saveMenu'); if(m) m.remove(); }
+document.getElementById('btnSave').onclick=e=>{
+  e.stopPropagation();
+  if(document.getElementById('saveMenu')){ saveMenuClose(); return; }
+  const r = e.currentTarget.getBoundingClientRect();
+  const m = document.createElement('div'); m.id='saveMenu';
+  m.innerHTML = '<button data-sv="gen"'+(prjKV&&prjId?'':' disabled')+'><b>ブラウザに保存</b><small>いまの姿に名前を付けて「過去の版」に残します</small></button>'
+    + '<button data-sv="file"><b>JSONファイルに保存</b><small>手元にファイルとして残します（Ctrl+S）</small></button>';
+  m.style.top = (r.bottom+4)+'px'; m.style.right = Math.max(8, innerWidth - r.right)+'px';
+  document.body.appendChild(m);
+  m.addEventListener('click', ev=>{ const b=ev.target.closest('[data-sv]'); if(!b || b.disabled) return;
+    saveMenuClose(); if(b.dataset.sv==='file') saveToFile(); else saveToBrowser(); });
+};
+addEventListener('pointerdown', e=>{ if(!e.target.closest('#saveMenu,#btnSave')) saveMenuClose(); }, true);
+addEventListener('keydown', e=>{ if(e.key==='Escape' && document.getElementById('saveMenu')){ e.__escHandled = true; saveMenuClose(); } }, true);
+async function saveToBrowser(){
+  if(!prjKV || !prjId){ setStatus('このブラウザでは、シナリオの置き場が使えません。JSONファイルに保存してください','#ff9b83'); return; }
+  const d = new Date(), z = n=>String(n).padStart(2,'0');
+  const def = '手動保存 '+d.getFullYear()+'/'+z(d.getMonth()+1)+'/'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());
+  const nm = prompt('この版の名前（シナリオの「過去の版」に★として残ります）', def);
+  if(nm===null) return;
+  try{
+    await saveNow();                                  // 打ちかけの分も置き場へ書いてから写す
+    await genSnap(prjId, null, nm.trim() || def);
+    setStatus('ブラウザに「'+(nm.trim()||def)+'」として残しました（シナリオ → 過去の版 から戻せます）','var(--ok)');
+  }catch(err){ setStatus('ブラウザに保存できませんでした。JSONファイルに保存してください','#ff9b83'); }
+}
 
 /* ---- 画像の挿入と設定 ---- */
 /* いま選んでいる画像を選び直す（無ければ新しく足す）。
@@ -13174,7 +13216,7 @@ const HELP = [
 <ul>
 <li>編集内容はこのブラウザに自動保存されます。打ち終えて0.7秒、打ち続けていても3秒ごとに保存します。</li>
 <li>タブを閉じたり再読み込みしたりしても、打った字は残ります。保存しきれなかった分は控えておき、次に開いたときに戻します。</li>
-<li>ツールバーの<b>保存</b>（<code>Ctrl</code>+<code>S</code>）で、ファイルに残せます。大切な原稿はこちらでも残してください。</li>
+<li>ツールバーの<b>保存 ▾</b>を押すと、保存先を選べます。<b>ブラウザに保存</b>は、いまの姿に名前を付けてシナリオの「過去の版」に★として残します（自動の版に押し出されて消えません。通信はせず、このブラウザの中だけです）。<b>JSONファイルに保存</b>（<code>Ctrl</code>+<code>S</code>）は、ファイルに残します。大切な原稿はファイルでも残してください。</li>
 <li>Chrome・Edge では、はじめの<b>保存</b>でファイルの置き場所を選ぶと、以後は自動保存のたびにそのファイルにも書きます。ブラウザのデータが消えても、そのファイルを<b>シナリオ</b>の画面の<b>JSONを読み込む</b>で戻せます。書く許可が切れたときは、上に帯が出るので<b>再開する</b>を押してください。</li>
 <li>保存に失敗すると、上に赤い帯が出て、直るまで消えません。</li>
 <li>ファイルに保存していない変更があると、ステータスに「未保存の変更あり」と出ます。</li>
@@ -14089,9 +14131,9 @@ async function prjDlgPaint(){
     const m=(await prjAll()).find(x=>x.id===prjGenOf);
     const gens=((m&&m.gens)||[]).slice().reverse();
     if(!gens.some(g=>String(g.t)===String(prjPick))) prjPick = gens.length ? String(gens[0].t) : null;
-    note.textContent='シナリオ「'+((m&&m.title)||'無題のシナリオ')+'」の過去の版です。戻すと新しいシナリオになり、いまのシナリオはそのまま残ります。';
+    note.textContent='シナリオ「'+((m&&m.title)||'無題のシナリオ')+'」の過去の版です。★は「保存」で名前を付けて残した版で、自動の版に押し出されて消えることはありません。戻すと新しいシナリオになり、いまのシナリオはそのまま残ります。';
     box.innerHTML = gens.map(g=>prjRowHTML(String(g.t), String(g.t)===String(prjPick),
-      '<span class="t">'+prjWhen(g.t)+'</span><span class="z">'+prjSize(g.z)+'</span>')).join('');
+      '<span class="t">'+prjWhen(g.t)+(g.n?'　<b class="gn">★ '+esc(g.n)+'</b>':'')+'</span><span class="z">'+prjSize(g.z)+'</span>')).join('');
   } else if(prjView==='trash'){
     const list=(await prjTrash()).sort((x,y)=>y.del-x.del);
     if(!list.some(x=>x.id===prjPick)) prjPick=(list[0]||{}).id||null;
