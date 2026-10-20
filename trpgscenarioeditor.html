@@ -605,7 +605,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.17.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.18.0</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -7399,6 +7399,126 @@ function keepCaret(){
   r.selectNodeContents(box); r.setEnd(s0.anchorNode, s0.anchorOffset);
   return r.toString().length;
 }
+/* ================= ↑↓で段落を越えて動く =================
+   原稿欄は段落ごとに別々の入力欄なので、そのままでは↑↓が段落の中で止まる。
+   いちばん上の行で↑、いちばん下の行で↓を押したら、前・次の段落へ移る。
+   移った先では、いまの横の位置にいちばん近い文字へカーソルを置く（caretPositionFromPoint）。
+   画像・表・NPCシートなど文字を打てない段落は、選んだ状態にして通る。
+   並びは原稿欄に並んでいる順（新規ウィンドウの中身や表の升目の中も、そのまま順に通る） */
+/* 1つの位置（範囲）の、画面での四角。
+   欄の中の「要素の位置」（段落の末尾に置いたときなど）は四角が取れないので、
+   文字の位置に置き直してから測る。それでも取れなければ、直前の1文字の右端で測る */
+function navRect(r, el){
+  let rs = r.getClientRects();
+  if(rs.length) return rs[rs.length-1];
+  const pre = document.createRange(); pre.selectNodeContents(el); pre.setEnd(r.startContainer, r.startOffset);
+  const n = pre.toString().length, t = document.createRange();
+  if(putCaret(el, t, n)){
+    rs = t.getClientRects(); if(rs.length) return rs[rs.length-1];
+    if(n>0 && t.startOffset>0){
+      t.setStart(t.startContainer, t.startOffset-1);
+      const c = t.getClientRects(); if(c.length){ const q = c[c.length-1]; return {left:q.right, right:q.right, top:q.top, bottom:q.bottom}; }
+    }
+  }
+  return el.getBoundingClientRect();
+}
+function navLineH(el){
+  const lh = parseFloat(getComputedStyle(el).lineHeight);
+  return lh>0 ? lh : (parseFloat(getComputedStyle(el).fontSize)||13)*1.6;
+}
+/* カーソルが、その欄のいちばん上（up）か、いちばん下（!up）の行にいるか */
+function navAtEdge(el, up){
+  const s = getSelection(); if(!s.rangeCount) return false;
+  const r = s.getRangeAt(0); if(!r.collapsed) return false;
+  if(!String(el.innerText||'').replace(/\n$/,'')) return true;        // 空の段落はどちらの端でもある
+  const cr = navRect(r, el), lh = navLineH(el);
+  const edge = document.createRange(); edge.selectNodeContents(el); edge.collapse(up);
+  const er = navRect(edge, el);
+  return up ? (cr.top - er.top < lh*0.5) : (er.bottom - cr.bottom < lh*0.5);
+}
+/* 原稿欄の並び（段落の行と、表の名前の欄）。いま見ている欄の中だけで数える */
+function navRows(from){
+  const box = (from && from.closest('#popSrc')) || srcList;
+  return [...box.querySelectorAll('.srctext[data-id]')].filter(x=>x.offsetParent);
+}
+/* 横の位置 x にいちばん近い文字へカーソルを置く。up なら最後の行、そうでなければ最初の行 */
+function navPlace(el, x, up){
+  el.scrollIntoView({block:'nearest'});
+  el.focus();
+  const b = el.getBoundingClientRect(), lh = navLineH(el);
+  const y = up ? b.bottom - lh*0.5 : b.top + lh*0.5;
+  let r = null;
+  if(x!=null){
+    const cx = Math.max(b.left+1, Math.min(b.right-1, x));
+    if(document.caretPositionFromPoint){
+      const p = document.caretPositionFromPoint(cx, y);
+      if(p && el.contains(p.offsetNode)){ r = document.createRange(); r.setStart(p.offsetNode, p.offset); }
+    } else if(document.caretRangeFromPoint){
+      const q = document.caretRangeFromPoint(cx, y);
+      if(q && el.contains(q.startContainer)) r = q;
+    }
+  }
+  if(!r){ r = document.createRange();
+    if(!putCaret(el, r, up ? String(el.textContent||'').length : 0)){ r.selectNodeContents(el); r.collapse(!up); } }
+  r.collapse(true);
+  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+/* from（原稿欄の欄）から d（-1 上・+1 下）へ1つ進む。x はいまの横の位置 */
+function navMove(from, d, x){
+  const rows = navRows(from), i = rows.indexOf(from);
+  const to = rows[i + d]; if(i<0 || !to) return false;
+  if(to.isContentEditable){ navPlace(to, x, d<0); return true; }
+  /* 文字を打てない段落は、選んだ状態にする。そこからもう一度↑↓で先へ進める */
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  const id = to.dataset.id;
+  editingId = null; sel.clear(); sel.add(id); lastPick = id;
+  paintSel(); syncBlockPanel(); jumpPreview(id);
+  to.scrollIntoView({block:'nearest'});
+  return true;
+}
+srcOn('keydown', e=>{
+  if(e.key!=='ArrowUp' && e.key!=='ArrowDown') return;
+  if(e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || imeBusy(e)) return;
+  const t = e.target.closest('.srctext[contenteditable=true]'); if(!t) return;
+  const up = e.key==='ArrowUp';
+  if(!navAtEdge(t, up)) return;                      // 段落の途中の行では、ふつうに段落の中を動く
+  const s = getSelection();
+  const x = s.rangeCount ? navRect(s.getRangeAt(0), t).left : null;
+  if(navMove(t, up ? -1 : 1, x)){ e.preventDefault(); e.__navDone = true; }   // 下の「選んでいるだけ」の受け口で、もう一度進まないように
+});
+/* 段落を選んでいるだけ（文字を打っていない）ときの↑↓と Enter。
+   ↑↓は前・次の段落へ、Enter は
+     ・画像や表など文字を打てない段落なら、すぐ下に空の描写を足してそこで書き始める
+     ・文字の段落なら、その末尾にカーソルを入れる */
+function navIdle(e){
+  if(e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || imeBusy(e)) return false;
+  if(sel.size!==1 || editingId || slashMenu || flowId) return false;
+  const a = document.activeElement;
+  if(a && a!==document.body && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(a.tagName)
+     || (a.closest && a.closest('#pagesPane,#tocPane')))) return false;
+  if(document.querySelector('#prjDlg[style*="flex"],#helpDlg[style*="flex"],#npcDlg[style*="flex"],#ccfDlg[style*="flex"],#tblDlg[style*="flex"],#ccfInDlg[style*="flex"],#ytDlg[style*="flex"],#flowDlg[style*="flex"],#prevDlg[style*="flex"],#outDlg[style*="flex"],#fontDlg[style*="flex"]')) return false;
+  return true;
+}
+addEventListener('keydown', e=>{
+  if(e.key!=='ArrowUp' && e.key!=='ArrowDown' && e.key!=='Enter') return;
+  if(e.__navDone || !navIdle(e)) return;
+  const id = [...sel][0], f = findBlock(id); if(!f) return;
+  const row = srcQ('.srctext[data-id="'+id+'"]:not([data-tsrc])');
+  if(e.key==='Enter'){
+    e.preventDefault();
+    if(!SRC_NOEDIT.includes(f.b.type)){ if(row && row.isContentEditable) focusSrc(id, true); return; }
+    /* すぐ下が空の描写なら、増やさずにそこへ入る（改ページのうしろに添えた空の段落など） */
+    const nx = f.list[f.i+1];
+    let nid;
+    if(nx && nx.type==='desc' && !String(nx.text||'').trim()) nid = nx.id;
+    else { const nb = newBlock('desc',''); nb.cols = 2; f.list.splice(f.i+1, 0, nb); nid = nb.id; }
+    editingId = nid; sel.clear(); sel.add(nid); lastPick = nid;
+    render(); focusSrc(nid, false); save();
+    return;
+  }
+  if(!row) return;
+  if(navMove(row, e.key==='ArrowUp' ? -1 : 1, null)) e.preventDefault();
+});
 srcOn('keydown', e=>{
   if(imeBusy(e)) return;
   const t = e.target.closest('.srctext[contenteditable=true]'); if(!t) return;
@@ -9718,6 +9838,8 @@ function addToCell(spot, k, root){
 }
 /* 段落の文字を紙面に使わない書式。選んだ段落をこれに作り変えると、書いてあった文字が紙面から消える */
 const NO_TEXT_TYPES = ['hr','vr','break','colbr','toc','image','flow','table','npc','popup'];
+/* 左の原稿欄で文字を打てない段落（選ぶだけの行）。↑↓で通るときは選んだ状態にし、Enter で下に段落を足す */
+const SRC_NOEDIT = ['npc','toc','break','colbr','table','popup','image'];
 /* そのうち、自分の内容（設定）を持つもの。足したあとはその段落を選んだままにして、右に設定を出す */
 const OWN_BODY_TYPES = ['toc','image','flow','table','npc','popup'];
 function hasOwnText(b){ return !NO_TEXT_TYPES.includes(b.type) && !!String(b.text||'').trim(); }
@@ -9733,8 +9855,13 @@ function setType(k){
   if(NO_TEXT_TYPES.includes(k) && [...sel].some(id=>{ const f=findBlock(id); return f && hasOwnText(f.b); })){
     insertTypedAfter(k); return;
   }
-  if(k==='image' && [...sel].every(id=>{const f=findBlock(id);return f&&f.b.type==='image';})){
-    pickImageFile(); return;
+  /* 画像・表・NPCシートなど、文字を打てない段落を選んでいるときは、それを作り変えずに
+     すぐ下へ新しい段落を足す（押した拍子に画像や表が消えないように）。
+     画像の選び直しは、右の設定欄の「画像を選び直す」でおこなう */
+  if([...sel].every(id=>{ const f=findBlock(id); return f && SRC_NOEDIT.includes(f.b.type); })){
+    const nb = insertTypedAfter(k);
+    if(nb && !SRC_NOEDIT.includes(k) && k!=='hr') focusSrc(nb.id, true);
+    return;
   }
   sel.forEach(id=>{const f=findBlock(id); if(!f) return;
     f.b.type=k;
@@ -9777,6 +9904,8 @@ function insertTypedAfter(k){
   if(k==='npc'){ nb.cols=1; ensureNpc(nb); }
   if(k==='table') ensureTable(nb);
   if(k==='popup') ensurePopup(nb);
+  if(k==='proc') applyBxTpl(nb,'skill');
+  if(k==='handout') ensureHo(nb);
   if(k==='break'||k==='toc'||k==='flow'||k==='image') nb.cols=1;
   if(k==='colbr') nb.cols=2;                       // 段の流れの中に置かないと段を送れない
   const L = a.list, i = L.indexOf(a.b), add = [nb];
@@ -9792,6 +9921,7 @@ function insertTypedAfter(k){
   editingId=null; render(); save();
   if(k==='image'){ imgReplaceId=nb.id; document.getElementById('imgFile').click(); }
   setStatus(TYPE_NAME(k)+'を下に足しました（選んでいた段落はそのままです）','var(--ok)');
+  return nb;
 }
 /* 何も選んでいないときは、いちばん後ろに新しい段落として足す */
 function addTyped(k){
@@ -12539,6 +12669,8 @@ const HELP = [
 <tr><th><code>Shift</code>+<code>Enter</code></th><td><b>段落の中で改行します。</b>段落は分かれません。</td></tr>
 <tr><th><code>Backspace</code></th><td>段落の先頭で押すと、前の段落と繋がります。</td></tr>
 <tr><th><code>Esc</code></th><td>1回押すと文字の編集をやめてその段落を選んだ状態に、もう1回押すと<b>選択も外れます</b>。ウィンドウを閉じるときにも使えます。</td></tr>
+<tr><th><code>↑</code> / <code>↓</code></th><td>左の原稿欄で、段落の<b>いちばん上の行で↑</b>・<b>いちばん下の行で↓</b>を押すと、前・次の段落へ移ります（横の位置はできるだけそのまま）。画像・表・NPCシートなど文字を打てない段落は<b>選んだ状態</b>にして通り、もう一度押すとさらに先へ進みます。段落を選んでいるだけのときも、↑↓で前・次の段落へ移れます。</td></tr>
+<tr><th><code>Enter</code>（段落を選んでいるとき）</th><td>画像・表など文字を打てない段落なら、<b>すぐ下に空の描写を足して</b>そこで書き始めます。文字の段落なら、その末尾にカーソルが入ります。</td></tr>
 <tr><th><code>Ctrl</code>+<code>S</code></th><td>ファイルに保存します。</td></tr>
 <tr><th><code>Ctrl</code>+<code>Z</code></th><td>元に戻します。文字の入力だけでなく、削除・書式変更・並べ替え・ページ設定も戻せます。</td></tr>
 <tr><th><code>Ctrl</code>+<code>Y</code></th><td>やり直します（<code>Ctrl</code>+<code>Shift</code>+<code>Z</code>も同じ）。</td></tr>
@@ -12601,7 +12733,7 @@ const HELP = [
 <li>出力したHTMLでは、左の目次の上に<b>登場人物（変数）</b>の欄が出ます。入れた値はそのブラウザに覚えさせるので、開き直しても残ります。値を入れるまでは既定値（なければ名前）を淡く出します。コピーで写す文にも、入れた値が入ります。</li>
 <li>編集画面の紙面は、出力したHTMLを開いた直後と同じく<b>既定値（なければ名前）</b>で表示します（<code>{HO1}</code> は「HO1」）。変数を含む段落は紙面の上では直接書き換えられないので、左の原稿で直してください（左の原稿には <code>{HO1}</code> のまま出ます）。</li>
 </ul>
-<p>ただし、<b>罫線・縦線・改ページ・改段・目次・画像・フローチャート・表・NPCシート・新規ウィンドウ</b>は段落の文字を使わないので、<b>文字の書いてある段落</b>を選んでいるときは、その段落を変えずに<b>すぐ下へ新しく足します</b>（書いた文字が消えないように）。選んでいる段落が空っぽなら、その段落が変わります。罫線・縦線・改ページ・改段なら、足したあとも打っていた段落のまま書き続けられます。同じことが <code>Ctrl</code>+<code>Alt</code>+各キーでもできます。</p>
+<p>ただし、<b>罫線・縦線・改ページ・改段・目次・画像・フローチャート・表・NPCシート・新規ウィンドウ</b>は段落の文字を使わないので、<b>文字の書いてある段落</b>を選んでいるときは、その段落を変えずに<b>すぐ下へ新しく足します</b>（書いた文字が消えないように）。選んでいる段落が空っぽなら、その段落が変わります。<br><b>画像・表・NPCシート・目次・改ページ・改段・新規ウィンドウ</b>など文字を打てない段落を選んでいるときは、どの書式を選んでも、それを作り変えずに<b>すぐ下へ新しい段落を足します</b>（画像の選び直しは右の設定欄の「画像を選び直す」で）。罫線・縦線・改ページ・改段なら、足したあとも打っていた段落のまま書き続けられます。同じことが <code>Ctrl</code>+<code>Alt</code>+各キーでもできます。</p>
 <p>左の一覧では書式名が行の左に出ます（この文字はコピーには含まれません）。</p>
 <h4>表紙ページと奥付</h4>
 <p>書式ツールバーの<b>装丁ブロック</b>から<b>表紙</b>・<b>奥付</b>を選びます。独立したページにしたいときは、前後に<b>改ページ</b>（区切りブロック）を入れてください。</p>
