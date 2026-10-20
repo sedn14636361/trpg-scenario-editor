@@ -166,6 +166,11 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
   border-radius:3px}
 .st-cell{color:#d8cfa8}
 .st-cellname{color:#c8b6ff;font-style:italic}
+/* 特殊ブロックの見出しの欄。本文の上に、小さく太く置く */
+.srcstack{flex:1;min-width:0;display:flex;flex-direction:column}
+.srcstack .srctext{flex:0 0 auto}
+.srctext.st-lb{font-size:.82em;font-weight:700;letter-spacing:.12em;color:#e3a07f;min-height:1.4em}
+.srctext.st-lb:empty::before{content:attr(data-ph);color:var(--muted);font-weight:400;letter-spacing:0}
 /* 升目の段落は「表の内容」の金の縦線の内側に、処理の中や新規ウィンドウの中と同じ深さで並べる */
 .srcpop.srccellblk{margin:0 0 3px 0;border-left:0;padding-left:0}
 /* 升目の呼び名。その下にその升目の段落が並ぶ（新規ウィンドウの「〜の内容」と同じ見た目） */
@@ -612,7 +617,7 @@ table.tbl td button.pop-btn,.tl-body button.pop-btn,.cd-v button.pop-btn{padding
 <div id="app">
   <div id="top" class="app-chrome">
     <span class="brand">シナリオ組版台</span>
-    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.24.0</span>
+    <span id="buildStamp" title="いま動いている版の印。不具合の連絡のときは、この文字も教えてください">v3.24.1</span>
     <span class="seggrp">
       <button id="btnUndo" title="元に戻す（Ctrl+Z）" disabled>&#8630;</button>
       <button id="btnRedo" title="やり直す（Ctrl+Y）" disabled>&#8631;</button>
@@ -6983,7 +6988,11 @@ function srcCellRowHTML(id, key, label, val, ph, cls){
    段落の text ではなく表の内容へ書き戻すために、ここを通す */
 function tsrcOf(el){
   if(!el || !el.dataset || el.dataset.tsrc==null) return null;
-  const f = findBlock(el.dataset.id); if(!f || f.b.type!=='table') return null;
+  const f = findBlock(el.dataset.id); if(!f) return null;
+  /* 特殊ブロックの見出し（会話なら話し手）。段落の本文ではなく見出しへ書き戻す */
+  if(el.dataset.tsrc==='lb' && f.b.type==='proc')
+    return {b:f.b, name:true, lb:true, get:()=>blockLabel(f.b), set:v=>{ f.b.lb = String(v==null?'':v); }};
+  if(f.b.type!=='table') return null;
   const t = ensureTable(f.b), k = el.dataset.tsrc;
   /* 升目の内容は段落の並びになったので、ここで扱うのは表の名前だけ */
   if(k!=='name') return null;
@@ -7018,6 +7027,10 @@ function srcRowHTML(b){
         + '<span>'+esc(String(b.cap||'').trim()||'（説明なし）')+'</span></div>';
     else inner = '<div class="srctext st-'+b.type+'" data-id="'+b.id+'" data-ph="'+ph+'"'
         + (editable?' contenteditable="true" spellcheck="false"':'') + '>'+esc(b.text)+'</div>';
+    /* 特殊ブロックは、本文の上に見出しの欄を置いて、原稿欄でそのまま打てるようにする */
+    if(b.type==='proc')
+      inner = '<div class="srcstack"><div class="srctext st-lb" data-id="'+b.id+'" data-tsrc="lb" contenteditable="true" spellcheck="false"'
+            + ' data-ph="'+(procName(b)==='会話'?'（話し手なし）':'（見出しなし）')+'">'+esc(blockLabel(b))+'</div>'+inner+'</div>';
     return '<div class="src'+(sel.has(b.id)?' pick':'')+(editingId===b.id?' editing':'')
       + (b.ind?' i'+Math.min(4,b.ind):'')+'" data-id="'+b.id+'" data-type="'+b.type+'">'
       + '<div class="srchandle" title="クリックで選択／ドラッグで移動">&#10303;</div>'
@@ -7227,6 +7240,8 @@ srcOn('input', e=>{
     const v = t.innerText.replace(/\n+$/,'');
     ts.set(v);
     mirrorSrcText(t.dataset.id, v, t.dataset.tsrc, t);
+    /* 特殊ブロックの見出しなら、右の設定欄の「見出し」も追いつかせる */
+    if(ts.lb){ const pi = document.querySelector('#propBody [data-p="lb"]'); if(pi && pi!==document.activeElement) pi.value = v; }
     repaginateSoon(); save(); return;
   }
   const f = findBlock(t.dataset.id); if(!f) return;
@@ -7612,7 +7627,7 @@ function caretOffset(el){
   return pre.toString().length;
 }
 function focusSrc(id, atEnd, caretAt){
-  const el = srcQ('.srctext[data-id="'+id+'"]'); if(!el) return;
+  const el = srcQ('.srctext[data-id="'+id+'"]:not([data-tsrc])'); if(!el) return;
   el.focus();
   const r=document.createRange();
   if(caretAt!=null && putCaret(el, r, caretAt)){ /* もとの位置に戻す */ }
@@ -7871,7 +7886,11 @@ srcOn('keydown', e=>{
   const ts = tsrcOf(t);
   if(ts){
     if(e.key==='Escape'){ e.preventDefault(); e.__escHandled = true; clearAllSel(); return; }
-    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); t.blur(); }
+    if(e.key==='Enter' && !e.shiftKey){
+      e.preventDefault();
+      if(ts.lb){ render(); focusSrc(ts.b.id, false); }   // 見出しを打ち終えたら、本文の頭へ
+      else t.blur();
+    }
     return;
   }
   const f = findBlock(t.dataset.id); if(!f) return;
@@ -7953,7 +7972,7 @@ srcOn('keydown', e=>{
     f.list.splice(f.i,1);
     editingId = prev.id; sel.clear(); sel.add(prev.id);
     render();
-    const pel = srcQ('.srctext[data-id="'+prev.id+'"]');
+    const pel = srcQ('.srctext[data-id="'+prev.id+'"]:not([data-tsrc])');
     if(pel){ pel.focus(); try{
       const r=document.createRange(), tn=pel.firstChild||pel;
       r.setStart(tn, Math.min(cut, tn.length!=null?tn.length:0)); r.collapse(true);
@@ -8542,10 +8561,15 @@ srcOn('dblclick', e=>{
   render(); focusSrc(f.b.id,true);
 });
 /* 右のページ側をクリックしたら、そのブロックを選んで左の該当箇所へ移動する */
+/* 押したところの、いちばん内側の段落の印。
+   段落の中の段落や升目の段落は、印（data-id）が外枠（.blkpad）のほうにしか付いていないので、両方から探す */
+function blkIdAt(el){
+  const b = el && el.closest ? el.closest('.blk[data-id],.blkpad[data-id]') : null;
+  return b ? b.dataset.id : null;
+}
 stage.addEventListener('click', e=>{
   if(e.target.closest(NPC_UI_SEL)) return;
-  const blk = e.target.closest('.blk'); if(!blk) return;
-  const id = blk.dataset.id;
+  const id = blkIdAt(e.target); if(!id || !findBlock(id)) return;
   if(e.shiftKey && lastPick){ sel.clear(); idsBetween(lastPick,id).forEach(x=>sel.add(x)); }
   else if(e.metaKey||e.ctrlKey){ sel.has(id)?sel.delete(id):sel.add(id); lastPick=id; }
   else { sel.clear(); sel.add(id); lastPick=id; }
@@ -9931,16 +9955,14 @@ npcOn('keydown', e=>{
 /* 表を広い窓で書く */
 npcOn('click', e=>{
   const btn=e.target.closest('[data-tbig]'); if(!btn) return;
-  const el=e.target.closest('.blk'); if(!el) return;
-  const f=findBlock(el.dataset.id); if(!f || f.b.type!=='table') return;
+  const f=findBlock(blkIdAt(btn)); if(!f || f.b.type!=='table') return;
   e.preventDefault();
   openTblModal(f.b.id);
 });
 /* プレビュー。操作の欄をぜんぶ外した、書き出したときと同じ姿を出す */
 npcOn('click', e=>{
   const btn=e.target.closest('[data-tprev]'); if(!btn) return;
-  const el=e.target.closest('.blk'); if(!el) return;
-  const f=findBlock(el.dataset.id); if(!f) return;
+  const f=findBlock(blkIdAt(btn)); if(!f) return;
   e.preventDefault();
   openBlockPreview(f.b);
 });
@@ -10629,7 +10651,7 @@ function propBlk(){ const f = propId ? findBlock(propId) : null; return f ? f.b 
       soft(); return;
     }
     const k=el.dataset.p, v=el.value;
-    if(k==='lb'){ b.lb=v; soft(); return; }
+    if(k==='lb'){ b.lb=v; if(b.type==='proc') mirrorSrcText(b.id, v, 'lb'); soft(); return; }   // 原稿欄の見出しの欄にも
     if(t){
       if(k==='tname'){ t.name=v; soft(); return; }
       if(k==='dice'){ t.dice=v; soft(); return; }
@@ -13261,6 +13283,7 @@ const HELP = [
 <h4>特殊ブロック</h4>
 <p><b>特殊ブロック</b>（前の名前は「処理」）は、「技能判定」「特殊ルール」「会話」「注釈」を1つにまとめた書式です。内容の書き方は同じで、<b>見た目だけを設定欄で選びます</b>。テンプレを押せばその見た目になり、そのうえで枠線の形（実線・破線・なし）、左の罫（なし・細い・太い）、字の大きさ（ふつう・小さめ・もっと小さく）、地色、文字にも色をつけるか、色（朱・墨・紺・藍・苔・金茶・灰）を個別に変えられます。</p>
 <ul>
+<li>見出し（会話なら話し手）は、左の原稿欄の本文の上の欄でも打てます。Enter で本文の頭へ移ります。</li>
 <li><b>会話</b>のテンプレは、枠も罫も地色もない紺の文字です。<b>見出しの欄が話し手</b>になります。<b>注釈</b>のテンプレは、細い罫と地色のある、小さな灰色の文字です。</li>
 <li>書式ツールバーの「会話」「注釈」（<code>Ctrl</code>+<code>Shift</code>+<code>4</code> / <code>5</code>）を押すと、そのテンプレの特殊ブロックができます。原稿欄の左の札には、見た目がテンプレのままなら「会話」「注釈」と出ます。</li>
 <li>枠を「なし」にしても、地色か左の罫があるときは、文字との間に左右の余白（2.5mm、左の罫のあとは 3.5mm）をとります。枠も罫も地色もないときは、会話と同じく余白も上下の間隔もふつうの段落と同じです。</li>
